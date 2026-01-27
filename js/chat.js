@@ -864,6 +864,230 @@ function handleClearChatHistory() {
     }
 }
 
+function handleExportCharacterData() {
+    if (!window.iphoneSimState.currentChatContactId) return;
+    const contactId = window.iphoneSimState.currentChatContactId;
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    const data = {
+        version: 1,
+        type: 'character_data',
+        contact: contact,
+        chatHistory: window.iphoneSimState.chatHistory[contactId] || [],
+        moments: window.iphoneSimState.moments.filter(m => m.contactId === contactId),
+        memories: window.iphoneSimState.memories.filter(m => m.contactId === contactId),
+        meetings: window.iphoneSimState.meetings ? window.iphoneSimState.meetings[contactId] || [] : [],
+        phoneLayout: window.iphoneSimState.phoneLayouts ? window.iphoneSimState.phoneLayouts[contactId] : null,
+        phoneContent: window.iphoneSimState.phoneContent ? window.iphoneSimState.phoneContent[contactId] : null,
+        itinerary: window.iphoneSimState.itineraries ? window.iphoneSimState.itineraries[contactId] : null,
+        exportTime: Date.now()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `character_${contact.name}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function handleImportCharacterData(e) {
+    if (!window.iphoneSimState.currentChatContactId) return;
+    const currentContactId = window.iphoneSimState.currentChatContactId;
+    
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!confirm('这将覆盖当前角色的所有数据（包括设定、聊天记录、朋友圈等），确定要继续吗？')) {
+        e.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+            if (!data.contact) {
+                alert('无效的角色数据文件');
+                return;
+            }
+
+            const currentContact = window.iphoneSimState.contacts.find(c => c.id === currentContactId);
+            if (currentContact) {
+                Object.assign(currentContact, data.contact);
+                currentContact.id = currentContactId; 
+            }
+
+            if (data.chatHistory) {
+                window.iphoneSimState.chatHistory[currentContactId] = data.chatHistory;
+            }
+
+            window.iphoneSimState.moments = window.iphoneSimState.moments.filter(m => m.contactId !== currentContactId);
+            if (data.moments) {
+                data.moments.forEach(m => {
+                    m.contactId = currentContactId;
+                    window.iphoneSimState.moments.push(m);
+                });
+            }
+
+            window.iphoneSimState.memories = window.iphoneSimState.memories.filter(m => m.contactId !== currentContactId);
+            if (data.memories) {
+                data.memories.forEach(m => {
+                    m.contactId = currentContactId;
+                    window.iphoneSimState.memories.push(m);
+                });
+            }
+
+            if (!window.iphoneSimState.meetings) window.iphoneSimState.meetings = {};
+            if (data.meetings) {
+                window.iphoneSimState.meetings[currentContactId] = data.meetings;
+            }
+
+            if (data.phoneLayout) {
+                if (!window.iphoneSimState.phoneLayouts) window.iphoneSimState.phoneLayouts = {};
+                window.iphoneSimState.phoneLayouts[currentContactId] = data.phoneLayout;
+            }
+
+            if (data.phoneContent) {
+                if (!window.iphoneSimState.phoneContent) window.iphoneSimState.phoneContent = {};
+                window.iphoneSimState.phoneContent[currentContactId] = data.phoneContent;
+            }
+
+            if (data.itinerary) {
+                if (!window.iphoneSimState.itineraries) window.iphoneSimState.itineraries = {};
+                window.iphoneSimState.itineraries[currentContactId] = data.itinerary;
+            }
+
+            saveConfig();
+            alert('角色数据导入成功！');
+            
+            openChatSettings(); 
+            renderChatHistory(currentContactId);
+            if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
+
+        } catch (err) {
+            console.error('Import failed', err);
+            alert('导入失败：文件格式错误');
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+
+function handleExportCharacterData() {
+    if (!window.iphoneSimState.currentChatContactId) return;
+    const contactId = window.iphoneSimState.currentChatContactId;
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    const data = {
+        version: 1,
+        type: 'character_data',
+        contact: contact,
+        chatHistory: window.iphoneSimState.chatHistory[contactId] || [],
+        moments: window.iphoneSimState.moments.filter(m => m.contactId === contactId),
+        memories: window.iphoneSimState.memories.filter(m => m.contactId === contactId),
+        meetings: window.iphoneSimState.meetings ? window.iphoneSimState.meetings[contactId] || [] : [],
+        phoneLayout: window.iphoneSimState.phoneLayouts ? window.iphoneSimState.phoneLayouts[contactId] : null,
+        phoneContent: window.iphoneSimState.phoneContent ? window.iphoneSimState.phoneContent[contactId] : null,
+        itinerary: window.iphoneSimState.itineraries ? window.iphoneSimState.itineraries[contactId] : null,
+        exportTime: Date.now()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `character_${contact.name}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function handleImportCharacterData(e) {
+    if (!window.iphoneSimState.currentChatContactId) return;
+    const currentContactId = window.iphoneSimState.currentChatContactId;
+    
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!confirm('这将覆盖当前角色的所有数据（包括设定、聊天记录、朋友圈等），确定要继续吗？')) {
+        e.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const data = JSON.parse(event.target.result);
+            if (!data.contact) {
+                alert('无效的角色数据文件');
+                return;
+            }
+
+            const currentContact = window.iphoneSimState.contacts.find(c => c.id === currentContactId);
+            if (currentContact) {
+                Object.assign(currentContact, data.contact);
+                currentContact.id = currentContactId; 
+            }
+
+            if (data.chatHistory) {
+                window.iphoneSimState.chatHistory[currentContactId] = data.chatHistory;
+            }
+
+            window.iphoneSimState.moments = window.iphoneSimState.moments.filter(m => m.contactId !== currentContactId);
+            if (data.moments) {
+                data.moments.forEach(m => {
+                    m.contactId = currentContactId;
+                    window.iphoneSimState.moments.push(m);
+                });
+            }
+
+            window.iphoneSimState.memories = window.iphoneSimState.memories.filter(m => m.contactId !== currentContactId);
+            if (data.memories) {
+                data.memories.forEach(m => {
+                    m.contactId = currentContactId;
+                    window.iphoneSimState.memories.push(m);
+                });
+            }
+
+            if (!window.iphoneSimState.meetings) window.iphoneSimState.meetings = {};
+            if (data.meetings) {
+                window.iphoneSimState.meetings[currentContactId] = data.meetings;
+            }
+
+            if (data.phoneLayout) {
+                if (!window.iphoneSimState.phoneLayouts) window.iphoneSimState.phoneLayouts = {};
+                window.iphoneSimState.phoneLayouts[currentContactId] = data.phoneLayout;
+            }
+
+            if (data.phoneContent) {
+                if (!window.iphoneSimState.phoneContent) window.iphoneSimState.phoneContent = {};
+                window.iphoneSimState.phoneContent[currentContactId] = data.phoneContent;
+            }
+
+            if (data.itinerary) {
+                if (!window.iphoneSimState.itineraries) window.iphoneSimState.itineraries = {};
+                window.iphoneSimState.itineraries[currentContactId] = data.itinerary;
+            }
+
+            saveConfig();
+            alert('角色数据导入成功！');
+            
+            openChatSettings(); 
+            renderChatHistory(currentContactId);
+            if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
+
+        } catch (err) {
+            console.error('Import failed', err);
+            alert('导入失败：文件格式错误');
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+}
+
 function handleSaveChatSettings() {
     if (!window.iphoneSimState.currentChatContactId) return;
     const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
@@ -5782,7 +6006,8 @@ function handleSaveEditedChatMessage() {
 
 // 初始化监听器
 function setupChatListeners() {
-    const wechatTabs = document.querySelectorAll('.wechat-tab-item');
+    // 仅选择主微信应用的底栏 Tab
+    const wechatTabs = document.querySelectorAll('#wechat-app .wechat-tab-item');
     
     wechatTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -6036,6 +6261,12 @@ function setupChatListeners() {
 
     const clearChatHistoryBtn = document.getElementById('clear-chat-history-btn');
     if (clearChatHistoryBtn) clearChatHistoryBtn.addEventListener('click', handleClearChatHistory);
+
+    const exportCharBtn = document.getElementById('export-character-btn');
+    if (exportCharBtn) exportCharBtn.addEventListener('click', handleExportCharacterData);
+
+    const importCharInput = document.getElementById('import-character-input');
+    if (importCharInput) importCharInput.addEventListener('change', handleImportCharacterData);
 
     const chatInput = document.getElementById('chat-input');
     const triggerAiReplyBtn = document.getElementById('trigger-ai-reply-btn');

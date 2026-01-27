@@ -4705,6 +4705,18 @@ html body .chat-message.user .voice-icon-box i { transform: rotate(-90deg); }
     color: #ffffff !important; /* 播放时变绿 */
 }
 
+/* Generating Pulse Animation */
+@keyframes generating-fade {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+.generating-pulse {
+    animation: generating-fade 1.5s infinite ease-in-out;
+    pointer-events: none; /* Prevent clicks while generating */
+}
+
 /* Voice Call Float Styles */
 .voice-call-float {
     position: absolute;

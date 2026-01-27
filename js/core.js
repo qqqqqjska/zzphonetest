@@ -131,6 +131,18 @@ const knownApps = {
     'message-app': { name: '信息', icon: 'fas fa-envelope', color: '#007AFF' }
 };
 
+// 获取查手机功能中，当前显示的"我"的头像
+// 在查手机的微信聊天中，"我"的头像应该是被查手机的机主的头像
+window.getCheckPhoneMyAvatar = function(contactId) {
+    if (!contactId) return 'https://api.dicebear.com/7.x/avataaars/svg?seed=Unknown';
+    // Use loose equality to handle string/number mismatch
+    const contact = window.iphoneSimState.contacts.find(c => c.id == contactId);
+    if (contact) {
+        return contact.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(contact.name || 'Unknown');
+    }
+    return 'https://api.dicebear.com/7.x/avataaars/svg?seed=Unknown';
+};
+
 // 图片压缩工具
 function compressImage(file, maxWidth = 1024, quality = 0.7) {
     return new Promise((resolve, reject) => {
@@ -150,8 +162,12 @@ function compressImage(file, maxWidth = 1024, quality = 0.7) {
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
+                // 填充白色背景以防止 PNG 转 JPEG 变黑
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
                 ctx.drawImage(img, 0, 0, width, height);
-                const compressedDataUrl = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
+                // 强制转换为 JPEG 以减小体积
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
                 resolve(compressedDataUrl);
             };
             img.onerror = (err) => reject(err);
@@ -159,6 +175,155 @@ function compressImage(file, maxWidth = 1024, quality = 0.7) {
         reader.onerror = (err) => reject(err);
     });
 }
+
+function compressBase64(base64, maxWidth = 1024, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.src = base64;
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+                height = Math.round(height * (maxWidth / width));
+                width = maxWidth;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressedDataUrl);
+        };
+        img.onerror = (err) => resolve(base64); // 如果加载失败，保留原图
+    });
+}
+
+window.optimizeStorage = async function() {
+    if (!confirm('这将压缩所有图片以减小文件体积，可能会降低部分图片清晰度。确定继续吗？')) return;
+    
+    showNotification('正在压缩数据，请稍候...', 0);
+    
+    try {
+        const tasks = [];
+
+        // 1. 联系人头像和背景
+        if (state.contacts) {
+            for (const c of state.contacts) {
+                if (c.avatar && c.avatar.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.avatar, 300, 0.7).then(d => c.avatar = d));
+                }
+                if (c.profileBg && c.profileBg.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.profileBg, 800, 0.7).then(d => c.profileBg = d));
+                }
+                if (c.chatBg && c.chatBg.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.chatBg, 800, 0.7).then(d => c.chatBg = d));
+                }
+                if (c.aiSettingBg && c.aiSettingBg.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.aiSettingBg, 800, 0.7).then(d => c.aiSettingBg = d));
+                }
+                if (c.userSettingBg && c.userSettingBg.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.userSettingBg, 800, 0.7).then(d => c.userSettingBg = d));
+                }
+                if (c.myAvatar && c.myAvatar.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.myAvatar, 300, 0.7).then(d => c.myAvatar = d));
+                }
+                if (c.voiceCallBg && c.voiceCallBg.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.voiceCallBg, 800, 0.7).then(d => c.voiceCallBg = d));
+                }
+                if (c.videoCallBgImage && c.videoCallBgImage.startsWith('data:image')) {
+                    tasks.push(compressBase64(c.videoCallBgImage, 800, 0.7).then(d => c.videoCallBgImage = d));
+                }
+            }
+        }
+
+        // 2. 朋友圈图片
+        if (state.moments) {
+            for (const m of state.moments) {
+                if (m.images) {
+                    for (let i = 0; i < m.images.length; i++) {
+                        let img = m.images[i];
+                        // 兼容旧格式（字符串）和新格式（对象）
+                        if (typeof img === 'string' && img.startsWith('data:image')) {
+                            tasks.push(compressBase64(img, 800, 0.7).then(d => m.images[i] = d));
+                        } else if (typeof img === 'object' && img.src && img.src.startsWith('data:image')) {
+                            tasks.push(compressBase64(img.src, 800, 0.7).then(d => img.src = d));
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 聊天记录图片
+        if (state.chatHistory) {
+            for (const contactId in state.chatHistory) {
+                const msgs = state.chatHistory[contactId];
+                for (const msg of msgs) {
+                    if ((msg.type === 'image' || msg.type === 'sticker') && msg.content && msg.content.startsWith('data:image')) {
+                        // 表情包也压缩，虽然可能丢透明度，但为了解决体积问题
+                        tasks.push(compressBase64(msg.content, 800, 0.7).then(d => msg.content = d));
+                    }
+                }
+            }
+        }
+
+        // 4. 个人资料
+        if (state.userProfile) {
+            if (state.userProfile.avatar && state.userProfile.avatar.startsWith('data:image')) {
+                tasks.push(compressBase64(state.userProfile.avatar, 300, 0.7).then(d => state.userProfile.avatar = d));
+            }
+            if (state.userProfile.bgImage && state.userProfile.bgImage.startsWith('data:image')) {
+                tasks.push(compressBase64(state.userProfile.bgImage, 800, 0.7).then(d => state.userProfile.bgImage = d));
+            }
+            if (state.userProfile.momentsBgImage && state.userProfile.momentsBgImage.startsWith('data:image')) {
+                tasks.push(compressBase64(state.userProfile.momentsBgImage, 800, 0.7).then(d => state.userProfile.momentsBgImage = d));
+            }
+        }
+
+        // 5. 音乐
+        if (state.music) {
+            if (state.music.cover && state.music.cover.startsWith('data:image')) {
+                tasks.push(compressBase64(state.music.cover, 300, 0.7).then(d => state.music.cover = d));
+            }
+            if (state.music.widgetBg && state.music.widgetBg.startsWith('data:image')) {
+                tasks.push(compressBase64(state.music.widgetBg, 800, 0.7).then(d => state.music.widgetBg = d));
+            }
+        }
+
+        // 6. 拍立得
+        if (state.polaroid) {
+            if (state.polaroid.img1 && state.polaroid.img1.startsWith('data:image')) {
+                tasks.push(compressBase64(state.polaroid.img1, 600, 0.7).then(d => state.polaroid.img1 = d));
+            }
+            if (state.polaroid.img2 && state.polaroid.img2.startsWith('data:image')) {
+                tasks.push(compressBase64(state.polaroid.img2, 600, 0.7).then(d => state.polaroid.img2 = d));
+            }
+        }
+
+        // 7. 自定义图标
+        if (state.icons) {
+            for (const appId in state.icons) {
+                const icon = state.icons[appId];
+                if (icon && icon.startsWith('data:image')) {
+                    tasks.push(compressBase64(icon, 100, 0.7).then(d => state.icons[appId] = d));
+                }
+            }
+        }
+
+        await Promise.all(tasks);
+        await saveConfig();
+        
+        showNotification('压缩完成！', 2000, 'success');
+        alert('数据压缩完成，现在导出文件应该会小很多。');
+        
+    } catch (e) {
+        console.error('Compression failed:', e);
+        showNotification('压缩失败', 2000, 'error');
+        alert('压缩过程中出现错误');
+    }
+};
 
 // 处理应用点击
 function handleAppClick(appId, appName) {
@@ -485,6 +650,9 @@ async function init() {
 
     const clearAllDataBtn = document.getElementById('clear-all-data');
     if (clearAllDataBtn) clearAllDataBtn.addEventListener('click', handleClearAllData);
+
+    const optimizeStorageBtn = document.getElementById('optimize-storage');
+    if (optimizeStorageBtn) optimizeStorageBtn.addEventListener('click', window.optimizeStorage);
 
     // 执行各模块的初始化监听器
     window.appInitFunctions.forEach(func => {

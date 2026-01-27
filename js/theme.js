@@ -1112,6 +1112,25 @@ function setupThemeListeners() {
     }
 }
 
+// --- 状态栏时间同步功能 ---
+
+function updateStatusBarTime() {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    
+    // 补零
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    
+    const timeString = `${hours}:${minutes}`;
+    
+    // 更新所有状态栏时间元素 (可能有多个)
+    const timeElements = document.querySelectorAll('.status-bar .time');
+    timeElements.forEach(el => {
+        el.textContent = timeString;
+    });
+}
+
 // 导出 UI 更新函数给 core.js 使用
 window.updateThemeUi = function() {
     const defaultVirtualImageUrlInput = document.getElementById('default-virtual-image-url');
@@ -1133,4 +1152,9 @@ window.updateThemeUi = function() {
 // 注册初始化函数
 if (window.appInitFunctions) {
     window.appInitFunctions.push(setupThemeListeners);
+    window.appInitFunctions.push(() => {
+        updateStatusBarTime();
+        // 每秒更新一次，确保时间准确（也可以每分钟，但每秒能更快响应分钟变化）
+        setInterval(updateStatusBarTime, 1000);
+    });
 }

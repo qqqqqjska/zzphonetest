@@ -400,6 +400,9 @@
                         </div>
                     </div>
                     <div class="list-item">
+                        <button id="optimize-storage" class="ios-btn-block">压缩图片数据</button>
+                    </div>
+                    <div class="list-item">
                         <button id="clear-all-data" class="ios-btn-block danger">清空所有数据</button>
                     </div>
                 </div>
@@ -607,6 +610,15 @@
                         <div class="ios-list-group" style="margin-top: 20px;">
                             <div class="list-item">
                                 <button id="trigger-ai-moment-btn" class="ios-btn-block secondary">让TA发动态</button>
+                            </div>
+                        </div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <button id="export-character-btn" class="ios-btn-block secondary">导出角色数据</button>
+                            </div>
+                            <div class="list-item">
+                                <input type="file" id="import-character-input" accept=".json" class="file-input-hidden">
+                                <label for="import-character-input" class="ios-btn-block secondary" style="margin-bottom:0; text-align:center;">导入角色数据</label>
                             </div>
                         </div>
                         <div class="ios-list-group">
@@ -2263,6 +2275,146 @@
         </div>
     </div>
 
+    <!-- 查手机全屏App -->
+    <div id="phone-app" class="app-screen hidden" style="background-color: #f2f2f7;">
+        <div class="app-header" style="background: transparent; border: none; position: absolute; z-index: 10; padding-left: 20px; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; height: auto; padding-top: max(47px, env(safe-area-inset-top));">
+            <button id="close-phone-app" class="back-btn" style="background: rgba(255,255,255,0.6); width: 32px; height: 32px; border-radius: 50%; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1);"><i class="fas fa-chevron-left" style="margin-right: 2px; font-size: 14px;"></i></button>
+        </div>
+
+        <div class="main-content" style="display: block; padding: 0; overflow: hidden; position: relative; height: 100%;">
+            <div id="phone-pages-container" class="pages-container">
+                <div id="phone-pages-wrapper" class="pages-wrapper">
+                    <!-- JS 生成 -->
+                </div>
+            </div>
+            <div id="phone-page-indicators" class="page-indicators" style="bottom: 40px;"></div>
+
+            <!-- 编辑工具栏 -->
+            <div id="phone-edit-mode-toolbar" class="hidden" style="position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.9); padding: 10px 20px; border-radius: 30px; display: flex; gap: 15px; z-index: 200; box-shadow: 0 5px 20px rgba(0,0,0,0.15); backdrop-filter: blur(10px);">
+                <button id="phone-add-widget-btn" class="ios-btn-small" style="background:#007AFF;">+</button>
+                <button id="phone-save-layout-btn" class="ios-btn-small" style="background:#34C759;">保存</button>
+                <button id="phone-exit-edit-btn" class="ios-btn-small">退出</button>
+            </div>
+        </div>
+
+        <!-- 查手机专用组件库弹窗 -->
+        <div id="phone-widget-library-modal" class="widget-library-modal">
+            <div class="library-header">
+                <h3 style="margin:0;">选择组件</h3>
+                <button id="phone-close-library-btn" class="ios-btn-small" style="background: #e5e5ea; color: #000;">关闭</button>
+            </div>
+            
+            <div class="library-body">
+                <div style="margin-top: 20px;">
+                    <div class="library-section-title">已导入</div>
+                    <div class="library-scroll-row" id="phone-lib-custom-row">
+                        <!-- JS 生成 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查手机-选择联系人弹窗 -->
+    <div id="phone-contact-select-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择要查看的手机</h3>
+                <button class="close-btn" id="close-phone-contact-select">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="ios-list-group" id="phone-contact-list">
+                    <!-- JS 生成联系人列表 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查手机 - 微信 -->
+    <div id="phone-wechat" class="sub-screen hidden" style="z-index: 200;">
+        <div class="app-header" id="phone-wechat-header" style="background: transparent; border: none; position: absolute; top: 0; left: 0; width: 100%; z-index: 10; padding-left: 20px; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; height: auto; padding-top: max(47px, env(safe-area-inset-top)); justify-content: space-between;">
+            <button class="icon-btn" id="phone-wechat-back-btn" onclick="document.getElementById('phone-wechat').classList.add('hidden')" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);"><i class="fas fa-chevron-left"></i></button>
+            <h3 id="phone-wechat-title" style="display: none; color: #000;">微信</h3>
+            <button class="icon-btn" id="generate-wechat-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);"><i class="fas fa-camera"></i></button>
+        </div>
+        
+        <!-- 隐藏的文件输入框，用于更换朋友圈背景 -->
+        <input type="file" id="phone-wechat-bg-input" accept="image/*" class="file-input-hidden">
+        
+        <div class="app-body" style="padding: 0; padding-bottom: 60px;">
+            <!-- Tab 1: 联系人 -->
+            <div id="phone-wechat-tab-contacts" class="phone-wechat-tab-content active" style="display:none; padding-top: 91px; padding-left: 16px; padding-right: 16px;">
+                <div class="ios-list-group" style="margin-top: 10px;">
+                    <div class="list-item" style="justify-content: center; color: #999;">暂无联系人</div>
+                </div>
+            </div>
+            
+            <!-- Tab 2: 朋友圈 -->
+            <div id="phone-wechat-tab-moments" class="phone-wechat-tab-content" style="display:block;">
+                <div class="moments-header">
+                    <div class="moments-cover" id="phone-wechat-cover" style="background-image: url('https://placehold.co/600x400/333/999'); cursor: default;">
+                        <div class="moments-user-info">
+                            <span class="moments-user-name" id="phone-wechat-user-name">User</span>
+                            <img class="moments-user-avatar" id="phone-wechat-user-avatar" src="">
+                        </div>
+                    </div>
+                </div>
+                <div class="moments-list" id="phone-wechat-moments-list">
+                    <!-- 动态列表 -->
+                    <div style="text-align: center; padding: 40px; color: #999;">点击右上角生成动态</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部 Tab 栏 -->
+        <div class="wechat-tab-bar">
+            <div class="wechat-tab-item" onclick="switchPhoneWechatTab('contacts')">
+                <i class="fas fa-address-book"></i>
+                <span>通讯录</span>
+            </div>
+            <div class="wechat-tab-item active" onclick="switchPhoneWechatTab('moments')">
+                <i class="fas fa-star"></i>
+                <span>朋友圈</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 查手机 - 微博 -->
+    <div id="phone-weibo" class="sub-screen hidden" style="z-index: 200;">
+        <div class="app-header">
+            <button class="back-btn" onclick="document.getElementById('phone-weibo').classList.add('hidden')"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>微博</h3>
+            <button class="icon-btn" id="generate-weibo-btn" style="font-size: 14px;">生成</button>
+        </div>
+        <div class="app-body">
+            <div id="phone-weibo-content"></div>
+        </div>
+    </div>
+
+    <!-- 查手机 - iCity -->
+    <div id="phone-icity" class="sub-screen hidden" style="z-index: 200;">
+        <div class="app-header">
+            <button class="back-btn" onclick="document.getElementById('phone-icity').classList.add('hidden')"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>iCity</h3>
+            <button class="icon-btn" id="generate-icity-btn" style="font-size: 14px;">生成</button>
+        </div>
+        <div class="app-body">
+            <div id="phone-icity-content"></div>
+        </div>
+    </div>
+
+    <!-- 查手机 - 浏览器 -->
+    <div id="phone-browser" class="sub-screen hidden" style="z-index: 200;">
+        <div class="app-header">
+            <button class="back-btn" onclick="document.getElementById('phone-browser').classList.add('hidden')"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>浏览器</h3>
+            <button class="icon-btn" id="generate-browser-btn" style="font-size: 14px;">生成</button>
+        </div>
+        <div class="app-body">
+            <div id="phone-browser-content"></div>
+        </div>
+    </div>
+
     <!-- 音频元素 -->
     <audio id="bg-music" loop></audio>
 
@@ -2278,6 +2430,7 @@
     <script src="js/meeting.js"></script>
     <script src="js/apps.js"></script>
     <script src="js/home.js"></script>
+    <script src="js/check_phone.js"></script>
     <script src="js/chat.js"></script>
     <script src="js/call_history.js"></script>
 
