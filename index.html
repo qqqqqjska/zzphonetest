@@ -1,0 +1,2370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>iPhone Simulator</title>
+    
+    <!-- 基本配置 -->
+    <meta name="theme-color" content="#000000">
+    
+    <!-- iOS全屏配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="iPhone Simulator">
+    
+    <!-- 优化视口配置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- 图标配置 -->
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/7YzrzNvw/IMG-4423.jpg">
+    <link rel="apple-touch-icon" sizes="152x152" href="https://i.postimg.cc/7YzrzNvw/IMG-4423.jpg">
+    <link rel="apple-touch-icon" sizes="180x180" href="https://i.postimg.cc/7YzrzNvw/IMG-4423.jpg">
+    
+    <!-- 对于iOS 15+，添加主题颜色适配 -->
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+    
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="screen-container" id="screen-container">
+        <!-- 总结通知横幅 -->
+        <div id="summary-notification" class="notification-banner hidden">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span id="summary-notification-text">正在总结...</span>
+        </div>
+
+        <!-- 行程生成通知横幅 -->
+        <div id="itinerary-notification" class="notification-banner hidden" style="top: 110px;">
+            <i class="fas fa-spinner fa-spin"></i>
+            <span id="itinerary-notification-text">正在生成行程...</span>
+        </div>
+
+        <!-- 状态栏模拟 -->
+        <div class="status-bar">
+            <div class="time">9:41</div>
+            <div class="status-icons">
+                <i class="fas fa-signal"></i>
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-battery-full"></i>
+            </div>
+        </div>
+
+       
+
+        <!-- 主要内容区域 -->
+        <div class="main-content" id="main-content" style="display: block; padding: 0; overflow: hidden; position: relative;">
+            <div id="pages-container" class="pages-container">
+                <div id="pages-wrapper" class="pages-wrapper">
+                    <!-- JS 将在这里动态生成 page 和 grid -->
+                </div>
+            </div>
+            <div id="page-indicators" class="page-indicators"></div>
+
+    <!-- 编辑工具栏等... -->
+    <div id="edit-mode-toolbar" class="hidden">
+        <button id="add-widget-btn" class="ios-btn-small" style="background:#007AFF;">+</button>
+        <button id="save-layout-btn" class="ios-btn-small" style="background:#34C759;">保存</button>
+
+        <button id="exit-edit-btn" class="ios-btn-small">退出</button>
+    </div>
+    <input type="file" id="widget-file-input" accept=".json" class="file-input-hidden">
+</div>
+
+<!-- 2. 【关键步骤】组件仓库：把你原来的复杂 HTML 代码原封不动移到这里 -->
+<div id="widget-repository">
+    
+    <!-- === 音乐小组件 (从原来的 .top-section 剪切过来) === -->
+    <div class="music-widget" id="music-widget">
+        <div class="vinyl-wrapper">
+            <div class="vinyl-disk" id="vinyl-disk">
+                <div class="vinyl-cover" id="vinyl-cover" style="background-image: url('https://api.dicebear.com/7.x/avataaars/svg?seed=Felix');"></div>
+            </div>
+        </div>
+        <div class="music-info">
+            <div class="song-title" id="song-title">Happy Together</div>
+            <div class="artist-name" id="artist-name">Maximillian</div>
+            <div class="lyrics-display" id="lyrics-display">
+                So fast, I almost missed it<br>
+                I spill another glass of wine
+            </div>
+            <div class="music-controls-mini">
+                <i class="fas fa-play" id="play-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- === 拍立得小组件 (从原来的 .left-area 剪切过来) === -->
+    <div class="polaroid-widget" id="polaroid-widget">
+        <!-- 底部拍立得 -->
+        <div class="polaroid-card bottom-card">
+            <div class="polaroid-img-container">
+                <img src="https://placehold.co/300x300/eee/999?text=Photo" id="polaroid-img-2" alt="Photo">
+            </div>
+            <div class="polaroid-text" id="polaroid-text-2">美好回忆</div>
+        </div>
+        <!-- 顶部拍立得 -->
+        <div class="polaroid-card top-card">
+            <div class="polaroid-img-container">
+                <img src="https://placehold.co/300x300/eee/999?text=Photo" id="polaroid-img-1" alt="Photo">
+            </div>
+            <div class="polaroid-text" id="polaroid-text-1">讨厌坏天气</div>
+            <div class="tape-strip"></div>
+        </div>
+        <!-- 隐藏的文件输入框 -->
+        <input type="file" id="polaroid-input-1" accept="image/*" class="file-input-hidden">
+        <input type="file" id="polaroid-input-2" accept="image/*" class="file-input-hidden">
+    </div>
+
+</div>
+
+<!-- 小组件库弹窗 -->
+<div id="widget-library-modal" class="widget-library-modal">
+    <div class="library-header">
+        <h3 style="margin:0;">小组件库</h3>
+        <button id="close-library-btn" class="ios-btn-small" style="background: #e5e5ea; color: #000;">关闭</button>
+    </div>
+    
+    <div class="library-body">
+        
+        <!-- 工具栏：导入按钮 -->
+        <div style="margin-bottom: 20px;">
+             <button id="import-json-btn" class="ios-btn-block" style="background-color: #007AFF;">
+                <i class="fas fa-file-import"></i> 导入 JSON 组件包
+             </button>
+        </div>
+
+        <!-- 1. 系统组件 -->
+        <div>
+            <div class="library-section-title">系统组件</div>
+            <div class="library-scroll-row" id="lib-system-row">
+                <!-- JS 会自动在这里生成音乐和拍立得的选项 -->
+            </div>
+        </div>
+
+        <!-- 2. 已导入的组件 -->
+        <div style="margin-top: 20px;">
+            <div class="library-section-title">已导入</div>
+            <div class="library-scroll-row" id="lib-custom-row">
+                <div style="color: #888; font-size: 14px; padding: 20px;">暂无导入的组件</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+            <!-- 1. 新的网格容器 (和上次一样) -->
+
+            <!-- 左侧拍立得小组件 -->
+           
+
+        <!-- 底部Dock栏 -->
+        <div class="dock-bar">
+            <div class="dock-container">
+                <div class="app-item dock-item" data-app-id="shopping-app">
+                    <div class="app-icon icon-shopping">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <span class="app-label">购物</span>
+                </div>
+                <div class="app-item dock-item" data-app-id="forum-app">
+                    <div class="app-icon icon-forum">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <span class="app-label">论坛</span>
+                </div>
+                <div class="app-item dock-item" data-app-id="phone-app">
+                    <div class="app-icon icon-phone">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <span class="app-label">查手机</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部Home Indicator -->
+        <div class="home-indicator"></div>
+
+        <!-- 设置全屏App -->
+        <div id="settings-app" class="app-screen hidden">
+            <div class="app-header">
+                <button id="close-settings-app" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>设置</h3>
+                <div style="width: 60px;"></div>
+            </div>
+            <div class="app-body">
+                <!-- 主 API 设置 -->
+                <div class="section-title">主 API 设置</div>
+                
+                <!-- 预设 -->
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>配置预设</label>
+                            <div class="input-row full-width">
+                                <select id="ai-preset-select">
+                                    <option value="">-- 选择预设 --</option>
+                                </select>
+                                <button id="save-ai-preset" class="ios-btn-small">保存</button>
+                                <button id="delete-ai-preset" class="ios-btn-small danger">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API 详情 -->
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 地址 (Base URL)</label>
+                            <input type="text" id="ai-api-url" placeholder="https://api.openai.com/v1">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 密钥 (Key)</label>
+                            <input type="password" id="ai-api-key" placeholder="sk-...">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <div class="input-row full-width">
+                                <button id="fetch-models" class="ios-btn-block">拉取模型列表</button>
+                            </div>
+                            <div class="input-row full-width" style="margin-top: 10px;">
+                                <select id="ai-model-select">
+                                    <option value="">请先拉取模型</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <div style="display: flex; justify-content: space-between; width: 100%;">
+                                <label>温度 (Temperature)</label>
+                                <span id="ai-temp-value">0.7</span>
+                            </div>
+                            <input type="range" id="ai-temperature" min="0" max="2" step="0.1" value="0.7" style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Whisper API 设置 -->
+                <div class="section-title">语音转文字 (Whisper) 设置</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API地址</label>
+                            <select id="whisper-connection-mode" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background-color: #f2f2f7;">
+                                <option value="custom">自定义地址</option>
+                                <option value="siliconflow">硅基流动 (推荐)</option>
+                            </select>
+                            <div style="font-size: 12px; color: #999; margin-top: 5px;">
+                                ⚠️ 如遇CORS错误，请联系API提供商修复服务器配置
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 地址 (Base URL)</label>
+                            <input type="text" id="whisper-api-url" placeholder="https://api.openai.com/v1">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 密钥 (Key)</label>
+                            <input type="password" id="whisper-api-key" placeholder="sk-...">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>模型 (Model)</label>
+                            <div class="input-row full-width" style="margin-bottom: 10px;">
+                                <button id="fetch-whisper-models" class="ios-btn-block">拉取模型列表</button>
+                            </div>
+                            <input type="text" id="whisper-model" placeholder="whisper-1" value="whisper-1">
+                            <select id="whisper-model-select" class="hidden" style="margin-top: 10px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background-color: #f2f2f7;">
+                                <option value="">选择模型...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Minimax TTS 设置 -->
+                <div class="section-title">语音合成 (Minimax TTS) 全局配置</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>Group ID</label>
+                            <input type="text" id="minimax-group-id" placeholder="Minimax Group ID">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API Key</label>
+                            <input type="password" id="minimax-api-key" placeholder="Minimax API Key">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>模型 (Model)</label>
+                            <input type="text" id="minimax-model" placeholder="speech-01-turbo" value="speech-01-turbo" style="margin-bottom: 10px;">
+                            <select id="minimax-model-select" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background-color: #f2f2f7;">
+                                <option value="">-- 快速选择模型 --</option>
+                                <option value="speech-01-turbo">speech-01-turbo</option>
+                                <option value="speech-01-240228">speech-01-240228</option>
+                                <option value="speech-01">speech-01</option>
+                                <option value="speech-02">speech-02</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content">
+                            <span style="font-size: 12px; color: #888;">提示：启用开关和音色设置已移至每个联系人的“聊天详情”页。</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 副 API 设置 -->
+                <div class="section-title">副 API 设置</div>
+                
+                <!-- 预设 -->
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>配置预设</label>
+                            <div class="input-row full-width">
+                                <select id="ai-preset-select-2">
+                                    <option value="">-- 选择预设 --</option>
+                                </select>
+                                <button id="save-ai-preset-2" class="ios-btn-small">保存</button>
+                                <button id="delete-ai-preset-2" class="ios-btn-small danger">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API 详情 -->
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 地址 (Base URL)</label>
+                            <input type="text" id="ai-api-url-2" placeholder="https://api.openai.com/v1">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>API 密钥 (Key)</label>
+                            <input type="password" id="ai-api-key-2" placeholder="sk-...">
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <div class="input-row full-width">
+                                <button id="fetch-models-2" class="ios-btn-block">拉取模型列表</button>
+                            </div>
+                            <div class="input-row full-width" style="margin-top: 10px;">
+                                <select id="ai-model-select-2">
+                                    <option value="">请先拉取模型</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <div style="display: flex; justify-content: space-between; width: 100%;">
+                                <label>温度 (Temperature)</label>
+                                <span id="ai-temp-value-2">0.7</span>
+                            </div>
+                            <input type="range" id="ai-temperature-2" min="0" max="2" step="0.1" value="0.7" style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据管理 -->
+                <div class="section-title">数据管理</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <button id="save-all-settings" class="ios-btn-block">保存所有配置</button>
+                    </div>
+                    <div class="list-item">
+                        <div class="button-row full-width">
+                            <button id="export-json" class="ios-btn-block secondary">导出数据</button>
+                            <label for="import-json" class="ios-btn-block secondary file-label">
+                                导入数据
+                                <input type="file" id="import-json" accept=".json" style="display: none;">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <button id="clear-all-data" class="ios-btn-block danger">清空所有数据</button>
+                    </div>
+                </div>
+                
+                <div style="height: 50px;"></div>
+            </div>
+        </div>
+
+        <!-- 微信全屏App -->
+        <div id="wechat-app" class="app-screen hidden">
+            <div class="wechat-header" id="wechat-header">
+                <div class="header-left">
+                    <button id="wechat-header-left-btn" class="wechat-icon-btn"><i class="fas fa-chevron-left"></i></button>
+                    <span id="wechat-header-back-text" style="font-size: 16px; margin-left: -5px; display: none;">微信</span>
+                </div>
+                <span class="wechat-title" id="wechat-header-title">微信</span>
+                <div class="header-right">
+                    <button id="wechat-header-right-btn" class="wechat-icon-btn"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+
+            <div class="wechat-body" id="wechat-body">
+                <!-- 好友列表页 -->
+                <div id="wechat-tab-contacts" class="wechat-tab-content active">
+                    <div class="contacts-custom-header">
+                        <div class="contacts-top-bar">
+                            <button class="icon-btn" id="contacts-back-btn"><i class="fas fa-bars"></i></button>
+                            <div style="flex: 1;"></div>
+                            <button class="icon-btn" id="add-contact-btn-custom"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="contacts-title">Message</div>
+                        <div class="contacts-group-tabs" id="contacts-group-tabs">
+                            <!-- 分组标签将通过JS生成 -->
+                        </div>
+                    </div>
+                    <div class="contact-list" id="contact-list">
+                        <!-- 联系人项将通过JS生成 -->
+                    </div>
+                </div>
+                <!-- 动态页 -->
+                <div id="wechat-tab-moments" class="wechat-tab-content">
+                    <div id="moments-container" class="moments-container">
+                        <!-- 朋友圈头部将通过JS生成 -->
+                    </div>
+                </div>
+                <!-- 我的页 -->
+                <div id="wechat-tab-me" class="wechat-tab-content">
+                    <div id="me-profile-container">
+                        <!-- 资料卡将通过JS生成 -->
+                    </div>
+                    
+                    <div class="ios-list-group" style="margin-top: 20px;">
+                        <div class="list-item center-content" id="switch-persona-btn">
+<span style="color: #000;">管理身份</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底栏 -->
+            <div class="wechat-tab-bar">
+                <div class="wechat-tab-item active" data-tab="contacts">
+                    <i class="fas fa-comment"></i>
+                    <span>微信</span>
+                </div>
+                <div class="wechat-tab-item" data-tab="moments">
+                    <i class="fas fa-star"></i>
+                    <span>动态</span>
+                </div>
+                <div class="wechat-tab-item" data-tab="me">
+                    <i class="fas fa-user"></i>
+                    <span>我</span>
+                </div>
+            </div>
+
+            <!-- 聊天设置全屏页 -->
+            <div id="chat-settings-screen" class="sub-screen hidden" style="z-index: 160;">
+                <div class="chat-header">
+                    <button id="close-chat-settings" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                    <span>聊天详情</span>
+                    <button id="save-chat-settings-btn" class="wechat-icon-btn" style="font-size: 16px; font-weight: 600; color: #07C160; width: auto; padding: 0 10px;">保存</button>
+                </div>
+                <div class="app-body" style="background-color: var(--bg-color);">
+                    <!-- 导航栏 -->
+                    <div class="chat-settings-nav">
+                        <div class="nav-item active" data-tab="ai">TA</div>
+                        <div class="nav-item" data-tab="user">我</div>
+                        <div class="nav-item" data-tab="appearance">外观</div>
+                        <div class="nav-indicator"></div>
+                    </div>
+
+                    <!-- AI Tab -->
+                    <div id="chat-setting-tab-ai" class="chat-setting-tab-content active">
+                        <!-- AI 设置卡片 -->
+                        <div class="ai-setting-card">
+                            <!-- 背景图区域 -->
+                            <div class="ai-setting-bg" id="ai-setting-bg-container">
+                                <input type="file" id="chat-setting-ai-bg-input" accept="image/*" class="file-input-hidden">
+                            </div>
+                            
+                            <!-- 头像区域 -->
+                            <div class="ai-setting-avatar-container">
+                                <input type="file" id="chat-setting-avatar" accept="image/*" class="file-input-hidden">
+                                <label for="chat-setting-avatar" class="ai-setting-avatar-wrapper">
+                                    <img id="chat-setting-avatar-preview" src="" alt="Avatar">
+                                </label>
+                            </div>
+
+                            <!-- 姓名 -->
+                            <div class="ai-setting-name-container">
+                                <input type="text" id="chat-setting-name" class="ai-setting-name-input" placeholder="姓名">
+                            </div>
+
+                            <!-- 备注 -->
+                            <div class="ai-setting-remark-container">
+                                <input type="text" id="chat-setting-remark" class="ai-setting-remark-input" placeholder="备注">
+                            </div>
+
+                            <!-- 分组 -->
+                            <div class="ai-setting-group-container" id="chat-setting-group-trigger">
+                                <span id="chat-setting-group-value" class="ai-setting-group-text">未分组</span>
+                                <i class="fas fa-chevron-right" style="font-size: 12px; color: #ccc;"></i>
+                            </div>
+
+                            <!-- 人设 -->
+                            <div class="ai-setting-persona-container">
+                                <textarea id="chat-setting-persona" class="ai-setting-persona-input" placeholder="输入人设..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>上下文条数限制 (0为不限制)</label>
+                                    <input type="number" id="chat-setting-context-limit" placeholder="默认全部" min="0">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>自动总结触发条数 (0为关闭)</label>
+                                    <input type="number" id="chat-setting-summary-limit" placeholder="默认关闭" min="0">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>显示AI心声</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="chat-setting-show-thought">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>AI可知晓心声</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="chat-setting-thought-visible">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>AI可知晓真实时间</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="chat-setting-real-time-visible">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-title">语音合成 (TTS)</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>启用 TTS (Minimax)</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="chat-setting-tts-enabled">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>音色 ID (Voice ID)</label>
+                                    <input type="text" id="chat-setting-tts-voice-id" placeholder="例如: male-qn-qingse">
+                                    <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                                        常用: male-qn-qingse (青涩), female-shaonv (少女), male-qn-jingying (精英)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-title">关联世界书</div>
+                        <div class="ios-list-group" id="chat-setting-wb-list">
+                            <!-- 世界书分类列表将通过JS生成 -->
+                        </div>
+
+                        <div class="section-title">关联表情包</div>
+                        <div class="ios-list-group" id="chat-setting-sticker-list">
+                            <!-- 表情包分类列表将通过JS生成 -->
+                        </div>
+
+                        <div class="ios-list-group" style="margin-top: 20px;">
+                            <div class="list-item">
+                                <button id="trigger-ai-moment-btn" class="ios-btn-block secondary">让TA发动态</button>
+                            </div>
+                        </div>
+                        <div class="ios-list-group">
+                            <div class="list-item center-content" id="clear-chat-history-btn">
+                                <span class="danger-text">清空聊天记录</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Tab -->
+                    <div id="chat-setting-tab-user" class="chat-setting-tab-content">
+                        <!-- 用户设置卡片 -->
+                        <div class="ai-setting-card">
+                            <!-- 背景图区域 -->
+                            <div class="ai-setting-bg" id="user-setting-bg-container" style="background-color: #ccc;">
+                                <input type="file" id="chat-setting-user-bg-input" accept="image/*" class="file-input-hidden">
+                            </div>
+                            
+                            <!-- 头像区域 -->
+                            <div class="ai-setting-avatar-container">
+                                <input type="file" id="chat-setting-my-avatar" accept="image/*" class="file-input-hidden">
+                                <label for="chat-setting-my-avatar" class="ai-setting-avatar-wrapper">
+                                    <img id="chat-setting-my-avatar-preview" src="" alt="Avatar">
+                                </label>
+                            </div>
+
+                            <!-- 身份选择 -->
+                            <div class="ai-setting-name-container">
+                                <select id="chat-setting-user-persona" class="ai-setting-name-input" style="background: transparent; border: none; text-align: center; width: auto; min-width: 150px;">
+                                    <option value="">-- 选择身份 --</option>
+                                </select>
+                            </div>
+
+                            <!-- 分隔线 -->
+                            <div style="width: 90%; height: 1px; background-color: #eee; margin: 20px 0;"></div>
+
+                            <!-- TA眼中的我 -->
+                            <div style="width: 100%; padding: 0 20px;">
+                                <div style="font-size: 13px; color: #6d6d72; margin-bottom: 10px; text-align: left; font-weight: 500;">TA眼中的我</div>
+                                
+                                <!-- 显示模式 -->
+                                <div id="user-perception-display" style="width: 100%;">
+                                    <div id="user-perception-list" style="margin-bottom: 15px; min-height: 20px; text-align: left; max-height: 150px; overflow-y: auto;">
+                                        <!-- 列表项将通过JS生成 -->
+                                    </div>
+                                    <button id="edit-user-perception-btn" class="ios-btn-block secondary">编辑</button>
+                                </div>
+
+                                <!-- 编辑模式 -->
+                                <div id="user-perception-edit" class="hidden" style="width: 100%;">
+                                    <textarea id="user-perception-input" style="width: 100%; height: 150px; border: 1px solid #ddd; border-radius: 8px; padding: 8px; margin-bottom: 10px; font-family: inherit; background-color: #f9f9f9;" placeholder="每行一条认知信息"></textarea>
+                                    <div style="display: flex; gap: 10px;">
+                                        <button id="save-user-perception-btn" class="ios-btn-block" style="background-color: #000; color: white; flex: 1;">保存</button>
+                                        <button id="cancel-user-perception-btn" class="ios-btn-block" style="background-color: #8e8e93; color: white; flex: 1;">取消</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Appearance Tab -->
+                    <div id="chat-setting-tab-appearance" class="chat-setting-tab-content">
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                                        <label>字体大小</label>
+                                        <span id="chat-font-size-value">16px</span>
+                                    </div>
+                                    <input type="range" id="chat-font-size-slider" min="12" max="30" step="1" value="16" style="width: 100%;">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>AI消息间隔 (毫秒)</label>
+                                    <div style="display: flex; gap: 10px; align-items: center;">
+                                        <input type="number" id="chat-setting-interval-min" placeholder="最小(默认400)" style="flex: 1;width: 70%;">
+                                        <span>-</span>
+                                        <input type="number" id="chat-setting-interval-max" placeholder="最大(默认2200)" style="flex: 1;">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>聊天背景</label>
+                                    <input type="file" id="chat-setting-bg" accept="image/*" class="file-input-hidden">
+                                    <label for="chat-setting-bg" class="ios-btn">选择图片</label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>视频通话背景</label>
+                                    <input type="file" id="chat-setting-video-bg" accept="image/*" class="file-input-hidden">
+                                    <label for="chat-setting-video-bg" class="ios-btn">选择图片</label>
+                                </div>
+                            </div>
+                            <div class="list-item no-padding">
+                                <div id="chat-bg-gallery" class="gallery-scroll">
+                                    <!-- 壁纸缩略图将在这里生成 -->
+                                </div>
+                            </div>
+                            <div class="list-item center-content" id="reset-chat-bg">
+                                <span class="danger-text">重置默认背景</span>
+                            </div>
+                        </div>
+
+                        <div class="section-title">聊天页面自定义CSS</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>CSS预设</label>
+                                    <div class="input-row full-width">
+                                        <select id="chat-css-preset-select">
+                                            <option value="">-- 选择预设 --</option>
+                                        </select>
+                                        <button id="save-chat-css-preset" class="ios-btn-small">保存</button>
+                                        <button id="delete-chat-css-preset" class="ios-btn-small danger">删除</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item no-padding">
+                                <textarea id="chat-setting-custom-css" placeholder="/* 仅针对当前聊天页面的CSS */" style="height: 200px;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 添加联系人弹窗 -->
+            <div id="add-contact-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>添加联系人</h3>
+                        <button class="close-btn" id="close-add-contact">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="avatar-upload-container">
+                            <div class="avatar-preview" id="contact-avatar-preview">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <input type="file" id="contact-avatar-upload" accept="image/*" class="file-input-hidden">
+                        </div>
+                        <div class="setting-group">
+                            <label>姓名</label>
+                            <input type="text" id="contact-name" placeholder="输入姓名">
+                        </div>
+                        <div class="setting-group">
+                            <label>备注</label>
+                            <input type="text" id="contact-remark" placeholder="输入备注">
+                        </div>
+                        <div class="setting-group">
+                            <label>人设 (Prompt)</label>
+                            <textarea id="contact-persona" placeholder="例如：你是一个热心的邻居..."></textarea>
+                        </div>
+                        <button id="save-contact-btn" class="ios-btn-block">保存并聊天</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 批量导入表情包弹窗 -->
+            <div id="import-sticker-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>导入表情包</h3>
+                        <button class="close-btn" id="close-import-sticker">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>分类名称</label>
+                            <input type="text" id="sticker-category-name" placeholder="例如：猫咪表情">
+                        </div>
+                        <div class="setting-group">
+                            <label>表情包列表 (格式: 描述：URL)</label>
+                            <textarea id="sticker-import-text" placeholder="开心：https://example.com/1.jpg&#10;难过：https://example.com/2.jpg" style="height: 200px;"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>或上传 JSON 文件</label>
+                            <input type="file" id="sticker-import-json" accept=".json" class="file-input-hidden">
+                            <label for="sticker-import-json" class="ios-btn-block secondary" style="text-align: center; margin-bottom: 0;">选择 JSON 文件</label>
+                            <div id="sticker-json-status" style="font-size: 12px; color: #888; margin-top: 5px; text-align: center;">未选择文件</div>
+                        </div>
+                        <button id="save-sticker-import-btn" class="ios-btn-block">导入</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 表情包选项弹窗 -->
+            <div id="sticker-options-modal" class="modal hidden" style="z-index: 200; align-items: flex-end;">
+                <div class="modal-content" style="height: auto; border-radius: 12px 12px 0 0; width: 100%; max-width: 100%; background-color: transparent;">
+                    <div class="ios-list-group" style="margin: 0 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item center-content" id="sticker-opt-manage" style="background: white; border-bottom: 1px solid #eee; height: 56px;">
+                            <span style="font-size: 18px; color: #007AFF;">管理表情</span>
+                        </div>
+                        <div class="list-item center-content" id="sticker-opt-import" style="background: white; height: 56px;">
+                            <span style="font-size: 18px; color: #007AFF;">导入表情</span>
+                        </div>
+                        <div class="list-item center-content" id="sticker-opt-deletecats" style="background: white; height: 56px;">
+                            <span style="font-size: 18px; color: #FF3B30;">删除分类</span>
+                        </div>
+                    </div>
+                    <div class="ios-list-group" style="margin: 10px 10px 20px 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item center-content" id="sticker-opt-cancel" style="background: white; height: 56px;">
+                            <span style="font-size: 18px; font-weight: bold; color: #007AFF;">取消</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 删除表情包分类弹窗 -->
+            <div id="sticker-delete-cats-modal" class="modal hidden" style="z-index: 210; align-items: flex-end;">
+                <div class="modal-content" style="height: auto; border-radius: 12px 12px 0 0; width: 100%; max-width: 100%; background-color: transparent;">
+                    <div class="ios-list-group" style="margin: 0 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item" style="background: white; padding: 12px 16px; font-weight: 600;">选择要删除的表情包分类</div>
+                        <div id="sticker-delete-cats-list" style="background: #fff; display: flex; flex-direction: column;"></div>
+                    </div>
+                    <div class="ios-list-group" style="margin: 10px 10px 20px 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item" style="background: white; height: 56px; display: flex; gap: 10px; justify-content: center; align-items: center;">
+                            <button id="confirm-delete-sticker-cats" class="ios-btn-block" style="max-width: 160px;">删除所选</button>
+                            <button id="close-delete-sticker-cats" class="ios-btn-block secondary" style="max-width: 120px;">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分组选择弹窗 -->
+            <div id="group-select-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>设置分组</h3>
+                        <button class="close-btn" id="close-group-select">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ios-list-group" id="group-list">
+                            <!-- 分组列表 -->
+                        </div>
+                        <button id="create-group-btn" class="ios-btn-block">新建分组</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 视频/语音通话选择弹窗 -->
+            <div id="video-call-modal" class="modal hidden" style="z-index: 200; align-items: flex-end;">
+                <div class="modal-content" style="height: auto; border-radius: 12px 12px 0 0; width: 100%; max-width: 100%; background-color: transparent;">
+                    <div class="ios-list-group" style="margin: 0 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item center-content" id="start-voice-call-btn" style="background: white; border-bottom: 1px solid #eee; height: 56px;">
+                            <span style="font-size: 18px; color: #007AFF;">语音通话</span>
+                        </div>
+                        <div class="list-item center-content" id="start-video-call-btn" style="background: white; border-bottom: 1px solid #eee; height: 56px;">
+                            <span style="font-size: 18px; color: #007AFF;">视频通话</span>
+                        </div>
+                        <div class="list-item center-content" id="view-call-history-btn" style="background: white; height: 56px;">
+                            <span style="font-size: 18px; color: #007AFF;">通话记录</span>
+                        </div>
+                    </div>
+                    <div class="ios-list-group" style="margin: 10px 10px 20px 10px; border-radius: 12px; overflow: hidden;">
+                        <div class="list-item center-content" id="cancel-video-call-btn" style="background: white; height: 56px;">
+                            <span style="font-size: 18px; font-weight: bold; color: #007AFF;">取消</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 转账弹窗 -->
+            <div id="transfer-modal" class="modal hidden" style="z-index: 200; align-items: center;">
+                <div class="modal-content" style="height: auto; border-radius: 12px; width: 85%; max-width: 320px; background-color: #fff;">
+                    <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
+                        <h3 style="width: 100%; text-align: center;">转账</h3>
+                        <button class="close-btn" id="close-transfer-modal" style="position: absolute; right: 15px;">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <div class="setting-group">
+                            <label>金额</label>
+                            <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                <span style="font-size: 24px; font-weight: bold;">¥</span>
+                                <input type="number" id="transfer-amount" placeholder="0.00" style="border: none; font-size: 24px; font-weight: bold; width: 100%; background: transparent; outline: none;">
+                            </div>
+                        </div>
+                        <div class="setting-group" style="margin-top: 15px;">
+                            <label>转账备注</label>
+                            <input type="text" id="transfer-remark" placeholder="添加备注(50字以内)" maxlength="50">
+                        </div>
+                        <button id="do-transfer-btn" class="ios-btn-block" style="margin-top: 20px; background-color: #07C160;">转账</button>
+                    </div>
+                </div>
+            </div>
+        <!-- 发送语音弹窗 -->
+        <div id="voice-input-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>发送语音</h3>
+                    <button class="close-btn" id="close-voice-input">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- 顶部切换 -->
+                    <div class="chat-settings-nav" style="margin: 0 0 20px 0;">
+                        <div class="nav-item active" id="tab-voice-fake" onclick="switchVoiceTab('fake')">文字转语音</div>
+                        <div class="nav-item" id="tab-voice-real" onclick="switchVoiceTab('real')">录制语音</div>
+                        <div class="nav-indicator" id="voice-nav-indicator" style="width: calc(50% - 4px);"></div>
+                    </div>
+
+                    <!-- 模式1: 伪造语音 (输入文字) -->
+                    <div id="voice-mode-fake">
+                        <div class="setting-group">
+                            <label>语音内容 (点击消息后显示)</label>
+                            <textarea id="voice-fake-text" placeholder="输入这段语音对应的文字内容..." style="height: 100px;"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>语音时长: <span id="voice-fake-duration-val">3</span>秒</label>
+                            <input type="range" id="voice-fake-duration" min="1" max="60" value="3" step="1">
+                        </div>
+                        <button id="send-fake-voice-btn" class="ios-btn-block" style="background-color: #07C160;">发送</button>
+                    </div>
+
+                    <!-- 模式2: 真实录音 (Web Speech API) -->
+                    <div id="voice-mode-real" class="hidden" style="text-align: center; padding: 20px 0;">
+                        <div id="voice-recording-status" style="font-size: 18px; margin-bottom: 20px; color: #888;">点击麦克风开始说话</div>
+                        <div id="voice-mic-btn" class="voice-mic-btn">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <div id="voice-real-result" style="margin-top: 20px; font-style: italic; color: #333; min-height: 20px;"></div>
+                        <button id="send-real-voice-btn" class="ios-btn-block" style="background-color: #07C160; margin-top: 20px;" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <!-- 聊天页面 -->
+            <div id="chat-screen" class="sub-screen hidden">
+                <div class="chat-header">
+                    <button id="back-to-contacts" class="back-btn"><i class="fas fa-chevron-left"></i></button>
+                    <button id="multi-select-cancel" class="multi-select-cancel hidden">退出</button>
+                    <span id="chat-title" style="cursor: pointer;">用户名</span>
+                    <button id="chat-settings-btn" class="wechat-icon-btn"><i class="fas fa-ellipsis-h"></i></button>
+                </div>
+                <!-- 多选删除控制项：右下删除（退出按钮已移入 header） -->
+                <button id="multi-select-delete" class="multi-select-delete hidden">删除(<span id="multi-select-count">0</span>)</button>
+                <!-- 心声气泡 -->
+                <div id="thought-bubble" class="thought-bubble hidden">
+                    <div class="thought-content" id="thought-content-text"></div>
+                </div>
+                <div class="chat-body" id="chat-messages">
+                    <!-- 消息列表 -->
+                </div>
+                <!-- 引用回复条 -->
+                <div id="reply-bar" class="reply-bar hidden">
+                    <div class="reply-content">
+                        <span id="reply-name" style="font-weight: 600;"></span>: <span id="reply-text"></span>
+                    </div>
+                    <div class="reply-close" id="close-reply-bar"><i class="fas fa-times-circle"></i></div>
+                </div>
+                <!-- 临时提示组件 -->
+                <div id="chat-toast" class="chat-toast hidden">
+                    <span id="chat-toast-text"></span>
+                </div>
+                <div class="chat-input-area">
+                    <button id="chat-more-btn" class="chat-icon-btn"><i class="fas fa-plus-circle"></i></button>
+                    <input type="text" id="chat-input">
+                    <button id="sticker-btn" class="chat-icon-btn" style="margin-right: 5px;"><i class="far fa-smile"></i></button>
+                    <button id="trigger-ai-reply-btn"><i class="fas fa-arrow-up"></i></button>
+                </div>
+                <!-- 表情包面板 -->
+                <div id="sticker-panel" class="sticker-panel hidden">
+                    <div class="sticker-top-bar">
+                        <div class="sticker-search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="sticker-search-input" placeholder="搜索表情">
+                        </div>
+                    </div>
+                    <div class="sticker-tab-bar" id="sticker-tab-bar">
+                        <div id="sticker-tabs-container" style="display: flex; flex: 1; overflow-x: auto; height: 100%; align-items: center;">
+                            <!-- 标签列表 -->
+                        </div>
+                        <div class="sticker-settings-tab" id="sticker-manage-btn">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                    </div>
+                    <div id="sticker-manage-actions" class="sticker-manage-actions hidden">
+                        <span id="sticker-select-count">已选 0</span>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="sticker-export-btn">导出</button>
+                            <button id="sticker-select-all-btn">全选</button>
+                            <button id="sticker-delete-btn" class="danger">删除</button>
+                        </div>
+                    </div>
+                    <div id="sticker-content" class="sticker-content">
+                        <!-- 表情包列表 -->
+                    </div>
+                </div>
+                
+                <!-- 更多功能面板 -->
+                <div id="chat-more-panel" class="chat-more-panel hidden">
+                    <div class="more-item" id="chat-more-regenerate-btn">
+                        <div class="more-icon"><i class="fas fa-redo"></i></div>
+                        <div class="more-label">重回</div>
+                    </div>
+                    <div class="more-item" id="chat-more-photo-btn">
+                        <div class="more-icon"><i class="fas fa-image"></i></div>
+                        <div class="more-label">照片</div>
+                    </div>
+                    <input type="file" id="chat-photo-input" accept="image/*" class="file-input-hidden">
+                    <div class="more-item" id="chat-more-camera-btn">
+                        <div class="more-icon"><i class="fas fa-camera"></i></div>
+                        <div class="more-label">拍摄</div>
+                    </div>
+                    <div class="more-item" id="chat-more-video-call-btn">
+                        <div class="more-icon"><i class="fas fa-video"></i></div>
+                        <div class="more-label">视频通话</div>
+                    </div>
+                    <div class="more-item" id="chat-more-location-btn">
+                        <div class="more-icon"><i class="fas fa-map-marker-alt"></i></div>
+                        <div class="more-label">位置</div>
+                    </div>
+                    <div class="more-item" id="chat-more-memory-btn">
+                        <div class="more-icon"><i class="fas fa-brain"></i></div>
+                        <div class="more-label">记忆</div>
+                    </div>
+                    <div class="more-item" id="chat-more-transfer-btn">
+                        <div class="more-icon"><i class="fas fa-exchange-alt"></i></div>
+                        <div class="more-label">转账</div>
+                    </div>
+                    <div class="more-item" id="chat-more-voice-btn">
+                        <div class="more-icon"><i class="fas fa-microphone"></i></div>
+                        <div class="more-label">语音输入</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 钱包页面 -->
+            <div id="wallet-screen" class="sub-screen hidden" style="z-index: 160;">
+                <div class="app-header wallet-header">
+                    <button id="close-wallet-screen" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                    <h3>钱包</h3>
+                    <div style="width: 60px;"></div>
+                </div>
+                <div class="app-body wallet-body">
+                    <!-- 余额卡片 -->
+                    <div class="wallet-card">
+                        <div class="wallet-label">总资产 (CNY)</div>
+                        <div class="wallet-balance" id="wallet-balance">¥ 0.00</div>
+                    </div>
+                    
+                    <!-- 操作按钮 -->
+                    <div class="wallet-actions">
+                        <button id="wallet-recharge-btn" class="wallet-action-btn">
+                            <div class="action-icon"><i class="fas fa-plus"></i></div>
+                            <span>充值</span>
+                        </button>
+                        <button class="wallet-action-btn" style="opacity: 0.5; cursor: not-allowed;">
+                            <div class="action-icon"><i class="fas fa-arrow-up"></i></div>
+                            <span>提现</span>
+                        </button>
+                    </div>
+
+                    <!-- 交易记录 -->
+                    <div class="section-title">最近交易</div>
+                    <div id="wallet-transactions" class="wallet-transactions">
+                        <!-- 交易列表 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 充值弹窗 -->
+            <div id="wallet-recharge-modal" class="modal hidden" style="z-index: 200; align-items: center;">
+                <div class="modal-content" style="height: auto; border-radius: 12px; width: 85%; max-width: 320px; background-color: #fff;">
+                    <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
+                        <h3 style="width: 100%; text-align: center; color: #000;">充值</h3>
+                        <button class="close-btn" id="close-recharge-modal" style="position: absolute; right: 15px;">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <div class="setting-group">
+                            <label>充值金额</label>
+                            <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                                <span style="font-size: 24px; font-weight: bold; color: #000;">¥</span>
+                                <input type="number" id="recharge-amount" placeholder="0.00" style="border: none; font-size: 24px; font-weight: bold; width: 100%; background: transparent; outline: none; color: #000;">
+                            </div>
+                        </div>
+                        <button id="do-recharge-btn" class="ios-btn-block" style="margin-top: 20px; background-color: #000;">确认充值</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI 资料卡全屏页 -->
+        <div id="ai-profile-screen" class="sub-screen hidden" style="z-index: 170; background-color: #fff;">
+            <div class="app-header transparent-header" id="ai-profile-header">
+                <button id="close-ai-profile" class="back-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);"><i class="fas fa-chevron-left"></i></button>
+                <div style="flex: 1;"></div>
+                <button id="ai-profile-more" class="wechat-icon-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); display: none;"><i class="fas fa-ellipsis-h"></i></button>
+            </div>
+            
+            <div class="app-body full-screen" style="padding: 0;">
+                <!-- 头部背景与头像 -->
+                <div class="profile-header-section">
+                    <div class="profile-bg" id="ai-profile-bg"></div>
+                    <div class="profile-avatar-container">
+                        <img src="" id="ai-profile-avatar" class="profile-avatar-large">
+                    </div>
+                    <div class="profile-info-primary">
+                        <h2 id="ai-profile-name"></h2>
+                        <p id="ai-profile-nickname" class="profile-nickname" style="display: none;"></p>
+                        <p id="ai-profile-id" class="profile-id"></p>
+                    </div>
+                </div>
+                
+
+                <!-- 详细信息列表 -->
+                <div class="profile-content-section">
+                    <!-- 备注与签名 -->
+                    <div class="ios-list-group">
+                        <div class="list-item">
+                            <div class="list-content column">
+                                <label class="field-label">备注名</label>
+                                <div id="ai-profile-remark" class="field-value"></div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                        <div class="list-item">
+                            <div class="list-content column">
+                                <label class="field-label">个性签名</label>
+                                <div id="ai-profile-signature" class="field-value"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 关系设置 -->
+                    <div class="ios-list-group">
+                        <div class="list-item" id="ai-relation-item">
+                            <div class="list-content">
+                                <label>关系</label>
+                                <span id="ai-profile-relation" class="value-right">未设置</span>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                    </div>
+
+                    <!-- 朋友圈入口 -->
+                    <div class="ios-list-group">
+                        <div class="list-item" id="ai-moments-entry">
+                            <div class="list-content">
+                                <label>朋友圈</label>
+                                <div class="moments-preview" id="ai-moments-preview">
+                                    <!-- 缩略图 -->
+                                </div>
+                            </div>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- 底部按钮 -->
+                    <div class="profile-actions">
+                        <button id="ai-profile-send-msg" class="ios-btn-block"><i class="fas fa-comment"></i> 见面</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 关系选择弹窗 -->
+            <div id="relation-select-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>设置关系</h3>
+                        <button class="close-btn" id="close-relation-select">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ios-list-group" id="relation-options">
+                            <!-- 选项由JS生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 隐藏的文件输入框，用于资料卡背景修改 -->
+            <input type="file" id="ai-profile-bg-input" accept="image/*" class="file-input-hidden">
+        </div>
+
+        <!-- 个人朋友圈全屏页 -->
+        <div id="personal-moments-screen" class="app-screen hidden" style="z-index: 180; background-color: #fff;">
+            <div class="wechat-header transparent" id="personal-moments-header">
+                <div class="header-left">
+                    <button id="close-personal-moments" class="wechat-icon-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5);"><i class="fas fa-chevron-left"></i></button>
+                </div>
+                <div class="header-right"></div>
+            </div>
+            <div class="wechat-body full-screen" id="personal-moments-body" style="padding-top: 0;">
+                <div id="personal-moments-container" class="moments-container">
+                    <!-- 个人朋友圈内容将通过JS生成 -->
+                </div>
+            </div>
+            <!-- 隐藏的文件输入框，用于个人朋友圈背景修改 -->
+            <input type="file" id="personal-moments-bg-input" accept="image/*" class="file-input-hidden">
+        </div>
+
+        <!-- 通话记录列表全屏页 -->
+        <div id="call-history-screen" class="sub-screen hidden" style="z-index: 250; background-color: #f2f2f7;">
+            <div class="app-header">
+                <button id="close-call-history" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>通话记录</h3>
+                <div style="width: 60px;"></div>
+            </div>
+            <div class="app-body">
+                <div id="call-history-list" class="ios-list-group" style="margin-top: 10px; background: transparent;">
+                    <!-- 列表项将通过JS生成 -->
+                </div>
+                <div class="empty-state" id="call-history-empty" style="display: none; text-align: center; color: #999; margin-top: 50px;">
+                    暂无通话记录
+                </div>
+            </div>
+        </div>
+
+        <!-- 通话记录详情全屏页 -->
+        <div id="call-detail-screen" class="sub-screen hidden" style="z-index: 260; background-color: #fff;">
+            <div class="app-header">
+                <button id="close-call-detail" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3 id="call-detail-title">通话详情</h3>
+                <div style="width: 60px;"></div>
+            </div>
+            <div class="app-body" id="call-detail-content" style="padding: 20px;">
+                <!-- 详情内容将通过JS生成 -->
+            </div>
+        </div>
+
+        <!-- 语音通话悬浮窗 -->
+        <div id="voice-call-float" class="voice-call-float hidden">
+            <div class="float-icon"><i class="fas fa-phone"></i></div>
+            <div class="float-info">
+                <div class="float-status">通话中</div>
+                <div class="float-time" id="float-call-time">00:00</div>
+            </div>
+        </div>
+
+        <!-- 语音通话全屏页 -->
+        <div id="voice-call-screen" class="app-screen hidden" style="z-index: 300; background-color: #000;">
+            <!-- 背景层 -->
+            <div id="voice-call-bg" class="voice-call-bg"></div>
+            <div class="voice-call-overlay"></div>
+            
+            <!-- 隐藏的文件输入框，用于更换通话背景 -->
+            <input type="file" id="voice-call-bg-input" accept="image/*" class="file-input-hidden">
+
+            <!-- 顶部控制栏 -->
+            <div class="voice-call-header">
+                <button id="voice-call-minimize-btn" class="icon-btn-white"><i class="fas fa-compress-alt"></i></button>
+                <div class="voice-call-time" id="voice-call-time">00:00</div>
+                <button id="voice-call-add-btn" class="icon-btn-white"><i class="fas fa-plus"></i></button>
+            </div>
+
+            <!-- 中间头像区域 -->
+            <div class="voice-call-avatar-container">
+                <div class="voice-call-avatar-wrapper">
+                    <img id="voice-call-avatar" src="" alt="Avatar">
+                </div>
+                <div class="voice-call-name" id="voice-call-name">用户名</div>
+                <div class="voice-call-status" id="voice-call-status">正在通话中...</div>
+            </div>
+
+            <!-- 对话显示区域 -->
+            <div class="voice-call-content-container" id="voice-call-content">
+                <!-- 对话内容将通过JS动态插入 -->
+            </div>
+
+            <!-- 底部输入框 -->
+            <div class="voice-call-input-area">
+                <input type="text" id="voice-call-input" placeholder="发送消息...">
+                <button id="voice-call-send-btn"><i class="fas fa-arrow-up"></i></button>
+            </div>
+
+            <!-- 底部控制栏 -->
+            <div class="voice-call-footer">
+                <!-- 通话中按钮组 -->
+                <div id="voice-call-actions-active" class="voice-call-actions-row">
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-mic-btn" class="voice-action-btn white active">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <span>麦克风已开</span>
+                    </div>
+                    
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-hangup-btn" class="voice-action-btn red">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                        <span>挂断</span>
+                    </div>
+
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-speaker-btn" class="voice-action-btn dark">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <span>扬声器已关</span>
+                    </div>
+                </div>
+
+                <!-- 来电按钮组 -->
+                <div id="voice-call-actions-incoming" class="voice-call-actions-row hidden" style="justify-content: space-around; width: 100%; padding: 0 40px;">
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-reject-btn" class="voice-action-btn red" style="width: 70px; height: 70px;">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                        <span>挂断</span>
+                    </div>
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-accept-btn" class="voice-action-btn green" style="width: 70px; height: 70px; background-color: #34C759; color: #fff;">
+                            <i class="fas fa-phone"></i>
+                        </button>
+                        <span>接通</span>
+                    </div>
+                </div>
+
+                <!-- 呼出按钮组 (新增) -->
+                <div id="voice-call-actions-outgoing" class="voice-call-actions-row hidden" style="justify-content: center; width: 100%;">
+                    <div class="voice-call-action-item">
+                        <button id="voice-call-cancel-btn" class="voice-action-btn red" style="width: 70px; height: 70px;">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                        <span>取消</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 视频通话全屏页 -->
+        <div id="video-call-screen" class="app-screen hidden" style="z-index: 300; background-color: #000;">
+            <!-- 背景层 -->
+            <div id="video-call-bg" class="video-call-bg"></div>
+            
+            <!-- 隐藏的文件输入框，用于更换视频通话背景 -->
+            <input type="file" id="video-call-bg-input" accept="image/*" class="file-input-hidden">
+
+            <!-- 顶部控制栏 -->
+            <div class="voice-call-header">
+                <button id="video-call-minimize-btn" class="icon-btn-white"><i class="fas fa-compress-alt"></i></button>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="voice-call-time" id="video-call-time">00:00</div>
+                    <div id="video-call-status" class="voice-call-status" style="font-size: 12px; opacity: 0.8;">正在通话中...</div>
+                </div>
+                <button id="video-call-add-btn" class="icon-btn-white"><i class="fas fa-plus"></i></button>
+            </div>
+
+            <!-- 右上角本地摄像头预览 -->
+            <div id="video-local-preview" class="video-local-preview hidden">
+                <video id="video-local-stream" autoplay playsinline muted></video>
+            </div>
+
+            <!-- 对话显示区域 -->
+            <div class="voice-call-content-container" id="video-call-content">
+                <!-- 对话内容将通过JS动态插入 -->
+            </div>
+
+            <!-- 底部输入框 -->
+            <div class="voice-call-input-area">
+                <input type="text" id="video-call-input" placeholder="发送消息...">
+                <button id="video-call-snapshot-btn"><i class="fas fa-camera"></i></button>
+                <button id="video-call-send-btn"><i class="fas fa-arrow-up"></i></button>
+            </div>
+
+            <!-- 自动截图设置弹窗 -->
+            <div id="auto-snapshot-modal" class="modal hidden" style="z-index: 310;">
+                <div class="modal-content" style="width: 80%; max-width: 300px;">
+                    <div class="modal-header">
+                        <h3>自动截图设置</h3>
+                        <button class="close-btn" id="close-auto-snapshot">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>截图间隔 (秒)</label>
+                            <input type="number" id="auto-snapshot-interval" placeholder="输入秒数，0为关闭" min="5">
+                        </div>
+                        <div style="font-size: 12px; color: #888; margin-bottom: 15px;">
+                            开启后，将按指定间隔自动截取视频画面并发送给AI进行分析。建议间隔不低于5秒。
+                        </div>
+                        <button id="save-auto-snapshot-btn" class="ios-btn-block">保存并生效</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部控制栏 -->
+            <div class="voice-call-footer">
+                <div class="voice-call-actions-row" style="justify-content: space-evenly; width: 100%;">
+                    <!-- 麦克风 -->
+                    <div class="voice-call-action-item">
+                        <button id="video-call-mic-btn" class="voice-action-btn white active">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <span>麦克风已开</span>
+                    </div>
+                    
+                    <!-- 挂断 -->
+                    <div class="voice-call-action-item">
+                        <button id="video-call-hangup-btn" class="voice-action-btn red">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                        <span>挂断</span>
+                    </div>
+
+                    <!-- 开启摄像头 -->
+                    <div class="voice-call-action-item">
+                        <button id="video-call-camera-btn" class="voice-action-btn white">
+                            <i class="fas fa-video"></i>
+                        </button>
+                        <span>摄像头已关</span>
+                    </div>
+
+                    <!-- 扬声器 -->
+                    <div class="voice-call-action-item">
+                        <button id="video-call-speaker-btn" class="voice-action-btn dark">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <span>扬声器已关</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 位置/行程全屏App -->
+        <div id="location-app" class="app-screen hidden">
+            <div class="app-header">
+                <button id="close-location-app" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>行程</h3>
+                <div class="header-actions" style="display: flex; gap: 10px;">
+                    <button id="itinerary-settings-btn" class="wechat-icon-btn"><i class="fas fa-cog"></i></button>
+                    <button id="refresh-location-btn" class="wechat-icon-btn"><i class="fas fa-sync-alt"></i></button>
+                </div>
+            </div>
+            <div class="app-body">
+                <div class="timeline-container">
+                    <!-- 示例数据 -->
+                    <div class="timeline-item">
+                        <div class="timeline-time">09:00</div>
+                        <div class="timeline-content">
+                            <div class="timeline-location"><i class="fas fa-home"></i> 家中</div>
+                            <div class="timeline-desc">起床，洗漱，吃早餐。</div>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-time">10:30</div>
+                        <div class="timeline-content">
+                            <div class="timeline-location"><i class="fas fa-subway"></i> 地铁站</div>
+                            <div class="timeline-desc">乘坐地铁前往公司。</div>
+                        </div>
+                    </div>
+                     <div class="timeline-item">
+                        <div class="timeline-time">12:00</div>
+                        <div class="timeline-content">
+                            <div class="timeline-location"><i class="fas fa-utensils"></i> 公司食堂</div>
+                            <div class="timeline-desc">吃午饭，休息一会儿。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 行程设置弹窗 -->
+            <div id="itinerary-settings-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>行程生成设置</h3>
+                        <button class="close-btn" id="close-itinerary-settings">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <label>启用自动生成行程</label>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="auto-itinerary-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div style="font-size: 12px; color: #888; margin-bottom: 15px;">
+                                当聊天消息累计达到指定条数时，自动生成一条新行程。
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <label>触发间隔 (消息条数)</label>
+                            <input type="number" id="auto-itinerary-interval" placeholder="默认 10" min="1">
+                        </div>
+                        <button id="save-itinerary-settings-btn" class="ios-btn-block">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+                <!-- ================= 见面功能 HTML 开始 ================= -->
+        <!-- 1. 见面记录列表页 -->
+        <div id="meetings-screen" class="sub-screen hidden" style="z-index: 180; background-color: #f2f2f7; position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+            <div class="app-header">
+                <button id="close-meetings-screen" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>见面记录</h3>
+                <div class="header-actions" style="display: flex; gap: 8px;">
+                    <button id="meeting-theme-btn" class="wechat-icon-btn"><i class="fas fa-palette"></i></button>
+                    <button id="meeting-style-btn" class="wechat-icon-btn"><i class="fas fa-pen-nib"></i></button>
+                    <button id="new-meeting-btn" class="wechat-icon-btn"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="app-body" style="padding-bottom: 20px;">
+                <div id="meetings-list" class="ios-list-group" style="margin-top: 10px; background: transparent;">
+                    <!-- 列表项 -->
+                </div>
+                <div class="empty-state" id="meetings-empty" style="display: none; text-align: center; color: #999; margin-top: 50px;">
+                    还没有见面记录，点击右上角 + 开始
+                </div>
+            </div>
+            
+            <!-- 文风设置弹窗 -->
+            <div id="meeting-style-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>见面文风设置</h3>
+                        <button class="close-btn" id="close-meeting-style">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>文风预设</label>
+                            <div class="input-row full-width">
+                                <select id="meeting-style-preset-select">
+                                    <option value="">-- 选择预设 --</option>
+                                </select>
+                                <button id="save-meeting-style-preset" class="ios-btn-small">保存</button>
+                                <button id="delete-meeting-style-preset" class="ios-btn-small danger">删除</button>
+                            </div>
+                        </div>
+                        <div class="setting-group">
+                            <label>描写风格</label>
+                            <textarea id="meeting-style-input" placeholder="例如：细腻、唯美、注重环境描写..." style="height: 100px;"></textarea>
+                        </div>
+                        <div class="setting-group">
+                            <label>AI输出字数范围</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" id="meeting-min-words" placeholder="最小字数" style="flex: 1;">
+                                <span>-</span>
+                                <input type="number" id="meeting-max-words" placeholder="最大字数" style="flex: 1;">
+                            </div>
+                        </div>
+                        <button id="save-meeting-style-btn" class="ios-btn-block">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 见面模式美化设置弹窗 -->
+            <div id="meeting-theme-modal" class="modal hidden">
+                <div class="modal-content" style="height: 85vh;">
+                    <div class="modal-header">
+                        <h3>见面美化</h3>
+                        <button class="close-btn" id="close-meeting-theme">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 字体设置 (复用逻辑) -->
+                        <div class="section-title" style="margin-left: 0;">字体设置</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                                        <label>字体大小</label>
+                                        <span id="meeting-font-size-value">16px</span>
+                                    </div>
+                                    <input type="range" id="meeting-font-size-slider" min="12" max="30" step="1" value="16" style="width: 100%;">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>字体预设</label>
+                                    <div class="input-row full-width">
+                                        <select id="meeting-font-preset-select">
+                                            <option value="">-- 选择预设 --</option>
+                                        </select>
+                                        <button id="save-meeting-font-preset" class="ios-btn-small">保存</button>
+                                        <button id="delete-meeting-font-preset" class="ios-btn-small danger">删除</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>上传字体文件</label>
+                                    <input type="file" id="meeting-font-upload" accept=".ttf,.otf,.woff,.woff2" class="file-input-hidden">
+                                    <label for="meeting-font-upload" class="ios-btn">选择文件</label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>网络字体链接</label>
+                                    <div class="input-row full-width">
+                                        <input type="text" id="meeting-font-url" placeholder="https://...">
+                                        <button id="apply-meeting-font-url" class="ios-btn-small">应用</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item center-content" id="reset-meeting-font-btn">
+                                <span class="danger-text">重置成系统默认字体</span>
+                            </div>
+                        </div>
+
+                        <!-- 图标设置 -->
+                        <div class="section-title" style="margin-left: 0;">图标设置</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>编辑图标</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <img id="meeting-edit-icon-preview" src="" style="width: 20px; height: 20px; object-fit: contain;">
+                                        <input type="file" id="meeting-edit-icon-upload" accept="image/*" class="file-input-hidden">
+                                        <label for="meeting-edit-icon-upload" class="ios-btn">更换</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>删除图标</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <img id="meeting-delete-icon-preview" src="" style="width: 20px; height: 20px; object-fit: contain;">
+                                        <input type="file" id="meeting-delete-icon-upload" accept="image/*" class="file-input-hidden">
+                                        <label for="meeting-delete-icon-upload" class="ios-btn">更换</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>结束图标</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <img id="meeting-end-icon-preview" src="" style="width: 20px; height: 20px; object-fit: contain;">
+                                        <input type="file" id="meeting-end-icon-upload" accept="image/*" class="file-input-hidden">
+                                        <label for="meeting-end-icon-upload" class="ios-btn">更换</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>续写图标</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <img id="meeting-continue-icon-preview" src="" style="width: 20px; height: 20px; object-fit: contain;">
+                                        <input type="file" id="meeting-continue-icon-upload" accept="image/*" class="file-input-hidden">
+                                        <label for="meeting-continue-icon-upload" class="ios-btn">更换</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CSS 自定义 -->
+                        <div class="section-title" style="margin-left: 0;">自定义 CSS (见面模式)</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>CSS 预设</label>
+                                    <div class="input-row full-width">
+                                        <select id="meeting-css-preset-select">
+                                            <option value="">-- 选择预设 --</option>
+                                        </select>
+                                        <button id="save-meeting-css-preset" class="ios-btn-small">保存</button>
+                                        <button id="delete-meeting-css-preset" class="ios-btn-small danger">删除</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-item no-padding">
+                                <textarea id="meeting-css-editor" placeholder="/* 在此输入自定义CSS */" style="height: 200px;"></textarea>
+                            </div>
+                            <div class="list-item">
+                                <button id="apply-meeting-css-btn" class="ios-btn-block">应用 CSS</button>
+                            </div>
+                        </div>
+                        <div style="height: 50px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 线下见面详情页 -->
+        <div id="meeting-detail-screen" class="sub-screen hidden" style="z-index: 190; background-color: #f5f5f5; position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+            <div class="app-header transparent-header" style="background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);">
+                <button id="end-meeting-btn" class="back-btn" style="color: #FF3B30;">
+                    <img id="meeting-end-icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkYzQjMwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMjFIMWMtMS4xIDAtMi0uOS0yLTJWMWMwLTEuMS45LTIgMi0yaDhNMjEgMTJsLTUtNW01IDVsLTUgNW01LTVoLTEzIi8+PC9zdmc+" style="width: 20px; height: 20px; object-fit: contain; margin-right: 5px;"> 结束
+                </button>
+                <h3 id="meeting-detail-title">线下见面</h3>
+                <div style="width: 60px;"></div>
+            </div>
+            
+            <div class="meeting-body" id="meeting-card-container" style="flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px;">
+                <!-- 卡片内容 -->
+            </div>
+
+                        <!-- 底部输入栏 (修改版：输入框在左，生成按钮在右) -->
+            <div class="meeting-input-area" id="meeting-input-area">
+                <!-- 输入框 -->
+                <textarea id="meeting-input" placeholder="输入动作或语言，按回车发送..."></textarea>
+                
+                <!-- AI续写按钮 (魔法棒) -->
+                <button id="meeting-ai-continue-btn" class="meeting-icon-btn" title="AI续写 (让剧情继续)">
+                    <img id="meeting-continue-icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTE1IDRWMiIvPjxwYXRoIGQ9Ik0xNSAxNnYtMiIvPjxwYXRoIGQ9Ik04IDloMiIvPjxwYXRoIGQ9Ik0yMCA5aDIiLz48cGF0aCBkPSJNMTcuOCAxMS44TDE5IDEzIi8+PHBhdGggZD0iTTEwLjYgNi42TDEyIDgiLz48cGF0aCBkPSJNNC44IDExLjhMNiAxMyIvPjxwYXRoIGQ9Ik0xMiA0LjhMMTAuNiA2Ii8+PHBhdGggZD0iTTE5IDQuOEwxNy44IDYiLz48cGF0aCBkPSJNMTIgMTMuMkw0LjggMjAuNGEyLjggMi44IDAgMCAwIDQgNEwxNiAxNy4yIi8+PC9zdmc+" style="width: 24px; height: 24px; object-fit: contain;">
+                </button>
+                
+                <!-- 原发送按钮 (隐藏，逻辑保留) -->
+                <button id="meeting-send-btn" style="display:none;"></button>
+            </div>
+
+            <!-- 见面剧情编辑弹窗 -->
+            <div id="edit-meeting-msg-modal" class="modal hidden" style="z-index: 210;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>编辑剧情</h3>
+                        <button class="close-btn" id="close-edit-meeting-msg">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>剧情内容</label>
+                            <textarea id="edit-meeting-msg-content" placeholder="输入新的剧情内容..." style="height: 150px;"></textarea>
+                        </div>
+                        <button id="save-edit-meeting-msg-btn" class="ios-btn-block">保存修改</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <!-- ================= 见面功能 HTML 结束 ================= -->
+
+        <!-- 记忆全屏App -->
+        <div id="memory-app" class="app-screen hidden">
+            <div class="app-header">
+                <button id="close-memory-app" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>记忆碎片</h3>
+                <div class="header-actions" style="display: flex; gap: 10px;">
+                    <button id="add-memory-btn" class="wechat-icon-btn"><i class="fas fa-plus"></i></button>
+                    <button id="manual-summary-btn" class="wechat-icon-btn"><i class="fas fa-magic"></i></button>
+                    <button id="memory-settings-btn" class="wechat-icon-btn"><i class="fas fa-cog"></i></button>
+                </div>
+            </div>
+            <div class="app-body">
+                <div id="memory-list" class="ios-list-group" style="background-color: transparent; margin-top: 10px;">
+                    <!-- 记忆卡片列表 -->
+                </div>
+                <div class="empty-state" id="memory-empty" style="display: none;">
+                    暂无记忆
+                </div>
+            </div>
+
+            <!-- 手动添加记忆弹窗 -->
+            <div id="add-memory-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>添加记忆</h3>
+                        <button class="close-btn" id="close-add-memory"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>记忆内容</label>
+                            <textarea id="manual-memory-content" placeholder="输入记忆内容..." style="height: 150px;"></textarea>
+                        </div>
+                        <button id="save-manual-memory-btn" class="ios-btn-block">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 编辑记忆弹窗 -->
+            <div id="edit-memory-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>编辑记忆</h3>
+                        <button class="close-btn" id="close-edit-memory"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>记忆内容</label>
+                            <textarea id="edit-memory-content" placeholder="输入记忆内容..." style="height: 150px;"></textarea>
+                        </div>
+                        <button id="save-edited-memory-btn" class="ios-btn-block">保存修改</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 手动总结弹窗 -->
+            <div id="manual-summary-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>手动总结</h3>
+                        <button class="close-btn" id="close-manual-summary">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>起始楼层</label>
+                            <input type="number" id="summary-start-index" placeholder="例如: 1" min="1">
+                        </div>
+                        <div class="setting-group">
+                            <label>结束楼层</label>
+                            <input type="number" id="summary-end-index" placeholder="例如: 10" min="1">
+                        </div>
+                        <div style="font-size: 12px; color: #888; margin-bottom: 15px;">
+                            将总结指定范围内的聊天记录。当前共有 <span id="total-chat-count">0</span> 条消息。
+                        </div>
+                        <button id="do-manual-summary-btn" class="ios-btn-block">开始总结</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 记忆设置弹窗 -->
+            <div id="memory-settings-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>记忆设置</h3>
+                        <button class="close-btn" id="close-memory-settings">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>发送最近几条记忆给AI</label>
+                            <input type="number" id="modal-memory-send-limit" placeholder="默认3条" min="0">
+                        </div>
+                        <button id="save-memory-settings-btn" class="ios-btn-block">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 世界书全屏App -->
+        <div id="worldbook-app" class="app-screen hidden">
+            <div class="app-header">
+                <button id="close-worldbook-app" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>世界书</h3>
+                <button id="add-worldbook-category" class="wechat-icon-btn"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="app-body">
+                <div class="ios-list-group" id="worldbook-category-list">
+                    <!-- 分类列表将通过JS生成 -->
+                </div>
+                <div class="empty-state" id="worldbook-empty" style="display: none;">
+                    暂无分类，点击右上角添加
+                </div>
+            </div>
+
+            <!-- 分类详情页 (子屏幕) -->
+            <div id="worldbook-detail-screen" class="sub-screen hidden">
+                <div class="app-header">
+                    <button id="back-to-worldbook-list" class="back-btn"><i class="fas fa-chevron-left"></i></button>
+                    <h3 id="wb-category-title">分类名</h3>
+                    <button id="add-worldbook-entry" class="wechat-icon-btn"><i class="fas fa-plus"></i></button>
+                </div>
+                <div class="app-body">
+                    <div class="ios-list-group" id="worldbook-entry-list">
+                        <!-- 条目列表 -->
+                    </div>
+                    <div class="empty-state" id="worldbook-entry-empty" style="display: none;">
+                        暂无条目，点击右上角添加
+                    </div>
+                    <div class="ios-list-group" style="margin-top: 20px;">
+                        <div class="list-item center-content" id="edit-category-btn">
+<span style="color: #000;">编辑当前分类</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 条目编辑弹窗 -->
+            <div id="worldbook-edit-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="worldbook-modal-title">编辑条目</h3>
+                        <button class="close-btn" id="close-worldbook-edit">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>备注 (可选)</label>
+                            <input type="text" id="wb-remark" placeholder="输入备注">
+                        </div>
+                        <div class="setting-group">
+                            <label>关键字 (可选，逗号分隔)</label>
+                            <input type="text" id="wb-keys" placeholder="例如: 城堡, 国王">
+                        </div>
+                        <div class="setting-group">
+                            <label>内容</label>
+                            <textarea id="wb-content" placeholder="描述内容..." style="height: 200px;"></textarea>
+                        </div>
+                        <button id="save-worldbook-btn" class="ios-btn-block">保存</button>
+                        <button id="delete-worldbook-btn" class="ios-btn-block danger" style="margin-top: 10px;">删除</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分类编辑弹窗 -->
+            <div id="category-edit-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="category-modal-title">编辑分类</h3>
+                        <button class="close-btn" id="close-category-edit">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>分类名称</label>
+                            <input type="text" id="cat-name" placeholder="输入分类名称">
+                        </div>
+                        <div class="setting-group">
+                            <label>描述 (可选)</label>
+                            <input type="text" id="cat-desc" placeholder="输入描述">
+                        </div>
+                        <button id="save-category-btn" class="ios-btn-block">保存</button>
+                        <button id="delete-category-btn" class="ios-btn-block danger" style="margin-top: 10px; display: none;">删除分类</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 身份管理弹窗 -->
+        <div id="persona-manage-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>管理身份</h3>
+                    <button class="close-btn" id="close-persona-manage">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="persona-list" class="ios-list-group">
+                        <!-- 列表 -->
+                    </div>
+                    <button id="add-persona-btn" class="ios-btn-block">新建身份</button>
+                </div>
+            </div>
+        </div>
+
+            <!-- 身份编辑弹窗 (简化版) -->
+            <div id="persona-edit-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="persona-modal-title">编辑身份</h3>
+                        <button class="close-btn" id="close-persona-edit">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>身份名称 (发送给AI的名字)</label>
+                            <input type="text" id="persona-name" placeholder="例如：哥哥、老板...">
+                        </div>
+                        <div class="setting-group">
+                            <label>AI认知中的我 (发送给AI的人设)</label>
+                            <textarea id="persona-ai-prompt" placeholder="例如：我是你的哥哥，性格..."></textarea>
+                        </div>
+                        <button id="save-persona-btn" class="ios-btn-block">保存</button>
+                        <button id="delete-persona-btn" class="ios-btn-block danger" style="display: none;">删除</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 隐藏的文件输入框，用于资料卡直接修改 -->
+            <input type="file" id="me-avatar-input" accept="image/*" class="file-input-hidden">
+            <input type="file" id="me-bg-input" accept="image/*" class="file-input-hidden">
+            <input type="file" id="moments-bg-input" accept="image/*" class="file-input-hidden">
+
+            <!-- 发布动态弹窗 -->
+            <div id="post-moment-modal" class="app-screen hidden" style="z-index: 200; background-color: #fff;">
+                <div class="app-header">
+                    <button id="close-post-moment" class="back-btn" style="color: #000;">取消</button>
+                    <button id="do-post-moment" class="ios-btn-small" style="background-color: #07C160; color: #fff; border-radius: 4px; padding: 4px 12px;">发表</button>
+                </div>
+                <div class="app-body" style="padding: 20px;">
+                    <textarea id="post-moment-text" placeholder="这一刻的想法..." style="width: 100%; height: 100px; border: none; font-size: 16px; resize: none; margin-bottom: 20px;"></textarea>
+                    <div id="post-moment-images" class="post-images-grid">
+                        <!-- 图片预览 -->
+                        <div class="add-image-btn" id="add-moment-image-btn">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <div class="add-image-btn" id="add-virtual-image-btn" style="border: 1px dashed #007AFF; color: #007AFF;">
+                            <i class="fas fa-font"></i>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #888; margin-top: 5px;">* 点击已添加的图片可编辑图片描述</div>
+                    <input type="file" id="post-moment-file-input" accept="image/*" multiple class="file-input-hidden">
+                </div>
+            </div>
+
+        
+        <!-- 美化全屏App -->
+        <div id="theme-app" class="app-screen hidden">
+            <div class="app-header">
+                <button id="close-theme-app" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                <h3>美化中心</h3>
+                <button id="save-theme-config-btn" class="wechat-icon-btn" style="font-size: 16px; font-weight: 600; color: #007AFF; width: auto; padding: 0 10px;">保存</button>
+            </div>
+            
+            <div class="app-body">
+                <!-- 美化选项 -->
+                <div class="section-title">个性化</div>
+                <div class="ios-list-group">
+                    <div class="list-item" id="open-theme-font">
+                        <div class="list-content">
+                            <label>字体设置</label>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                    </div>
+                    <div class="list-item" id="open-theme-wallpaper">
+                        <div class="list-content">
+                            <label>壁纸设置</label>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                    </div>
+                    <div class="list-item" id="open-theme-icons">
+                        <div class="list-content">
+                            <label>应用图标</label>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 通用设置 (从设置页移来) -->
+                <div class="section-title">通用设置</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content">
+                            <label>显示状态栏</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="show-status-bar-toggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>默认虚拟图片 URL</label>
+                            <input type="text" id="default-virtual-image-url" placeholder="https://placehold.co/600x400/png?text=Photo">
+                            <div style="font-size: 12px; color: #888; margin-top: 4px;">用于“拍摄”功能和AI发送的图片</div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>动态图片 URL</label>
+                            <input type="text" id="default-moment-virtual-image-url" placeholder="https://placehold.co/600x400/png?text=Moment">
+                            <div style="font-size: 12px; color: #888; margin-top: 4px;">用于动态页面的图片描述</div>
+                        </div>
+                    </div>
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>初始加载聊天条数 (0为不限制)</label>
+                            <input type="number" id="chat-loading-limit" placeholder="默认20" min="0">
+                            <div style="font-size: 12px; color: #888; margin-top: 4px;">减少条数可加快进入聊天页面的速度</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSS编辑器区块 -->
+                <div class="section-title">高级自定义 (CSS)</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content column">
+                            <label>CSS预设</label>
+                            <div class="input-row full-width">
+                                <select id="css-preset-select">
+                                    <option value="">-- 选择预设 --</option>
+                                </select>
+                                <button id="save-css-preset" class="ios-btn-small">保存</button>
+                                <button id="delete-css-preset" class="ios-btn-small danger">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="list-item no-padding">
+                        <textarea id="css-editor" placeholder="/* 在此输入自定义CSS */"></textarea>
+                    </div>
+                    <div class="list-item">
+                        <div class="button-row full-width">
+                            <button id="save-css" class="ios-btn-block">应用并保存CSS配置</button>
+                            <button id="export-css" class="ios-btn-block secondary">导出CSS</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="height: 50px;"></div> <!-- 底部留白 -->
+            </div>
+
+            <!-- 字体设置子页面 -->
+            <div id="theme-font-screen" class="sub-screen hidden">
+                <div class="app-header">
+                    <button id="close-theme-font" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                    <h3>字体设置</h3>
+                    <div style="width: 60px;"></div>
+                </div>
+                <div class="app-body">
+                    <div class="section-title">字体设置</div>
+                    <div class="ios-list-group">
+                        <div class="list-item">
+                            <div class="list-content column">
+                                <label>字体预设</label>
+                                <div class="input-row full-width">
+                                    <select id="font-preset-select">
+                                        <option value="">-- 选择预设 --</option>
+                                    </select>
+                                    <button id="save-font-preset" class="ios-btn-small">保存</button>
+                                    <button id="delete-font-preset" class="ios-btn-small danger">删除</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-item">
+                            <div class="list-content">
+                                <label>上传字体文件</label>
+                                <input type="file" id="font-upload" accept=".ttf,.otf,.woff,.woff2" class="file-input-hidden">
+                                <label for="font-upload" class="ios-btn">选择文件</label>
+                            </div>
+                        </div>
+                        <div class="list-item">
+                            <div class="list-content column">
+                                <label>网络字体链接</label>
+                                <div class="input-row full-width">
+                                    <input type="text" id="font-url" placeholder="https://...">
+                                    <button id="apply-font-url" class="ios-btn-small">应用</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-item center-content" id="reset-font-btn">
+                            <span class="danger-text">重置成系统默认字体</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 壁纸设置子页面 -->
+            <div id="theme-wallpaper-screen" class="sub-screen hidden">
+                <div class="app-header">
+                    <button id="close-theme-wallpaper" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                    <h3>壁纸设置</h3>
+                    <div style="width: 60px;"></div>
+                </div>
+                <div class="app-body">
+                    <div class="section-title">壁纸设置</div>
+                    <div class="ios-list-group">
+                        <div class="list-item">
+                            <div class="list-content">
+                                <label>上传壁纸</label>
+                                <input type="file" id="wallpaper-upload" accept="image/*" class="file-input-hidden">
+                                <label for="wallpaper-upload" class="ios-btn">选择图片</label>
+                            </div>
+                        </div>
+                        <div class="list-item no-padding">
+                            <div id="wallpaper-gallery" class="gallery-scroll">
+                                <!-- 壁纸缩略图将在这里生成 -->
+                            </div>
+                        </div>
+                        <div class="list-item center-content" id="reset-wallpaper">
+                            <span class="danger-text">重置默认壁纸</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图标设置子页面 -->
+            <div id="theme-icons-screen" class="sub-screen hidden">
+                <div class="app-header">
+                    <button id="close-theme-icons" class="back-btn"><i class="fas fa-chevron-left"></i> 返回</button>
+                    <h3>应用图标</h3>
+                    <div style="width: 60px;"></div>
+                </div>
+                <div class="app-body">
+                    <div class="section-title">图标预设</div>
+                    <div class="ios-list-group">
+                        <div class="list-item">
+                            <div class="list-content column">
+                                <label>管理预设</label>
+                                <div class="input-row full-width">
+                                    <select id="icon-preset-select">
+                                        <option value="">-- 选择预设 --</option>
+                                    </select>
+                                    <button id="save-icon-preset" class="ios-btn-small">保存</button>
+                                    <button id="delete-icon-preset" class="ios-btn-small danger">删除</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">应用图标</div>
+                    <div class="ios-list-group" id="icon-setting-list">
+                        <!-- 图标设置项将通过JS动态生成 -->
+                    </div>
+                    <div class="ios-list-group">
+                        <div class="list-item center-content" id="reset-icons">
+                            <span class="danger-text">重置所有图标</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 音乐设置弹窗 -->
+    <div id="music-settings-modal" class="modal hidden">
+        <div class="modal-content" style="height: 85vh; padding-bottom: 0;">
+            <div class="modal-header">
+                <h3>音乐设置</h3>
+                <button class="close-btn" id="close-music-settings">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0; display: flex; flex-direction: column;">
+                
+                <!-- 上半部分：外观设置 -->
+                <div style="padding: 20px; border-bottom: 1px solid #eee; background-color: #fff;">
+                    <div class="section-title" style="margin-left: 0; margin-bottom: 15px;">外观设置</div>
+                    <div style="display: flex; gap: 20px; justify-content: center;">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <label style="margin-bottom: 10px; font-size: 13px; color: #888;">当前封面</label>
+                            <div class="avatar-upload-container" style="margin-bottom: 10px;">
+                                <div class="avatar-preview" id="music-cover-preview">
+                                    <i class="fas fa-camera"></i>
+                                </div>
+                                <input type="file" id="music-cover-upload" accept="image/*" class="file-input-hidden">
+                            </div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <label style="margin-bottom: 10px; font-size: 13px; color: #888;">组件背景</label>
+                            <div class="avatar-upload-container" style="margin-bottom: 10px;">
+                                <div class="avatar-preview" id="music-widget-bg-preview" style="border-radius: 12px;">
+                                    <i class="fas fa-image"></i>
+                                </div>
+                                <input type="file" id="music-widget-bg-upload" accept="image/*" class="file-input-hidden">
+                            </div>
+                        </div>
+                    </div>
+                    <button id="save-music-appearance" class="ios-btn-block" style="margin-top: 0;">保存外观</button>
+                </div>
+
+                <!-- 下半部分：歌曲管理 -->
+                <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background-color: #f2f2f7;">
+                    <!-- 导航栏 -->
+                    <div class="chat-settings-nav" style="margin: 10px 16px; background-color: #fff;">
+                        <div class="nav-item active" id="tab-music-list">歌曲列表</div>
+                        <div class="nav-item" id="tab-music-upload">上传歌曲</div>
+                        <div class="nav-indicator" id="music-nav-indicator" style="width: calc(50% - 4px);"></div>
+                    </div>
+
+                    <!-- 歌曲列表页 -->
+                    <div id="music-view-list" class="music-tab-content active" style="flex: 1; overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom));">
+                        <div class="ios-list-group" id="music-playlist">
+                            <!-- 歌曲列表项 -->
+                        </div>
+                        <div class="empty-state" id="music-empty-state" style="display: none;">暂无歌曲</div>
+                    </div>
+
+                    <!-- 上传歌曲页 -->
+                    <div id="music-view-upload" class="music-tab-content" style="flex: 1; overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom)); display: none;">
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>歌曲文件</label>
+                                    <div class="input-row full-width">
+                                        <button id="upload-music-btn" class="ios-btn-block secondary">选择文件</button>
+                                        <input type="file" id="music-file-upload" accept="audio/*" class="file-input-hidden">
+                                    </div>
+                                    <input type="text" id="music-url-input" placeholder="或输入歌曲 URL" style="margin-top: 10px;">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>基本信息</label>
+                                    <input type="text" id="input-song-title" placeholder="歌名">
+                                    <input type="text" id="input-artist-name" placeholder="歌手" style="margin-top: 10px;">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>歌词 (.lrc)</label>
+                                    <div class="input-row full-width">
+                                        <button id="upload-lyrics-btn" class="ios-btn-block secondary">选择歌词文件</button>
+                                        <input type="file" id="lyrics-file-upload" accept=".lrc" class="file-input-hidden">
+                                    </div>
+                                    <div id="lyrics-status" style="font-size: 12px; color: #888; margin-top: 5px;">未选择文件</div>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <button id="save-new-song" class="ios-btn-block">添加到列表并播放</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音频元素 -->
+    <audio id="bg-music" loop></audio>
+
+    <!-- 引入 localForage 用于存储大文件 (可选，如果需要) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <!-- Bmob SDK (本地文件) -->
+    <script src="js/bmob.min.js"></script>
+    <!-- 资格码验证 -->
+    <script src="js/auth.js"></script>
+    <script src="js/core.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/worldbook.js"></script>
+    <script src="js/meeting.js"></script>
+    <script src="js/apps.js"></script>
+    <script src="js/home.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/call_history.js"></script>
+
+<!-- 在 index.html 中找到 <!-- 编辑记忆弹窗 --> 附近，添加以下代码 -->
+
+            <!-- 编辑消息弹窗 -->
+            <div id="edit-chat-msg-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>编辑消息</h3>
+                        <button class="close-btn" id="close-edit-chat-msg">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="setting-group">
+                            <label>消息内容</label>
+                            <textarea id="edit-chat-msg-content" placeholder="输入新的消息内容..." style="height: 150px;"></textarea>
+                        </div>
+                        <button id="save-edit-chat-msg-btn" class="ios-btn-block">保存修改</button>
+                    </div>
+                </div>
+            </div>
+<!-- 在 index.html 中找到 <!-- 编辑消息弹窗 --> 附近，添加以下代码 -->
+
+            <!-- 发送语音弹窗 -->
+            <div id="voice-input-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>发送语音</h3>
+                        <button class="close-btn" id="close-voice-input">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- 顶部切换 -->
+                        <div class="chat-settings-nav" style="margin: 0 0 20px 0;">
+                            <div class="nav-item active" id="tab-voice-fake" onclick="switchVoiceTab('fake')">文字转语音</div>
+                            <div class="nav-item" id="tab-voice-real" onclick="switchVoiceTab('real')">录制语音</div>
+                            <div class="nav-indicator" id="voice-nav-indicator" style="width: calc(50% - 4px);"></div>
+                        </div>
+
+                        <!-- 模式1: 伪造语音 (输入文字) -->
+                        <div id="voice-mode-fake">
+                            <div class="setting-group">
+                                <label>语音内容 (点击消息后显示)</label>
+                                <textarea id="voice-fake-text" placeholder="输入这段语音对应的文字内容..." style="height: 100px;"></textarea>
+                            </div>
+                            <div class="setting-group">
+                                <label>语音时长: <span id="voice-fake-duration-val">3</span>秒</label>
+                                <input type="range" id="voice-fake-duration" min="1" max="60" value="3" step="1">
+                            </div>
+                            <button id="send-fake-voice-btn" class="ios-btn-block" style="background-color: #07C160;">发送</button>
+                        </div>
+
+                        <!-- 模式2: 真实录音 (Web Speech API) -->
+                        <div id="voice-mode-real" class="hidden" style="text-align: center; padding: 20px 0;">
+                            <div id="voice-recording-status" style="font-size: 18px; margin-bottom: 20px; color: #888;">点击麦克风开始说话</div>
+                            <div id="voice-mic-btn" class="voice-mic-btn">
+                                <i class="fas fa-microphone"></i>
+                            </div>
+                            <div id="voice-real-result" style="margin-top: 20px; font-style: italic; color: #333; min-height: 20px;"></div>
+                            <button id="send-real-voice-btn" class="ios-btn-block" style="background-color: #07C160; margin-top: 20px;" disabled>发送</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+</body>
+</html>
+
+</file_content>
+
+现在您已经获得了文件的最新状态，请使用更少、更精确的 SEARCH 块再次尝试操作。特别是对于大型文件，明智的做法可能是尝试将自己限制在每次不超过 5 个 SEARCH/REPLACE 块，然后等待用户对操作结果的响应，然后再进行另一个 replace_in_file 调用来进行额外的编辑。
+（如果您连续 3 次遇到此错误，您可以使用 write_to_file 工具作为后备方案。）
+</error><environment_details>
+# VSCode Visible Files
+script.js
+index.html
+
+# VSCode Open Tabs
+style.css
+script.js
+index.html
+
+# 当前时间
+2026/1/24 下午3:18:00 (Asia/Shanghai, UTC+8:00)
+
+# 上下文窗口使用
+0 / 300K 令牌已使用 (0%)
+
+# 当前模式
+行动模式
+</environment_details>
