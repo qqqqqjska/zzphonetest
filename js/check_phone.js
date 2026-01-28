@@ -74,16 +74,25 @@ function initPhoneGrid() {
         /* 查手机-微信底栏全宽适配 */
         #phone-wechat .wechat-tab-bar {
             width: 100% !important;
-            height: 60px !important;
+            height: auto !important;
+            min-height: 85px !important;
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
             border-radius: 0 !important;
             margin: 0 !important;
-            padding-bottom: env(safe-area-inset-bottom) !important;
+            padding-top: 10px !important;
+            padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
             background-color: #f7f7f7 !important;
             border-top: 1px solid rgba(0,0,0,0.1) !important;
             box-shadow: none !important;
+            align-items: flex-start !important;
+        }
+
+        /* 调整图标垂直位置 */
+        #phone-wechat .wechat-tab-item {
+            justify-content: flex-start !important;
+            margin-top: 5px !important;
         }
         
         /* 查手机-联系人选择弹窗半屏高度优化 */
