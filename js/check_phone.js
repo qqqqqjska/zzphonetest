@@ -1781,7 +1781,201 @@ window.closePhoneWechatChat = function() {
     }
 };
 
+// 浏览器菜单和历史页面动画函数
+function openBrowserMenu() {
+    const modal = document.getElementById('browser-menu-modal');
+    const panel = document.getElementById('browser-menu-panel');
+    
+    if (modal && panel) {
+        modal.classList.remove('hidden');
+        // 强制重绘，然后添加动画
+        requestAnimationFrame(() => {
+            panel.style.transform = 'translateY(0)';
+        });
+    }
+}
+
+function closeBrowserMenu() {
+    const modal = document.getElementById('browser-menu-modal');
+    const panel = document.getElementById('browser-menu-panel');
+    
+    if (modal && panel) {
+        panel.style.transform = 'translateY(100%)';
+        // 等待动画完成后隐藏
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+function openBrowserHistory() {
+    // 先关闭菜单
+    closeBrowserMenu();
+    
+    // 延迟打开历史页面，让菜单先关闭
+    setTimeout(() => {
+        const modal = document.getElementById('browser-history-modal');
+        const panel = document.getElementById('browser-history-panel');
+        
+        if (modal && panel) {
+            modal.classList.remove('hidden');
+            // 强制重绘，然后添加动画
+            requestAnimationFrame(() => {
+                panel.style.transform = 'translateY(0)';
+            });
+        }
+    }, 150);
+}
+
+function closeBrowserHistory() {
+    const modal = document.getElementById('browser-history-modal');
+    const panel = document.getElementById('browser-history-panel');
+    
+    if (modal && panel) {
+        panel.style.transform = 'translateY(100%)';
+        // 等待动画完成后隐藏
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+// 渲染浏览器内容（包括历史记录）
+function renderPhoneBrowser(contactId) {
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const browserHistory = content ? content.browserHistory : [];
+    
+    // 渲染历史记录列表
+    const historyList = document.getElementById('browser-history-list');
+    if (!historyList) return;
+    
+    if (!browserHistory || browserHistory.length === 0) {
+        historyList.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #999;">
+                <i class="far fa-clock" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i>
+                <p>点击右上角生成浏览历史</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // 按日期分组历史记录
+    const groupedHistory = {};
+    browserHistory.forEach(item => {
+        const date = item.date || '今天';
+        if (!groupedHistory[date]) {
+            groupedHistory[date] = [];
+        }
+        groupedHistory[date].push(item);
+    });
+    
+    let html = '';
+    Object.keys(groupedHistory).forEach(date => {
+        html += `
+            <div class="history-date-group" style="margin-bottom: 20px;">
+                <div class="history-date-header" style="padding: 15px 20px 10px 20px; font-size: 14px; font-weight: 600; color: #8e8e93; background: #f8f8f8;">
+                    ${date}
+                </div>
+                <div class="history-items">
+        `;
+        
+        groupedHistory[date].forEach((item, index) => {
+            const favicon = item.favicon || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiByeD0iMiIgZmlsbD0iIzAwN0FGRiIvPgo8cGF0aCBkPSJNOCA0VjEyTTQgOEgxMiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+';
+            const isLastItem = index === groupedHistory[date].length - 1;
+            const borderStyle = isLastItem ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
+            
+            html += `
+                <div class="history-item" style="display: flex; align-items: center; padding: 12px 20px; background: #fff; ${borderStyle}">
+                    <img src="${favicon}" style="width: 16px; height: 16px; margin-right: 12px; border-radius: 2px;" onerror="this.style.display='none'">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 16px; color: #000; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${item.title || item.url || '未知页面'}
+                        </div>
+                        <div style="font-size: 12px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${item.url || ''}
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #8e8e93; margin-left: 10px;">
+                        ${item.time || ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    historyList.innerHTML = html;
+}
+
+// 生成浏览器历史记录
+async function generatePhoneBrowserHistory(contact) {
+    const btn = document.getElementById('generate-browser-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('generating-pulse');
+    }
+
+    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成浏览器历史记录。
+
+角色设定：${contact.persona || '无'}
+
+【任务要求】
+1. 生成 15-25 条浏览历史记录。
+2. 内容要符合角色的身份、兴趣和生活习惯。
+3. 包含不同类型的网站：搜索、新闻、购物、娱乐、工作、学习等。
+4. 时间要合理分布在最近几天。
+5. 网站标题要真实自然，不要太假。
+
+【返回格式】
+必须是纯 JSON 数组，格式如下：
+[
+  {
+    "title": "网页标题",
+    "url": "https://example.com",
+    "time": "10:30",
+    "date": "2026年1月28日",
+    "favicon": "https://example.com/favicon.ico"
+  }
+]
+
+【重要】
+- 直接返回 JSON 数组，不要包含任何说明文字
+- 不要使用 Markdown 代码块标记
+- 确保 JSON 格式正确`;
+
+    await callAiGeneration(contact, systemPrompt, 'browser', btn);
+}
+
 // 注册
 if (window.appInitFunctions) {
     window.appInitFunctions.push(initPhoneGrid);
 }
+
+// 生成浏览器内容的包装函数
+function generateBrowserContent() {
+    if (!currentCheckPhoneContactId) {
+        alert('请先选择一个联系人');
+        return;
+    }
+    
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    if (!contact) {
+        alert('联系人不存在');
+        return;
+    }
+    
+    generatePhoneBrowserHistory(contact);
+}
+
+// 全局函数注册
+window.openBrowserMenu = openBrowserMenu;
+window.closeBrowserMenu = closeBrowserMenu;
+window.openBrowserHistory = openBrowserHistory;
+window.closeBrowserHistory = closeBrowserHistory;
+window.renderPhoneBrowser = renderPhoneBrowser;
+window.generatePhoneBrowserHistory = generatePhoneBrowserHistory;
+window.generateBrowserContent = generateBrowserContent;
