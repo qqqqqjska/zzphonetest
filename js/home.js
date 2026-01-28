@@ -265,6 +265,14 @@ function renderItems() {
                 el.addEventListener('touchend', (e) => handleItemTouchEnd(e, item), { passive: false });
             }
 
+            // Fix: 更新 pointer-events，确保退出编辑模式后组件可交互
+            if (item.type === 'custom-json-widget') {
+                const content = el.firstChild;
+                if (content) {
+                    content.style.pointerEvents = isEditMode ? 'none' : 'auto';
+                }
+            }
+
             if (item.type === 'dom-element' || item.type === 'custom-json-widget') {
                 applyWidgetSize(slot, item.size);
                 slot.classList.add('widget-slot');

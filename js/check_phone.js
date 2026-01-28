@@ -279,7 +279,11 @@ function initPhoneGrid() {
             } else if (appId === 'phone-browser') {
                 document.getElementById('phone-browser').classList.remove('hidden');
                 if (currentCheckPhoneContactId) {
-                    renderPhoneBrowser(currentCheckPhoneContactId);
+                    if (window.renderPhoneBrowser) window.renderPhoneBrowser(currentCheckPhoneContactId);
+                    if (window.renderBrowserSearchRecords) window.renderBrowserSearchRecords(currentCheckPhoneContactId);
+                    if (window.renderBrowserBookmarks) window.renderBrowserBookmarks(currentCheckPhoneContactId);
+                    if (window.renderBrowserDownloads) window.renderBrowserDownloads(currentCheckPhoneContactId);
+                    if (window.renderBrowserShare) window.renderBrowserShare(currentCheckPhoneContactId);
                 }
             } else {
                 originalHandleAppClick(appId, appName);
@@ -1103,6 +1107,8 @@ async function handlePhoneAppGenerate(appType) {
         // 但用户点击生成，通常意味着强制生成。
         // 读取内容逻辑移到打开应用时，这里只负责生成。
         await generatePhoneWechatMoments(contact);
+    } else if (appType === 'browser') {
+        await generatePhoneBrowserHistory(contact);
     } else {
         alert(`正在生成 ${contact.name} 的 ${appType} 内容...\n(功能开发中)`);
     }
@@ -1185,24 +1191,70 @@ async function callAiGeneration(contact, systemPrompt, type, btn) {
         const data = await response.json();
         let content = data.choices[0].message.content.trim();
         
-        // 尝试提取 JSON 部分
-        const firstBrace = content.indexOf('{');
-        const lastBrace = content.lastIndexOf('}');
-        const firstBracket = content.indexOf('[');
-        const lastBracket = content.lastIndexOf(']');
-
+        // 改进的JSON提取逻辑
         let jsonStr = content;
-        // 简单判断是对象还是数组
-        if (type === 'all' && firstBrace !== -1 && lastBrace !== -1) {
-            jsonStr = content.substring(firstBrace, lastBrace + 1);
-        } else if (type !== 'all' && firstBracket !== -1 && lastBracket !== -1) {
-            jsonStr = content.substring(firstBracket, lastBracket + 1);
-        } else {
-             // Fallback
-             jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        // 首先移除markdown代码块标记
+        jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        
+        // 移除可能的前后文本说明
+        const lines = jsonStr.split('\n');
+        let startIndex = -1;
+        let endIndex = -1;
+        
+        // 查找JSON开始和结束位置
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (startIndex === -1 && (line.startsWith('{') || line.startsWith('['))) {
+                startIndex = i;
+            }
+            if (line.endsWith('}') || line.endsWith(']')) {
+                endIndex = i;
+            }
         }
         
-        const result = JSON.parse(jsonStr);
+        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+            jsonStr = lines.slice(startIndex, endIndex + 1).join('\n');
+        }
+        
+        // 如果还是找不到合适的JSON，尝试用大括号或方括号定位
+        if (!jsonStr.trim().startsWith('{') && !jsonStr.trim().startsWith('[')) {
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            const firstBracket = content.indexOf('[');
+            const lastBracket = content.lastIndexOf(']');
+            
+            // 根据type判断期望的JSON格式
+            if (type === 'browser_all' || type === 'all') {
+                // 期望对象格式
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    jsonStr = content.substring(firstBrace, lastBrace + 1);
+                }
+            } else {
+                // 期望数组格式
+                if (firstBracket !== -1 && lastBracket !== -1) {
+                    jsonStr = content.substring(firstBracket, lastBracket + 1);
+                }
+            }
+        }
+        
+        // 清理可能的多余字符
+        jsonStr = jsonStr.trim();
+        
+        // 尝试解析JSON，如果失败则提供更详细的错误信息
+        let result;
+        try {
+            console.log('尝试解析JSON，类型:', type);
+            console.log('提取的JSON字符串长度:', jsonStr.length);
+            console.log('JSON字符串前200字符:', jsonStr.substring(0, 200));
+            result = JSON.parse(jsonStr);
+            console.log('JSON解析成功，结果类型:', typeof result, '是否为数组:', Array.isArray(result));
+        } catch (parseError) {
+            console.error('JSON解析失败，原始内容:', content);
+            console.error('提取的JSON字符串:', jsonStr);
+            console.error('解析错误:', parseError);
+            throw new Error(`JSON解析失败: ${parseError.message}\n提取的内容: ${jsonStr.substring(0, 200)}...`);
+        }
 
         if (!window.iphoneSimState.phoneContent[contact.id]) {
             window.iphoneSimState.phoneContent[contact.id] = {};
@@ -1228,8 +1280,23 @@ async function callAiGeneration(contact, systemPrompt, type, btn) {
         } else if (type === 'browser' && Array.isArray(result)) {
             window.iphoneSimState.phoneContent[contact.id].browserHistory = result;
             renderPhoneBrowser(contact.id);
+        } else if (type === 'browser_all') {
+            if (!window.iphoneSimState.phoneContent[contact.id].browserData) {
+                window.iphoneSimState.phoneContent[contact.id].browserData = {};
+            }
+            window.iphoneSimState.phoneContent[contact.id].browserData = result;
+            
+            if (window.renderBrowserSearchRecords) window.renderBrowserSearchRecords(contact.id);
+            if (window.renderPhoneBrowser) window.renderPhoneBrowser(contact.id);
+            if (window.renderBrowserBookmarks) window.renderBrowserBookmarks(contact.id);
+            if (window.renderBrowserDownloads) window.renderBrowserDownloads(contact.id);
+            if (window.renderBrowserShare) window.renderBrowserShare(contact.id);
+            
+            if (window.showChatToast) window.showChatToast('浏览器内容生成完成');
+            else alert('浏览器内容生成完成');
         } else {
-            throw new Error('返回格式不正确');
+            console.error('未知的生成类型或格式不正确:', { type, result });
+            throw new Error(`返回格式不正确。类型: ${type}, 结果类型: ${typeof result}, 是否为数组: ${Array.isArray(result)}`);
         }
 
         if (window.saveConfig) window.saveConfig();
@@ -1840,70 +1907,127 @@ function closeBrowserHistory() {
     }
 }
 
-// 渲染浏览器内容（包括历史记录）
-function renderPhoneBrowser(contactId) {
-    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
-    const browserHistory = content ? content.browserHistory : [];
+function openBrowserBookmarks() {
+    closeBrowserMenu();
+    setTimeout(() => {
+        const modal = document.getElementById('browser-bookmarks-modal');
+        const panel = document.getElementById('browser-bookmarks-panel');
+        if (modal && panel) {
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.style.transform = 'translateY(0)';
+            });
+        }
+    }, 150);
+}
+
+function closeBrowserBookmarks() {
+    const modal = document.getElementById('browser-bookmarks-modal');
+    const panel = document.getElementById('browser-bookmarks-panel');
+    if (modal && panel) {
+        panel.style.transform = 'translateY(100%)';
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+function openBrowserDownloads() {
+    closeBrowserMenu();
+    setTimeout(() => {
+        const modal = document.getElementById('browser-downloads-modal');
+        const panel = document.getElementById('browser-downloads-panel');
+        if (modal && panel) {
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.style.transform = 'translateY(0)';
+            });
+        }
+    }, 150);
+}
+
+function closeBrowserDownloads() {
+    const modal = document.getElementById('browser-downloads-modal');
+    const panel = document.getElementById('browser-downloads-panel');
+    if (modal && panel) {
+        panel.style.transform = 'translateY(100%)';
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+function openBrowserShare() {
+    closeBrowserMenu();
+    setTimeout(() => {
+        const modal = document.getElementById('browser-share-modal');
+        const panel = document.getElementById('browser-share-panel');
+        if (modal && panel) {
+            modal.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.style.transform = 'translateY(0)';
+            });
+        }
+    }, 150);
+}
+
+function closeBrowserShare() {
+    const modal = document.getElementById('browser-share-modal');
+    const panel = document.getElementById('browser-share-panel');
+    if (modal && panel) {
+        panel.style.transform = 'translateY(100%)';
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+// 渲染浏览器搜索记录
+function renderBrowserSearchRecords(contactId) {
+    const list = document.getElementById('browser-search-records-list');
+    if (!list) return;
     
-    // 渲染历史记录列表
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const records = content && content.browserData ? content.browserData.search_history : [];
+    
+    list.innerHTML = '';
+    
+    const items = records && records.length > 0 ? records : [
+        "https://api.dzzi.ai/", "宝可梦编号查询", "南京审计大学门户信息", "单词数统计器",
+        "如何做红烧肉", "最近的电影院", "天气预报", "Python入门教程", "全部历史 >"
+    ];
+
+    items.forEach(text => {
+        const div = document.createElement('div');
+        div.className = 'record-item';
+        div.style.cssText = 'font-size: 13px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;';
+        div.textContent = text;
+        list.appendChild(div);
+    });
+}
+
+// 渲染浏览器历史记录
+function renderPhoneBrowser(contactId) {
     const historyList = document.getElementById('browser-history-list');
     if (!historyList) return;
     
-    if (!browserHistory || browserHistory.length === 0) {
-        historyList.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: #999;">
-                <i class="far fa-clock" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i>
-                <p>点击右上角生成浏览历史</p>
-            </div>
-        `;
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const historyData = (content && content.browserData && content.browserData.browser_history) || (content && content.browserHistory) || [];
+    
+    if (!historyData || historyData.length === 0) {
+        historyList.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999;"><i class="far fa-clock" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i><p>暂无历史记录</p></div>`;
         return;
     }
     
-    // 按日期分组历史记录
-    const groupedHistory = {};
-    browserHistory.forEach(item => {
-        const date = item.date || '今天';
-        if (!groupedHistory[date]) {
-            groupedHistory[date] = [];
-        }
-        groupedHistory[date].push(item);
-    });
-    
     let html = '';
-    Object.keys(groupedHistory).forEach(date => {
-        html += `
-            <div class="history-date-group" style="margin-bottom: 20px;">
-                <div class="history-date-header" style="padding: 15px 20px 10px 20px; font-size: 14px; font-weight: 600; color: #8e8e93; background: #f8f8f8;">
-                    ${date}
-                </div>
-                <div class="history-items">
-        `;
-        
-        groupedHistory[date].forEach((item, index) => {
-            const favicon = item.favicon || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiByeD0iMiIgZmlsbD0iIzAwN0FGRiIvPgo8cGF0aCBkPSJNOCA0VjEyTTQgOEgxMiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+';
-            const isLastItem = index === groupedHistory[date].length - 1;
-            const borderStyle = isLastItem ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
-            
-            html += `
-                <div class="history-item" style="display: flex; align-items: center; padding: 12px 20px; background: #fff; ${borderStyle}">
-                    <img src="${favicon}" style="width: 16px; height: 16px; margin-right: 12px; border-radius: 2px;" onerror="this.style.display='none'">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: 16px; color: #000; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${item.title || item.url || '未知页面'}
-                        </div>
-                        <div style="font-size: 12px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${item.url || ''}
-                        </div>
-                    </div>
-                    <div style="font-size: 12px; color: #8e8e93; margin-left: 10px;">
-                        ${item.time || ''}
-                    </div>
-                </div>
-            `;
-        });
+    historyData.forEach((item, index) => {
+        const title = item.title || item.url || '未知页面';
+        const borderStyle = index === historyData.length - 1 ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
         
         html += `
-                </div>
+            <div onclick='openBrowserPageDetail(${JSON.stringify(item).replace(/'/g, "'")}, "history")' style="padding: 15px 20px; background: #fff; ${borderStyle}; cursor: pointer;">
+                <div style="font-size: 16px; color: #000; margin-bottom: 4px; font-weight: 500;">${title}</div>
+                <div style="font-size: 12px; color: #8e8e93;">${item.time || '刚刚'}</div>
             </div>
         `;
     });
@@ -1911,7 +2035,133 @@ function renderPhoneBrowser(contactId) {
     historyList.innerHTML = html;
 }
 
-// 生成浏览器历史记录
+// 渲染书签
+function renderBrowserBookmarks(contactId) {
+    const list = document.querySelector('#browser-bookmarks-panel .history-content > div');
+    if (!list) return;
+    
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const bookmarks = content && content.browserData ? content.browserData.bookmarks : [];
+    
+    if (!bookmarks || bookmarks.length === 0) {
+        list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999;"><i class="far fa-star" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i><p>暂无书签</p></div>`;
+        return;
+    }
+
+    let html = '';
+    bookmarks.forEach((item, index) => {
+        const borderStyle = index === bookmarks.length - 1 ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
+        html += `
+            <div onclick='openBrowserPageDetail(${JSON.stringify(item).replace(/'/g, "'")}, "bookmark")' style="padding: 15px 20px; background: #fff; ${borderStyle}; cursor: pointer; display: flex; align-items: center;">
+                <i class="fas fa-star" style="color: #FFD700; margin-right: 10px;"></i>
+                <div style="flex: 1;">
+                    <div style="font-size: 16px; color: #000; font-weight: 500;">${item.title}</div>
+                </div>
+                <i class="fas fa-chevron-right" style="color: #ccc; font-size: 12px;"></i>
+            </div>
+        `;
+    });
+    list.innerHTML = html;
+}
+
+// 渲染下载
+function renderBrowserDownloads(contactId) {
+    const list = document.querySelector('#browser-downloads-panel .history-content > div');
+    if (!list) return;
+    
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const downloads = content && content.browserData ? content.browserData.downloads : [];
+    
+    if (!downloads || downloads.length === 0) {
+        list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999;"><i class="fas fa-arrow-down" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i><p>暂无下载</p></div>`;
+        return;
+    }
+
+    let html = '';
+    downloads.forEach((item, index) => {
+        const borderStyle = index === downloads.length - 1 ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
+        const icon = item.icon || '📄';
+        html += `
+            <div style="padding: 15px 20px; background: #fff; ${borderStyle}; display: flex; align-items: center;">
+                <div style="font-size: 24px; margin-right: 15px;">${icon}</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 16px; color: #000; font-weight: 500;">${item.filename}</div>
+                    <div style="font-size: 12px; color: #8e8e93;">已完成 • 2.5MB</div>
+                </div>
+            </div>
+        `;
+    });
+    list.innerHTML = html;
+}
+
+// 渲染分享
+function renderBrowserShare(contactId) {
+    const list = document.querySelector('#browser-share-panel .history-content > div');
+    if (!list) return;
+    
+    const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
+    const shares = content && content.browserData ? content.browserData.share_history : [];
+    
+    if (!shares || shares.length === 0) {
+        list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999;"><i class="fas fa-share-alt" style="font-size: 48px; margin-bottom: 15px; opacity: 0.5;"></i><p>暂无分享</p></div>`;
+        return;
+    }
+
+    let html = '';
+    shares.forEach((item, index) => {
+        const borderStyle = index === shares.length - 1 ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
+        html += `
+            <div onclick='openBrowserPageDetail(${JSON.stringify(item).replace(/'/g, "'")}, "share")' style="padding: 15px 20px; background: #fff; ${borderStyle}; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                <div style="flex: 1; margin-right: 10px;">
+                    <div style="font-size: 16px; color: #000; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.title}</div>
+                </div>
+                <div style="font-size: 14px; color: #8e8e93;">
+                    分享给: ${item.target}
+                </div>
+            </div>
+        `;
+    });
+    list.innerHTML = html;
+}
+
+// 打开详情页
+window.openBrowserPageDetail = function(item, type) {
+    const modal = document.getElementById('browser-page-detail');
+    const titleEl = document.getElementById('browser-detail-title');
+    const contentEl = document.getElementById('browser-detail-content');
+    const footerEl = document.getElementById('browser-detail-footer');
+    
+    if (!modal) return;
+    
+    titleEl.textContent = item.title || '详情';
+    
+    // 内容部分
+    if (type === 'share') {
+        contentEl.innerHTML = `<p><strong>分享内容：</strong>${item.title}</p><p><strong>分享给：</strong>${item.target}</p>`;
+    } else {
+        contentEl.innerHTML = item.content || '（无详细内容）';
+    }
+    
+    // 底部部分
+    let footerText = '';
+    if (type === 'history') {
+        footerText = `<i>💭 ${item.thoughts || ''}</i>`;
+    } else if (type === 'bookmark') {
+        footerText = `<i>💭 ${item.thoughts || ''}</i><br><br>⭐️ ${item.reason || ''}`;
+    } else if (type === 'share') {
+        footerText = `[配文] "${item.comment || ''}"`;
+    }
+    
+    footerEl.innerHTML = footerText;
+    
+    modal.classList.remove('hidden');
+}
+
+window.closeBrowserPageDetail = function() {
+    document.getElementById('browser-page-detail').classList.add('hidden');
+}
+
+// 生成浏览器所有内容
 async function generatePhoneBrowserHistory(contact) {
     const btn = document.getElementById('generate-browser-btn');
     if (btn) {
@@ -1919,35 +2169,61 @@ async function generatePhoneBrowserHistory(contact) {
         btn.classList.add('generating-pulse');
     }
 
-    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成浏览器历史记录。
+    let userPersonaInfo = '';
+    if (contact.userPersonaId) {
+        const p = window.iphoneSimState.userPersonas.find(p => p.id === contact.userPersonaId);
+        if (p) userPersonaInfo = `用户(我)的设定：${p.name} - ${p.aiPrompt || ''}`;
+    } else if (window.iphoneSimState.userProfile) {
+        userPersonaInfo = `用户(我)的昵称：${window.iphoneSimState.userProfile.name}`;
+    }
 
-角色设定：${contact.persona || '无'}
+    const history = window.iphoneSimState.chatHistory[contact.id] || [];
+    const recentChat = history.slice(-20).map(m => `${m.role === 'user' ? '用户' : contact.name}: ${m.content}`).join('\n');
+
+    let worldbookInfo = '';
+    if (window.iphoneSimState.worldbook) {
+        const activeEntries = window.iphoneSimState.worldbook.filter(e => e.enabled);
+        if (contact.linkedWbCategories) {
+             const linked = activeEntries.filter(e => contact.linkedWbCategories.includes(e.categoryId));
+             if (linked.length > 0) worldbookInfo = '相关世界书设定：\n' + linked.map(e => e.content).join('\n');
+        }
+    }
+
+    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成浏览器相关的所有数据。
+
+【角色设定】
+人设：${contact.persona || '无'}
+${userPersonaInfo}
+
+【背景信息】
+${worldbookInfo}
+最近聊天：
+${recentChat}
 
 【任务要求】
-1. 生成 15-25 条浏览历史记录。
-2. 内容要符合角色的身份、兴趣和生活习惯。
-3. 包含不同类型的网站：搜索、新闻、购物、娱乐、工作、学习等。
-4. 时间要合理分布在最近几天。
-5. 网站标题要真实自然，不要太假。
+请生成一个 JSON 对象，包含以下 5 个部分的真实数据 (数据要符合角色人设和生活习惯)：
+
+1. "search_history" (搜索记录): 9 个字符串。
+   - 模拟真人搜索时的关键词或问题。
+   
+2. "browser_history" (浏览历史): 5 个对象。
+   - { "title": "网页标题", "content": "网页详细内容摘要(100字左右)", "thoughts": "角色浏览时的心理活动(斜体)", "time": "10:30" }
+   
+3. "bookmarks" (书签/收藏): 5 个对象。
+   - { "title": "网页标题", "content": "网页内容简介", "thoughts": "角色想法", "reason": "收藏原因" }
+   
+4. "downloads" (下载记录): 5 个对象。
+   - { "filename": "文件名(包含后缀)", "icon": "文件类型的Emoji图标" }
+   - 包含文件、资源、APP等。
+   
+5. "share_history" (分享记录): 5 个对象。
+   - { "title": "分享的内容标题", "target": "分享给谁(名字)", "comment": "分享时的配文/吐槽(简单一句话)" }
 
 【返回格式】
-必须是纯 JSON 数组，格式如下：
-[
-  {
-    "title": "网页标题",
-    "url": "https://example.com",
-    "time": "10:30",
-    "date": "2026年1月28日",
-    "favicon": "https://example.com/favicon.ico"
-  }
-]
+必须是纯 JSON 对象。
+不要包含 Markdown 标记。`;
 
-【重要】
-- 直接返回 JSON 数组，不要包含任何说明文字
-- 不要使用 Markdown 代码块标记
-- 确保 JSON 格式正确`;
-
-    await callAiGeneration(contact, systemPrompt, 'browser', btn);
+    await callAiGeneration(contact, systemPrompt, 'browser_all', btn);
 }
 
 // 注册
@@ -1971,11 +2247,99 @@ function generateBrowserContent() {
     generatePhoneBrowserHistory(contact);
 }
 
+function enterBrowserSearchMode() {
+    if (currentCheckPhoneContactId) {
+        renderBrowserSearchRecords(currentCheckPhoneContactId);
+    }
+
+    const logo = document.getElementById('browser-logo');
+    const records = document.getElementById('browser-search-records');
+    const searchBar = document.getElementById('browser-search-bar');
+    const searchInput = document.getElementById('browser-search-input');
+    const searchIcon = document.getElementById('browser-search-icon');
+    const content = document.getElementById('phone-browser-content');
+
+    if (logo) {
+        logo.style.opacity = '0';
+        // 使用 visibility: hidden 保持占位，防止下方元素(搜索框)位置跳动
+        setTimeout(() => logo.style.visibility = 'hidden', 300);
+    }
+    
+    if (content) content.style.opacity = '0'; // 同样渐隐内容
+
+    if (records) {
+        records.classList.remove('hidden');
+        // 简单的淡入效果
+        records.style.opacity = '0';
+        requestAnimationFrame(() => {
+            records.style.transition = 'opacity 0.3s ease';
+            records.style.opacity = '1';
+        });
+    }
+
+    if (searchBar) {
+        // 不需要调整 marginBottom，因为位置应该保持不变
+    }
+
+    if (searchInput) {
+        searchInput.style.textAlign = 'left';
+        searchInput.value = ''; // 清空
+        searchInput.placeholder = '|'; // 模拟光标
+    }
+
+    if (searchIcon) {
+        searchIcon.style.display = 'block';
+    }
+}
+
+function exitBrowserSearchMode() {
+    const logo = document.getElementById('browser-logo');
+    const records = document.getElementById('browser-search-records');
+    const searchBar = document.getElementById('browser-search-bar');
+    const searchInput = document.getElementById('browser-search-input');
+    const searchIcon = document.getElementById('browser-search-icon');
+    const content = document.getElementById('phone-browser-content');
+
+    if (records) {
+        records.style.opacity = '0';
+        setTimeout(() => {
+            records.classList.add('hidden');
+            if (logo) {
+                logo.style.visibility = 'visible'; // 恢复可见
+                requestAnimationFrame(() => logo.style.opacity = '1');
+            }
+            if (content) content.style.opacity = '1';
+        }, 300);
+    }
+
+    if (searchInput) {
+        searchInput.style.textAlign = 'center';
+        searchInput.placeholder = '搜索或输入网址';
+        searchInput.value = '';
+    }
+
+    if (searchIcon) {
+        searchIcon.style.display = 'none';
+    }
+}
+
 // 全局函数注册
 window.openBrowserMenu = openBrowserMenu;
 window.closeBrowserMenu = closeBrowserMenu;
 window.openBrowserHistory = openBrowserHistory;
 window.closeBrowserHistory = closeBrowserHistory;
+window.openBrowserBookmarks = openBrowserBookmarks;
+window.closeBrowserBookmarks = closeBrowserBookmarks;
+window.openBrowserDownloads = openBrowserDownloads;
+window.closeBrowserDownloads = closeBrowserDownloads;
+window.openBrowserShare = openBrowserShare;
+window.closeBrowserShare = closeBrowserShare;
 window.renderPhoneBrowser = renderPhoneBrowser;
+window.renderBrowserSearchRecords = renderBrowserSearchRecords;
+window.renderBrowserBookmarks = renderBrowserBookmarks;
+window.renderBrowserDownloads = renderBrowserDownloads;
+window.renderBrowserShare = renderBrowserShare;
 window.generatePhoneBrowserHistory = generatePhoneBrowserHistory;
 window.generateBrowserContent = generateBrowserContent;
+window.enterBrowserSearchMode = enterBrowserSearchMode;
+window.exitBrowserSearchMode = exitBrowserSearchMode;
