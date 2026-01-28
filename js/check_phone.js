@@ -96,6 +96,11 @@ function initPhoneGrid() {
             height: 100% !important;
             padding-bottom: env(safe-area-inset-bottom) !important;
         }
+        
+        /* 查手机-主屏幕图标网格整体下移 */
+        #phone-pages-container .home-screen-grid {
+            padding-top: 130px !important;
+        }
 
         /* 强制修复查手机页面布局 (覆盖所有潜在偏移) */
         #phone-app {
@@ -105,7 +110,7 @@ function initPhoneGrid() {
             width: 100% !important;
             height: 100% !important;
             bottom: 0 !important;
-            z-index: 200 !important;
+            z-index: 900 !important; /* 提高层级，覆盖主屏幕底栏 */
             background-color: #f2f2f7 !important;
             transform: none !important; /* 防止位移 */
             margin: 0 !important;
@@ -118,13 +123,14 @@ function initPhoneGrid() {
             min-height: 90px !important;
         }
 
+        /* 确保子页面层级高于主页面 */
         #phone-wechat {
-            z-index: 210 !important;
+            z-index: 910 !important;
             height: 100% !important;
             bottom: 0 !important;
         }
         #phone-contact-select-modal {
-            z-index: 220 !important;
+            z-index: 920 !important;
         }
     `;
     document.head.appendChild(style);
