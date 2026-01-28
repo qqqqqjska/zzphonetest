@@ -68,6 +68,37 @@ function initPhoneGrid() {
     // 绑定按钮事件
     setupPhoneListeners();
 
+    // 注入查手机专用样式，修复底部空隙问题
+    const style = document.createElement('style');
+    style.innerHTML = `
+        /* 查手机-微信底栏全宽适配 */
+        #phone-wechat .wechat-tab-bar {
+            width: 100% !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding-bottom: env(safe-area-inset-bottom) !important;
+            background-color: #f7f7f7 !important;
+            border-top: 1px solid rgba(0,0,0,0.1) !important;
+            box-shadow: none !important;
+        }
+        
+        /* 查手机-联系人选择弹窗半屏高度优化 */
+        #phone-contact-select-modal .modal-content {
+            min-height: 60vh !important;
+            padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
+        }
+
+        /* 查手机-主屏幕高度适配 */
+        #phone-pages-container {
+            height: 100% !important;
+            padding-bottom: env(safe-area-inset-bottom) !important;
+        }
+    `;
+    document.head.appendChild(style);
+
     // 覆盖全局 handleAppClick 以拦截查手机应用
     if (window.handleAppClick) {
         const originalHandleAppClick = window.handleAppClick;
