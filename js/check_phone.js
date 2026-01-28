@@ -61,10 +61,55 @@ window.getSmartAvatar = function(name) {
 function getSmartAvatar(name) { return window.getSmartAvatar(name); }
 
 window.getSmartImage = function(text) {
+    // 根据文本生成随机渐变色
+    const str = text || 'Image';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue1 = Math.abs(hash % 360);
+    const hue2 = (hue1 + 60) % 360; // 增加色彩对比度
+    
+    // 根据文本内容选择更合适的颜色主题
+    const lowerText = str.toLowerCase();
+    let colorScheme = { hue1, hue2, saturation: 70, lightness: 75 };
+    
+    if (lowerText.includes('sunset') || lowerText.includes('日落')) {
+        colorScheme = { hue1: 25, hue2: 45, saturation: 85, lightness: 70 };
+    } else if (lowerText.includes('ocean') || lowerText.includes('sea') || lowerText.includes('海')) {
+        colorScheme = { hue1: 200, hue2: 240, saturation: 80, lightness: 70 };
+    } else if (lowerText.includes('forest') || lowerText.includes('tree') || lowerText.includes('森林')) {
+        colorScheme = { hue1: 100, hue2: 130, saturation: 75, lightness: 65 };
+    } else if (lowerText.includes('food') || lowerText.includes('美食') || lowerText.includes('burger')) {
+        colorScheme = { hue1: 30, hue2: 50, saturation: 80, lightness: 70 };
+    } else if (lowerText.includes('cat') || lowerText.includes('dog') || lowerText.includes('宠物')) {
+        colorScheme = { hue1: 280, hue2: 320, saturation: 60, lightness: 80 };
+    }
+    
+    // 添加简单的图标元素
+    let iconSvg = '';
+    if (lowerText.includes('cat') || lowerText.includes('猫')) {
+        iconSvg = `<circle cx="180" cy="120" r="8" fill="rgba(255,255,255,0.8)"/>
+                   <circle cx="220" cy="120" r="8" fill="rgba(255,255,255,0.8)"/>
+                   <path d="M190 140 Q200 150 210 140" stroke="rgba(255,255,255,0.8)" stroke-width="2" fill="none"/>`;
+    } else if (lowerText.includes('sun') || lowerText.includes('日落')) {
+        iconSvg = `<circle cx="200" cy="100" r="25" fill="rgba(255,255,255,0.6)"/>
+                   <path d="M200 60 L200 80 M200 120 L200 140 M160 100 L180 100 M220 100 L240 100 M170 70 L180 80 M220 80 L230 70 M170 130 L180 120 M220 120 L230 130" stroke="rgba(255,255,255,0.6)" stroke-width="3"/>`;
+    } else if (lowerText.includes('heart') || lowerText.includes('❤')) {
+        iconSvg = `<path d="M200 120 C190 110, 170 110, 170 130 C170 150, 200 170, 200 170 C200 170, 230 150, 230 130 C230 110, 210 110, 200 120 Z" fill="rgba(255,255,255,0.7)"/>`;
+    }
+    
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
-        <rect width="400" height="300" fill="#f2f2f7"/>
-        <text x="50%" y="50%" dy=".3em" text-anchor="middle" fill="#ccc" font-size="30" font-family="sans-serif">${text || 'Image'}</text>
-        <rect x="0" y="0" width="400" height="300" fill="none" stroke="#e5e5e5" stroke-width="2"/>
+        <defs>
+            <linearGradient id="grad${hash}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:hsl(${colorScheme.hue1}, ${colorScheme.saturation}%, ${colorScheme.lightness}%);stop-opacity:1" />
+                <stop offset="50%" style="stop-color:hsl(${(colorScheme.hue1 + colorScheme.hue2) / 2}, ${colorScheme.saturation - 10}%, ${colorScheme.lightness + 5}%);stop-opacity:1" />
+                <stop offset="100%" style="stop-color:hsl(${colorScheme.hue2}, ${colorScheme.saturation}%, ${colorScheme.lightness}%);stop-opacity:1" />
+            </linearGradient>
+        </defs>
+        <rect width="400" height="300" fill="url(#grad${hash})"/>
+        ${iconSvg}
+        <text x="50%" y="75%" dy=".3em" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-weight="500" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${str}</text>
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 };
@@ -1071,15 +1116,20 @@ async function generatePhoneWechatAll(contact) {
 【任务要求 1：聊天列表 (chats)】
 1. 生成 6-10 个聊天会话。
 2. 包含好友、群聊、工作联系人。
-3. 【重要】绝不要生成与“我”、“玩家”、“User”、“{{user}}”或当前手机持有者自己的聊天。只生成与其他NPC（虚构人物）的聊天。
+3. 【重要】绝不要生成与"我"、"玩家"、"User"、"{{user}}"或当前手机持有者自己的聊天。只生成与其他NPC（虚构人物）的聊天。
 4. 每个会话包含 "messages" 数组 (5-10条记录)。
    - role: "friend" 或 "me"。
    - type: "text", "image", "voice"。
 
 【任务要求 2：朋友圈 (moments)】
-1. 生成 7-10 条动态。
-2. 包含图片(url)、点赞(likes)、评论(comments)。
-3. 设置可见性(visibility): include, exclude, private (仅自己可见)。
+1. 生成 8-12 条动态。
+2. 【关键】必须包含大量其他好友（NPC）的动态。
+   - 只有 3-4 条是【${contact.name}】自己发的。
+   - 剩余 6-7 条必须是【${contact.name}】的好友、同事、家人等发的。
+3. 【图片生成规则】：images数组请使用【英文关键词|中文描述】格式
+   - 正确示例："cute cat|可爱小猫", "sunset beach|海滩日落", "delicious pizza|美味披萨"
+   - 英文要简单明确，中文是备用显示文本
+4. 设置可见性(visibility)。
 
 【返回格式】
 必须是合法的 JSON 对象：
@@ -1198,43 +1248,58 @@ async function generatePhoneWechatMoments(contact) {
         btn.disabled = true;
     }
 
-    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成微信朋友圈【信息流/Timeline】内容。
-注意：这是${contact.name}刷朋友圈时看到的内容，包含朋友们的动态。
+    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成微信朋友圈【信息流/Timeline】。
+！！！重要！！！：你生成的是${contact.name}【看到的】朋友圈列表，而不是他/她【发的】列表。所以大部分内容应该来自【别人】。
 
 角色设定：${contact.persona || '无'}
 
-【任务要求】
-1. 生成 8-12 条朋友圈动态。
-2. 【关键】多样化发布者：
-   - 仅 3-4 条是【${contact.name}】自己发的 (isSelf: true)。
-   - 其余 70% 以上的内容必须是【${contact.name}】的各种好友、同事、家人（虚构NPC）发的 (isSelf: false)。
-3. 好友动态要丰富多彩：
-   - 不同的人设（如：爱晒美食的、加班抱怨的、转发文章的、晒娃的、微商代购等）。
-   - 名字要像真实的微信昵称（如：A01修电脑王哥、小柠檬、AAA建材、沉默是金等）。
-4. 内容要符合角色设定和当前情境。
-5. 图片URL请使用 placeholder。
-6. 时间可以是最近几天，错落有致。
+【严格执行以下规则】
+1. 总共生成 10 条动态。
+2. 【必须】包含 6-7 条由【其他好友/NPC】发布的动态 (isSelf: false)。
+3. 【最多】包含 3-5 条由【${contact.name}】自己发布的动态 (isSelf: true)。
+4. 如果生成的动态全部是${contact.name}发的，将被视为任务失败。
+5. 【图片生成重要规则】：
+   - images 数组必须使用【英文关键词|中文描述】格式
+   - 英文关键词要简单明确，如："cute cat|可爱的猫"、"sunset sky|日落天空"、"delicious food|美味食物"
+   - 避免复杂句子，用简单的名词组合
+   - 常用关键词：cat, dog, sunset, food, flower, city, beach, coffee, happy, smile, nature
+   - 示例："beautiful flower|美丽的花朵"、"city night|城市夜景"、"coffee time|咖啡时光"
 
-【返回格式】
-必须是合法的 JSON 数组，格式如下：
+【好友内容要求】
+- 创造多样化的好友身份：微商、亲戚、同事、甚至陌生人。
+- 昵称要真实：如"A01修电脑王哥"、"小柠檬"、"AAA建材"、"沉默是金"等。
+- 内容风格：晒娃、抱怨加班、心灵鸡汤、微商广告、旅游打卡等。
+
+【返回格式示例】
+必须是 JSON 数组，请参考以下结构（包含好友和自己）：
 [
   {
-    "isSelf": true, // 是否是本人发的
-    "name": "${contact.name}", // 如果是本人则用本人名字，否则生成一个有趣的好友昵称
-    "content": "文字内容...",
-    "time": "1小时前", // 相对时间字符串
-    "images": ["url1", "url2"], // 图片数组，可以为空
-    "likes": ["好友A", "好友B"], // 点赞人名数组
-    "comments": [ // 评论数组
-      {"user": "好友C", "content": "评论内容..."}
-    ],
-    "visibility": { // 可见性设置 (可选)
-       "type": "include", // include (部分可见), exclude (不给谁看), 或 private (仅自己可见)
-       "list": ["好友A"], // 如果是 include/exclude，则是名单
-       "labels": ["高中同学", "家人"] // 如果是 include/exclude，则是标签
-    }
+    "isSelf": false,
+    "name": "AAA建材-老张",
+    "content": "今日特价，欢迎咨询！",
+    "time": "10分钟前",
+    "images": [],
+    "likes": ["${contact.name}"],
+    "comments": []
   },
-  ...
+  {
+    "isSelf": true,
+    "name": "${contact.name}",
+    "content": "今天天气真好。",
+    "time": "1小时前",
+    "images": [],
+    "likes": ["好友A"],
+    "comments": [{"user": "好友B", "content": "羡慕"}]
+  },
+  {
+    "isSelf": false,
+    "name": "七大姑",
+    "content": "转发：震惊！这三种食物不能一起吃...",
+    "time": "2小时前",
+    "images": [],
+    "likes": [],
+    "comments": []
+  }
 ]
 
 【特别规则 - 仅自己可见】
@@ -1279,9 +1344,13 @@ function renderPhoneWechatMoments(contactId) {
         
         let avatar;
         if (moment.isSelf) {
-            avatar = contact.avatar || getSmartAvatar(contact.name);
+            let selfAvatar = contact.avatar;
+            if (selfAvatar && (selfAvatar.includes('pravatar') || selfAvatar.includes('placehold') || selfAvatar.includes('dicebear'))) {
+                selfAvatar = null;
+            }
+            avatar = selfAvatar || window.getSmartAvatar(contact.name);
         } else {
-            avatar = getSmartAvatar(moment.name);
+            avatar = window.getSmartAvatar(moment.name);
         }
 
         let imagesHtml = '';
@@ -1290,10 +1359,32 @@ function renderPhoneWechatMoments(contactId) {
             imagesHtml = `<div class="moment-images ${gridClass}">
                 ${moment.images.map((src, i) => {
                     let imgSrc = src;
-                    if (!src || src.includes('placehold') || src.includes('dicebear')) {
+                    let fallbackText = src || ('图 ' + (i+1));
+
+                    // 解析 "English|Chinese" 格式
+                    if (src && !src.startsWith('http') && !src.startsWith('data:') && src.includes('|')) {
+                        const parts = src.split('|');
+                        const prompt = parts[0].trim().replace(/[^a-zA-Z0-9\s-]/g, ''); // 清理特殊字符
+                        fallbackText = parts[1].trim(); // Chinese part
+                        
+                        // 直接使用本地生成，确保图片一定能显示
+                        imgSrc = window.getSmartImage(fallbackText);
+                    }
+                    // 只有英文关键词的情况
+                    else if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+                        const prompt = src.replace(/[^a-zA-Z0-9\s-]/g, ''); // 清理特殊字符
+                        fallbackText = src;
+                        
+                        // 直接使用本地生成，确保图片一定能显示
+                        imgSrc = window.getSmartImage(fallbackText);
+                    }
+                    // 占位符处理
+                    else if (!src || src.includes('placehold') || src.includes('dicebear')) {
                         imgSrc = window.getSmartImage('图 ' + (i+1));
                     }
-                    return `<img src="${imgSrc}" class="moment-img" onerror="this.onerror=null;this.src=window.getSmartImage('图 ' + (${i+1}))">`;
+                    
+                    // 简化错误处理，直接使用本地生成的图片
+                    return `<img src="${imgSrc}" class="moment-img" onerror="this.onerror=null;this.src=window.getSmartImage('${fallbackText}')">`;
                 }).join('')}
             </div>`;
         }
@@ -1319,11 +1410,14 @@ function renderPhoneWechatMoments(contactId) {
         let commentsHtml = '';
         if (moment.comments && moment.comments.length > 0) {
             commentsHtml = `<div class="moment-comments">
-                ${moment.comments.map(c => `
+                ${moment.comments.map(c => {
+                    const cName = c.name || c.user || '好友';
+                    const cContent = c.content || '...';
+                    return `
                     <div class="comment-item">
-                        <span class="comment-user">${c.user || c.name || '未知用户'}</span>：<span class="comment-content">${c.content}</span>
+                        <span class="comment-user">${cName}</span>：<span class="comment-content">${cContent}</span>
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>`;
         }
 
@@ -1529,7 +1623,7 @@ function renderPhoneWechatContacts(contactId) {
     // 构建 HTML
     let html = `
         <!-- 搜索框 -->
-        <div style="padding: 0 16px 16px 16px;">
+        <div style="padding: 20px 16px 16px 16px;">
             <div style="background: #e3e3e8; border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; color: #8e8e93;">
                 <i class="fas fa-search" style="font-size: 14px; margin-right: 6px;"></i>
                 <span style="font-size: 16px;">搜索</span>
@@ -1549,8 +1643,10 @@ function renderPhoneWechatContacts(contactId) {
             <div style="background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">`;
         
         chats.forEach((chat, index) => {
+            // 预处理头像 URL，避免 404 和 403
             let avatar = chat.avatar;
-            if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
+            if (!avatar || (!avatar.startsWith('http') && !avatar.startsWith('data:')) || 
+                avatar.includes('placehold') || avatar.includes('dicebear') || avatar.includes('pravatar')) {
                  avatar = window.getSmartAvatar(chat.name);
             }
 
@@ -1614,7 +1710,7 @@ window.openPhoneWechatChat = function(index, contactId) {
                 <button class="wechat-icon-btn"><i class="fas fa-ellipsis-h"></i></button>
             </div>
         </div>
-        <div class="wechat-body" style="padding: 15px; padding-top: calc(50px + max(47px, env(safe-area-inset-top))); padding-bottom: calc(70px + env(safe-area-inset-bottom)); overflow-y: auto; height: 100%; box-sizing: border-box;">
+        <div class="wechat-body" style="padding: 15px; padding-top: calc(80px + max(47px, env(safe-area-inset-top))); padding-bottom: calc(70px + env(safe-area-inset-bottom)); overflow-y: auto; height: 100%; box-sizing: border-box;">
             <div class="chat-messages-container"></div>
         </div>
         <div class="chat-input-area" style="position: absolute; bottom: 0; width: 100%; box-sizing: border-box; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #f7f7f7; border-top: 1px solid #dcdcdc;">
