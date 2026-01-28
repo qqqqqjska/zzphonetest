@@ -39,6 +39,20 @@ let phoneTouchDraggedItem = null;
 // 查手机当前联系人
 let currentCheckPhoneContactId = null;
 
+// --- 辅助函数：生成本地头像和图片 ---
+function getSmartAvatar(name) {
+    const initial = (name || 'U').charAt(0).toUpperCase();
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6'];
+    const color = colors[name ? name.length % colors.length : 0];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${color}"/><text x="50" y="50" dy=".35em" text-anchor="middle" fill="white" font-size="50" font-family="sans-serif">${initial}</text></svg>`;
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+function getSmartImage(text) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f0f0f0"/><text x="50%" y="50%" dy=".3em" text-anchor="middle" fill="#ccc" font-size="40" font-family="sans-serif">${text || 'Image'}</text></svg>`;
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
 // --- 初始化 ---
 
 function initPhoneGrid() {
@@ -913,7 +927,8 @@ async function generatePhoneWechatAll(contact) {
 【任务要求 1：聊天列表 (chats)】
 1. 生成 6-10 个聊天会话。
 2. 包含好友、群聊、工作联系人。
-3. 每个会话包含 "messages" 数组 (5-10条记录)。
+3. 【重要】绝不要生成与“我”、“玩家”、“User”、“{{user}}”或当前手机持有者自己的聊天。只生成与其他NPC（虚构人物）的聊天。
+4. 每个会话包含 "messages" 数组 (5-10条记录)。
    - role: "friend" 或 "me"。
    - type: "text", "image", "voice"。
 
@@ -1112,16 +1127,25 @@ function renderPhoneWechatMoments(contactId) {
         const item = document.createElement('div');
         item.className = 'moment-item';
         
-        let avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(moment.name);
+        let avatar;
         if (moment.isSelf) {
-            avatar = contact.avatar || avatar;
+            avatar = contact.avatar || getSmartAvatar(contact.name);
+        } else {
+            avatar = getSmartAvatar(moment.name);
         }
 
         let imagesHtml = '';
         if (moment.images && moment.images.length > 0) {
             const gridClass = moment.images.length === 1 ? 'single' : 'grid';
             imagesHtml = `<div class="moment-images ${gridClass}">
-                ${moment.images.map(src => `<img src="${src}" class="moment-img">`).join('')}
+                ${moment.images.map((src, i) => {
+                    // 如果 src 是 placeholder，替换为本地 SVG
+                    let imgSrc = src;
+                    if (!src || src.includes('placehold') || src.includes('dicebear')) {
+                        imgSrc = getSmartImage('图 ' + (i+1));
+                    }
+                    return `<img src="${imgSrc}" class="moment-img">`;
+                }).join('')}
             </div>`;
         }
 
@@ -1292,10 +1316,11 @@ async function generatePhoneWechatChats(contact) {
 【任务要求】
 1. 生成 6-10 个聊天会话。
 2. 包含好友、群聊（可选）、工作/生活相关联系人。
-3. "lastMessage" 应简短真实，符合该联系人与主角的关系。
-4. "time" 应是最近的时间。
-5. "unread" (未读数) 随机生成，大部分为 0，少数为 1-5。
-6. 必须包含 "messages" 数组，生成最近 5-10 条聊天记录。
+3. 【重要】绝不要生成与“我”、“玩家”、“User”、“{{user}}”或当前手机持有者自己的聊天。只生成与其他NPC（虚构人物）的聊天。
+4. "lastMessage" 应简短真实，符合该联系人与主角的关系。
+5. "time" 应是最近的时间。
+6. "unread" (未读数) 随机生成，大部分为 0，少数为 1-5。
+7. 必须包含 "messages" 数组，生成最近 5-10 条聊天记录。
    - role: "friend" (对方) 或 "me" (主角)。
    - content: 聊天内容。
    - type: "text" (默认), "image", "voice" (可选)。
@@ -1334,8 +1359,16 @@ function renderPhoneWechatContacts(contactId) {
     
     // 获取数据
     const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
-    const chats = content ? content.wechatChats : [];
+    let chats = content ? content.wechatChats : [];
     
+    // 过滤掉不应出现的聊天（如 User, {{user}}）
+    if (chats && chats.length > 0) {
+        chats = chats.filter(c => {
+            const name = c.name ? c.name.toLowerCase() : '';
+            return !['user', '{{user}}', 'me', '玩家', '我'].includes(name);
+        });
+    }
+
     if (!chats || chats.length === 0) {
         container.innerHTML = `
             <div class="ios-list-group" style="margin-top: 10px; background-color: transparent;">
@@ -1350,8 +1383,8 @@ function renderPhoneWechatContacts(contactId) {
     
     chats.forEach((chat, index) => {
         let avatar = chat.avatar;
-        if (!avatar || avatar.includes('placehold')) {
-             avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(chat.name);
+        if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
+             avatar = getSmartAvatar(chat.name);
         }
 
         const unreadHtml = chat.unread > 0 
@@ -1404,21 +1437,21 @@ window.openPhoneWechatChat = function(index, contactId) {
     }
 
     detailScreen.innerHTML = `
-        <div class="wechat-header" style="background: #ededed; color: #000; position: absolute; top: 0; width: 100%;">
-            <div class="header-left">
+        <div class="wechat-header" style="background: #ededed; color: #000; position: absolute; top: 0; width: 100%; height: calc(44px + max(47px, env(safe-area-inset-top))); padding-top: max(47px, env(safe-area-inset-top)); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; z-index: 10;">
+            <div class="header-left" style="height: 44px; display: flex; align-items: center;">
                 <button class="wechat-icon-btn" onclick="window.closePhoneWechatChat()"><i class="fas fa-chevron-left"></i></button>
             </div>
-            <span class="wechat-title">${chat.name}</span>
-            <div class="header-right">
+            <span class="wechat-title" style="line-height: 44px;">${chat.name}</span>
+            <div class="header-right" style="height: 44px; display: flex; align-items: center;">
                 <button class="wechat-icon-btn"><i class="fas fa-ellipsis-h"></i></button>
             </div>
         </div>
-        <div class="wechat-body" style="padding: 15px; padding-top: 110px; padding-bottom: 70px; overflow-y: auto; height: 100%; box-sizing: border-box;">
+        <div class="wechat-body" style="padding: 15px; padding-top: calc(50px + max(47px, env(safe-area-inset-top))); padding-bottom: calc(70px + env(safe-area-inset-bottom)); overflow-y: auto; height: 100%; box-sizing: border-box;">
             <div class="chat-messages-container"></div>
         </div>
-        <div class="chat-input-area" style="position: absolute; bottom: 0; width: 100%; box-sizing: border-box;">
+        <div class="chat-input-area" style="position: absolute; bottom: 0; width: 100%; box-sizing: border-box; padding-bottom: max(10px, env(safe-area-inset-bottom)); background: #f7f7f7; border-top: 1px solid #dcdcdc;">
             <button class="chat-icon-btn"><i class="fas fa-plus-circle"></i></button>
-            <input type="text" placeholder="发送消息..." disabled style="background-color: #fff;">
+            <input type="text" placeholder="发送消息..." disabled style="background-color: #fff; height: 36px; border-radius: 6px; padding: 0 10px; border: none; flex: 1;">
             <button class="chat-icon-btn"><i class="far fa-smile"></i></button>
             <button class="chat-icon-btn"><i class="fas fa-plus"></i></button>
         </div>
@@ -1437,8 +1470,8 @@ window.openPhoneWechatChat = function(index, contactId) {
             let avatarHtml = '';
             if (!isMe) {
                 let avatar = chat.avatar;
-                if (!avatar || avatar.includes('placehold')) {
-                     avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(chat.name);
+                if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
+                     avatar = getSmartAvatar(chat.name);
                 }
                 avatarHtml = `<img src="${avatar}" class="chat-avatar">`;
             }
