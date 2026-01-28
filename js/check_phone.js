@@ -74,6 +74,7 @@ function initPhoneGrid() {
         /* 查手机-微信底栏全宽适配 */
         #phone-wechat .wechat-tab-bar {
             width: 100% !important;
+            height: 60px !important;
             left: 0 !important;
             right: 0 !important;
             bottom: 0 !important;
