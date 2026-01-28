@@ -1993,8 +1993,8 @@ function renderBrowserSearchRecords(contactId) {
     list.innerHTML = '';
     
     const items = records && records.length > 0 ? records : [
-        "https://api.dzzi.ai/", "宝可梦编号查询", "南京审计大学门户信息", "单词数统计器",
-        "如何做红烧肉", "最近的电影院", "天气预报", "Python入门教程", "全部历史 >"
+        "搜索记录1", "搜索记录2", "搜索记录3", "搜索记录4",
+        "搜索记录5", "搜索记录6", "搜索记录7", "搜索记录8", "搜索记录9"
     ];
 
     items.forEach(text => {
