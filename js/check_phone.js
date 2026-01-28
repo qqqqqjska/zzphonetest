@@ -40,18 +40,35 @@ let phoneTouchDraggedItem = null;
 let currentCheckPhoneContactId = null;
 
 // --- 辅助函数：生成本地头像和图片 ---
-function getSmartAvatar(name) {
+window.getSmartAvatar = function(name) {
     const initial = (name || 'U').charAt(0).toUpperCase();
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6'];
-    const color = colors[name ? name.length % colors.length : 0];
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${color}"/><text x="50" y="50" dy=".35em" text-anchor="middle" fill="white" font-size="50" font-family="sans-serif">${initial}</text></svg>`;
+    const colors = [
+        ['#FF9A9E', '#FECFEF'], ['#a18cd1', '#fbc2eb'], ['#84fab0', '#8fd3f4'],
+        ['#cfd9df', '#e2ebf0'], ['#fccb90', '#d57eeb'], ['#e0c3fc', '#8ec5fc']
+    ];
+    const colorPair = colors[(name ? name.length : 0) % colors.length];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        <defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:${colorPair[0]};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${colorPair[1]};stop-opacity:1" />
+        </linearGradient></defs>
+        <rect width="100" height="100" fill="url(#grad)"/>
+        <text x="50" y="55" text-anchor="middle" fill="white" font-size="45" font-family="sans-serif" font-weight="bold">${initial}</text>
+    </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-}
+};
+// 兼容旧调用
+function getSmartAvatar(name) { return window.getSmartAvatar(name); }
 
-function getSmartImage(text) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f0f0f0"/><text x="50%" y="50%" dy=".3em" text-anchor="middle" fill="#ccc" font-size="40" font-family="sans-serif">${text || 'Image'}</text></svg>`;
+window.getSmartImage = function(text) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+        <rect width="400" height="300" fill="#f2f2f7"/>
+        <text x="50%" y="50%" dy=".3em" text-anchor="middle" fill="#ccc" font-size="30" font-family="sans-serif">${text || 'Image'}</text>
+        <rect x="0" y="0" width="400" height="300" fill="none" stroke="#e5e5e5" stroke-width="2"/>
+    </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-}
+};
+function getSmartImage(text) { return window.getSmartImage(text); }
 
 // --- 初始化 ---
 
@@ -71,28 +88,56 @@ function initPhoneGrid() {
     // 注入查手机专用样式，修复底部空隙问题
     const style = document.createElement('style');
     style.innerHTML = `
-        /* 查手机-微信底栏全宽适配 */
+        /* 查手机-微信 悬浮Dock栏适配 */
         #phone-wechat .wechat-tab-bar {
-            width: 100% !important;
-            height: auto !important;
-            min-height: 85px !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            border-radius: 0 !important;
+            position: absolute !important;
+            width: auto !important;
+            min-width: 220px !important;
+            height: 64px !important;
+            min-height: 0 !important;
+            left: 50% !important;
+            right: auto !important;
+            bottom: max(30px, env(safe-area-inset-bottom)) !important;
+            transform: translateX(-50%) !important;
+            
+            border-radius: 32px !important;
             margin: 0 !important;
-            padding-top: 10px !important;
-            padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
-            background-color: #f7f7f7 !important;
-            border-top: 1px solid rgba(0,0,0,0.1) !important;
-            box-shadow: none !important;
-            align-items: flex-start !important;
+            padding: 0 20px !important;
+            
+            background-color: rgba(255, 255, 255, 0.9) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border-top: none !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+            
+            align-items: center !important;
+            justify-content: space-around !important;
+            z-index: 999 !important;
         }
 
-        /* 调整图标垂直位置 */
+        /* 调整图标位置 - 恢复居中 */
         #phone-wechat .wechat-tab-item {
-            justify-content: flex-start !important;
-            margin-top: 5px !important;
+            justify-content: center !important;
+            align-items: center !important;
+            margin-top: 0 !important;
+            flex: 1 !important;
+            height: 100% !important;
+            color: #b0b0b0 !important;
+        }
+        
+        #phone-wechat .wechat-tab-item.active {
+            color: #007AFF !important;
+        }
+        
+        /* 查手机-微信背景色调整 (灰底) */
+        #phone-wechat {
+            background-color: #f2f2f7 !important;
+        }
+        
+        /* 隐藏微信原生标题栏背景，使其透明 */
+        #phone-wechat-header {
+            background-color: transparent !important;
+            border-bottom: none !important;
         }
         
         /* 查手机-联系人选择弹窗半屏高度优化 */
@@ -133,8 +178,8 @@ function initPhoneGrid() {
             min-height: 90px !important;
         }
 
-        /* 修复查手机内App底部漏出问题 */
-        #phone-wechat, #phone-weibo, #phone-icity, #phone-browser {
+        /* 修复查手机内App底部漏出问题 - 其他应用 (白底) */
+        #phone-weibo, #phone-icity, #phone-browser {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
@@ -144,6 +189,20 @@ function initPhoneGrid() {
             bottom: 0 !important;
             z-index: 210 !important;
             background-color: #fff !important; /* 强制背景色，防止透出 */
+            overflow: hidden !important;
+        }
+
+        /* 修复查手机内App底部漏出问题 - 微信 (灰底) */
+        #phone-wechat {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            height: 100vh !important; /* 强制使用 vh */
+            bottom: 0 !important;
+            z-index: 210 !important;
+            background-color: #f2f2f7 !important; /* 灰底，适配圆角卡片 */
             overflow: hidden !important;
         }
         
@@ -1139,23 +1198,29 @@ async function generatePhoneWechatMoments(contact) {
         btn.disabled = true;
     }
 
-    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成微信朋友圈内容。
+    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成微信朋友圈【信息流/Timeline】内容。
+注意：这是${contact.name}刷朋友圈时看到的内容，包含朋友们的动态。
+
 角色设定：${contact.persona || '无'}
 
 【任务要求】
-1. 生成 7-10 条朋友圈动态。
-2. 至少 3 条是【${contact.name}】自己发的。
-3. 其余的是【${contact.name}】的好友（虚构人物）发的。
+1. 生成 8-12 条朋友圈动态。
+2. 【关键】多样化发布者：
+   - 仅 3-4 条是【${contact.name}】自己发的 (isSelf: true)。
+   - 其余 70% 以上的内容必须是【${contact.name}】的各种好友、同事、家人（虚构NPC）发的 (isSelf: false)。
+3. 好友动态要丰富多彩：
+   - 不同的人设（如：爱晒美食的、加班抱怨的、转发文章的、晒娃的、微商代购等）。
+   - 名字要像真实的微信昵称（如：A01修电脑王哥、小柠檬、AAA建材、沉默是金等）。
 4. 内容要符合角色设定和当前情境。
-5. 图片URL请使用 placeholder (例如 https://placehold.co/400x400?text=Image)。
-6. 时间可以是最近几天。
+5. 图片URL请使用 placeholder。
+6. 时间可以是最近几天，错落有致。
 
 【返回格式】
 必须是合法的 JSON 数组，格式如下：
 [
   {
     "isSelf": true, // 是否是本人发的
-    "name": "${contact.name}", // 如果是本人则用本人名字，否则生成一个好友名字
+    "name": "${contact.name}", // 如果是本人则用本人名字，否则生成一个有趣的好友昵称
     "content": "文字内容...",
     "time": "1小时前", // 相对时间字符串
     "images": ["url1", "url2"], // 图片数组，可以为空
@@ -1173,7 +1238,7 @@ async function generatePhoneWechatMoments(contact) {
 ]
 
 【特别规则 - 仅自己可见】
-请随机生成 1-2 条“仅自己可见”的动态（visibility.type = "private"）。
+请随机生成 0-2 条“仅自己可见”的动态（visibility.type = "private"）。
 1. 内容风格：吐槽、emo、深夜感悟、自言自语。
 2. 点赞（likes）：必须为空。
 3. 评论（comments）：可以是空的，或者是自己（isSelf=true）的追加评论（自言自语）。
@@ -1224,12 +1289,11 @@ function renderPhoneWechatMoments(contactId) {
             const gridClass = moment.images.length === 1 ? 'single' : 'grid';
             imagesHtml = `<div class="moment-images ${gridClass}">
                 ${moment.images.map((src, i) => {
-                    // 如果 src 是 placeholder，替换为本地 SVG
                     let imgSrc = src;
                     if (!src || src.includes('placehold') || src.includes('dicebear')) {
-                        imgSrc = getSmartImage('图 ' + (i+1));
+                        imgSrc = window.getSmartImage('图 ' + (i+1));
                     }
-                    return `<img src="${imgSrc}" class="moment-img">`;
+                    return `<img src="${imgSrc}" class="moment-img" onerror="this.onerror=null;this.src=window.getSmartImage('图 ' + (${i+1}))">`;
                 }).join('')}
             </div>`;
         }
@@ -1269,7 +1333,7 @@ function renderPhoneWechatMoments(contactId) {
         }
 
         item.innerHTML = `
-            <img src="${avatar}" class="moment-avatar">
+            <img src="${avatar}" class="moment-avatar" onerror="this.onerror=null;this.src=window.getSmartAvatar('${moment.name || 'User'}')">
             <div class="moment-content">
                 <div class="moment-name">${moment.name}</div>
                 <div class="moment-text">${moment.content}</div>
@@ -1437,16 +1501,16 @@ JSON 格式示例：
 function renderPhoneWechatContacts(contactId) {
     const container = document.getElementById('phone-wechat-tab-contacts');
     if (!container) return;
-    
-    // 清空现有列表（保留顶部的padding等样式，所以重新构建 list 容器）
-    // 但原结构是 container -> ios-list-group -> items
-    // 我们重建内部结构
+
+    // 强制修复背景色，确保圆角卡片可见
+    const appEl = document.getElementById('phone-wechat');
+    if (appEl) appEl.style.backgroundColor = '#f2f2f7';
     
     // 获取数据
     const content = window.iphoneSimState.phoneContent && window.iphoneSimState.phoneContent[contactId];
     let chats = content ? content.wechatChats : [];
     
-    // 过滤掉不应出现的聊天（如 User, {{user}}）
+    // 过滤掉不应出现的聊天
     if (chats && chats.length > 0) {
         chats = chats.filter(c => {
             const name = c.name ? c.name.toLowerCase() : '';
@@ -1454,53 +1518,72 @@ function renderPhoneWechatContacts(contactId) {
         });
     }
 
+    // 更新 Header 标题
+    const titleEl = document.getElementById('phone-wechat-title');
+    if (titleEl) {
+        titleEl.textContent = `微信(${chats ? chats.length : 0})`;
+        titleEl.style.fontSize = '17px';
+        titleEl.style.fontWeight = '600';
+    }
+
+    // 构建 HTML
+    let html = `
+        <!-- 搜索框 -->
+        <div style="padding: 0 16px 16px 16px;">
+            <div style="background: #e3e3e8; border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; color: #8e8e93;">
+                <i class="fas fa-search" style="font-size: 14px; margin-right: 6px;"></i>
+                <span style="font-size: 16px;">搜索</span>
+            </div>
+        </div>
+    `;
+
     if (!chats || chats.length === 0) {
-        container.innerHTML = `
-            <div class="ios-list-group" style="margin-top: 10px; background-color: transparent;">
-                <div class="list-item" style="justify-content: center; color: #999; border: none; background: transparent;">
+        html += `
+            <div style="padding: 0 16px;">
+                <div style="background: #fff; border-radius: 18px; padding: 20px; text-align: center; color: #999;">
                     点击右上角生成聊天
                 </div>
             </div>`;
-        return;
-    }
+    } else {
+        html += `<div style="padding: 0 16px 100px 16px;">
+            <div style="background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">`;
+        
+        chats.forEach((chat, index) => {
+            let avatar = chat.avatar;
+            if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
+                 avatar = window.getSmartAvatar(chat.name);
+            }
 
-    let html = '<div class="ios-list-group" style="margin-top: 0; background-color: #fff;">';
-    
-    chats.forEach((chat, index) => {
-        let avatar = chat.avatar;
-        if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
-             avatar = getSmartAvatar(chat.name);
-        }
+            const unreadHtml = chat.unread > 0 
+                ? `<div class="unread-badge" style="position: absolute; top: -5px; right: -5px;">${chat.unread}</div>` 
+                : '';
 
-        const unreadHtml = chat.unread > 0 
-            ? `<div class="unread-badge" style="position: absolute; top: -5px; right: -5px;">${chat.unread}</div>` 
-            : '';
+            // 最后一项不显示下划线
+            const borderStyle = index === chats.length - 1 ? 'border: none;' : 'border-bottom: 1px solid #f0f0f0;';
 
-        html += `
-            <div class="contact-item" style="height: 72px;" onclick="window.openPhoneWechatChat(${index}, '${contactId}')">
-                <div class="contact-content-wrapper" style="height: 100%; padding: 10px 16px;">
-                    <div style="position: relative; margin-right: 12px;">
-                        <img src="${avatar}" class="contact-avatar" style="width: 48px; height: 48px; margin: 0;">
+            html += `
+                <div onclick="window.openPhoneWechatChat(${index}, '${contactId}')" style="display: flex; align-items: center; padding: 12px 16px; cursor: pointer; background: #fff;">
+                    <div style="position: relative; margin-right: 12px; flex-shrink: 0;">
+                        <img src="${avatar}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;" onerror="this.onerror=null;this.src=window.getSmartAvatar('${chat.name || 'User'}')">
                         ${unreadHtml}
                     </div>
-                    <div class="contact-info">
-                        <div class="contact-header-row">
-                            <span class="contact-name" style="font-size: 16px; font-weight: 500;">${chat.name}</span>
-                            <span class="contact-time" style="font-size: 10px; color: #b2b2b2;">${chat.time}</span>
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; height: 48px; ${borderStyle}">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <span style="font-size: 16px; font-weight: 500; color: #000;">${chat.name}</span>
+                            <span style="font-size: 12px; color: #8e8e93;">${chat.time || ''}</span>
                         </div>
-                        <div class="contact-msg-row">
-                            <span class="contact-msg-preview" style="font-size: 13px; color: #999;">${chat.lastMessage}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 14px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${chat.lastMessage || ''}</span>
+                            <i class="fas fa-chevron-right" style="font-size: 12px; color: #d1d1d6; opacity: 0.5;"></i>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
-    });
+            `;
+        });
+        
+        html += `</div></div>`;
+    }
     
-    html += '</div>';
-    
-    // 设置 padding-top 以避开 header (header height ~91px)
-    // 但 CSS 中已经设置了 padding-top: 91px
     container.innerHTML = html;
 }
 
@@ -1516,7 +1599,7 @@ window.openPhoneWechatChat = function(index, contactId) {
         detailScreen = document.createElement('div');
         detailScreen.id = 'phone-wechat-chat-detail';
         detailScreen.className = 'sub-screen';
-        detailScreen.style.zIndex = '210'; // Above tabs
+        detailScreen.style.zIndex = '1000'; // Above floating dock (z-index 999)
         detailScreen.style.backgroundColor = '#f2f2f7';
         document.getElementById('phone-wechat').appendChild(detailScreen);
     }
@@ -1556,9 +1639,9 @@ window.openPhoneWechatChat = function(index, contactId) {
             if (!isMe) {
                 let avatar = chat.avatar;
                 if (!avatar || avatar.includes('placehold') || avatar.includes('dicebear')) {
-                     avatar = getSmartAvatar(chat.name);
+                     avatar = window.getSmartAvatar(chat.name);
                 }
-                avatarHtml = `<img src="${avatar}" class="chat-avatar">`;
+                avatarHtml = `<img src="${avatar}" class="chat-avatar" onerror="this.onerror=null;this.src=window.getSmartAvatar('${chat.name || 'User'}')">`;
             }
 
             // Simple text rendering, ignoring types for now or basic support
