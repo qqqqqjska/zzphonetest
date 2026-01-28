@@ -276,6 +276,11 @@ function initPhoneGrid() {
                         renderPhoneWechatMoments(currentCheckPhoneContactId);
                     }
                 }
+            } else if (appId === 'phone-browser') {
+                document.getElementById('phone-browser').classList.remove('hidden');
+                if (currentCheckPhoneContactId) {
+                    renderPhoneBrowser(currentCheckPhoneContactId);
+                }
             } else {
                 originalHandleAppClick(appId, appName);
             }
@@ -1129,7 +1134,7 @@ async function generatePhoneWechatAll(contact) {
 3. 【图片生成规则】：images数组请使用【英文关键词|中文描述】格式
    - 正确示例："cute cat|可爱小猫", "sunset beach|海滩日落", "delicious pizza|美味披萨"
    - 英文要简单明确，中文是备用显示文本
-4. 设置可见性(visibility)。
+4. 设置可见性(visibility)：请随机包含 1-2 条【仅自己可见】的动态（visibility: {type: "private"}），通常是emo或深夜感悟。
 
 【返回格式】
 必须是合法的 JSON 对象：
@@ -1220,6 +1225,9 @@ async function callAiGeneration(contact, systemPrompt, type, btn) {
             // 刷新当前页面状态
             const currentTab = document.getElementById('phone-wechat-tab-contacts').style.display === 'block' ? 'contacts' : 'moments';
             window.switchPhoneWechatTab(currentTab);
+        } else if (type === 'browser' && Array.isArray(result)) {
+            window.iphoneSimState.phoneContent[contact.id].browserHistory = result;
+            renderPhoneBrowser(contact.id);
         } else {
             throw new Error('返回格式不正确');
         }
@@ -1302,12 +1310,15 @@ async function generatePhoneWechatMoments(contact) {
   }
 ]
 
-【特别规则 - 仅自己可见】
-请随机生成 0-2 条“仅自己可见”的动态（visibility.type = "private"）。
-1. 内容风格：吐槽、emo、深夜感悟、自言自语。
-2. 点赞（likes）：必须为空。
-3. 评论（comments）：可以是空的，或者是自己（isSelf=true）的追加评论（自言自语）。
-4. 这种动态必须是本人发的（isSelf=true）。
+【特别规则 - 可见性设置】
+请随机生成 0-3 条带有特殊可见性设置的动态（必须是本人发的 isSelf=true）。
+1. 仅自己可见：visibility = { "type": "private" }
+   - 内容：吐槽、emo、深夜感悟。
+2. 部分可见：visibility = { "type": "include", "labels": ["分组名"] }
+   - 必须提供 labels 数组，例如：["家人"], ["大学同学"], ["公司同事"]。
+3. 不给谁看：visibility = { "type": "exclude", "labels": ["分组名"] }
+   - 必须提供 labels 数组，例如：["老板"], ["前任"]。
+4. 公开：默认，不需要 visibility 字段，或者 visibility = { "type": "public" }。
 `;
 
     await callAiGeneration(contact, systemPrompt, 'moments', btn);
@@ -1391,7 +1402,7 @@ function renderPhoneWechatMoments(contactId) {
 
         let visibilityHtml = '';
         // 仅在是本人发的动态且包含可见性设置时显示
-        if (moment.isSelf && moment.visibility && moment.visibility.type) {
+        if (moment.isSelf && moment.visibility && moment.visibility.type && moment.visibility.type !== 'public') {
             let iconClass = 'fas fa-user';
             if (moment.visibility.type === 'private') {
                 iconClass = 'fas fa-lock';

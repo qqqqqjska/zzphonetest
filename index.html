@@ -2404,14 +2404,50 @@
     </div>
 
     <!-- 查手机 - 浏览器 -->
-    <div id="phone-browser" class="sub-screen hidden" style="z-index: 200;">
-        <div class="app-header">
-            <button class="back-btn" onclick="document.getElementById('phone-browser').classList.add('hidden')"><i class="fas fa-chevron-left"></i> 返回</button>
-            <h3>浏览器</h3>
-            <button class="icon-btn" id="generate-browser-btn" style="font-size: 14px;">生成</button>
+    <div id="phone-browser" class="sub-screen hidden" style="z-index: 200; background-color: #fff; display: flex; flex-direction: column;">
+        <!-- 顶部导航栏 -->
+        <div class="browser-header" style="padding-top: max(47px, env(safe-area-inset-top)); padding-left: 20px; padding-right: 20px; padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+             <div class="header-left" onclick="document.getElementById('phone-browser').classList.add('hidden')" style="display: flex; align-items: center; gap: 10px; color: #333; cursor: pointer;">
+                 <i class="fas fa-search" style="font-size: 18px;"></i>
+                 <span style="font-size: 18px; font-weight: 500;">主页</span>
+             </div>
+             <div class="header-right">
+                 <!-- 右上角生成按钮 -->
+                 <button id="generate-browser-btn" class="icon-btn" style="color: #333; font-size: 20px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: transparent; border: none;">
+                    <i class="fas fa-expand"></i>
+                 </button>
+             </div>
         </div>
-        <div class="app-body">
-            <div id="phone-browser-content"></div>
+
+        <!-- 主体内容 -->
+        <div class="app-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 100px; width: 100%;">
+             <!-- Logo (替换为多彩图标) -->
+             <div class="browser-logo" style="margin-bottom: 50px;">
+                 <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #007AFF, #5AC8FA); border-radius: 20px; display: flex; align-items: center; justify-content: center; transform: rotate(-10deg); box-shadow: 0 10px 20px rgba(0, 122, 255, 0.3);">
+                     <i class="fas fa-compass" style="font-size: 48px; color: #fff; transform: rotate(10deg);"></i>
+                 </div>
+             </div>
+             
+             <!-- 搜索框 -->
+             <div class="browser-search-bar" style="width: 85%; height: 50px; border: 1px solid #e0e0e0; border-radius: 25px; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); background-color: #f9f9f9;">
+                 <input type="text" placeholder="搜索或输入网址" disabled style="border: none; outline: none; width: 100%; font-size: 16px; text-align: center; background: transparent; color: #333;">
+             </div>
+
+             <!-- 生成内容展示容器 -->
+             <div id="phone-browser-content" style="width: 100%; margin-top: 30px; padding: 0 20px; overflow-y: auto; max-height: 40vh;">
+                 <!-- 生成的历史记录/书签将显示在这里 -->
+             </div>
+        </div>
+
+        <!-- 底部工具栏 -->
+        <div class="browser-nav-bar" style="height: 50px; border-top: 1px solid #f0f0f0; display: flex; justify-content: space-around; align-items: center; padding-bottom: max(10px, env(safe-area-inset-bottom)); background-color: #fff;">
+             <button class="nav-btn" style="color: #333; font-size: 20px; padding: 10px; background: transparent; border: none;"><i class="fas fa-chevron-left"></i></button>
+             <button class="nav-btn" style="color: #ccc; font-size: 20px; padding: 10px; background: transparent; border: none;"><i class="fas fa-chevron-right"></i></button>
+             <button class="nav-btn" style="color: #333; font-size: 22px; padding: 10px; background: transparent; border: none;"><i class="fas fa-home"></i></button>
+             <button class="nav-btn" style="padding: 10px; background: transparent; border: none;">
+                <div style="font-size: 12px; border: 2px solid #333; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold;">1</div>
+             </button>
+             <button class="nav-btn" style="color: #333; font-size: 20px; padding: 10px; background: transparent; border: none;"><i class="fas fa-bars"></i></button>
         </div>
     </div>
 
