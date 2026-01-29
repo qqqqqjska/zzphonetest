@@ -2030,7 +2030,7 @@ function parseMixedContent(content) {
     
     // 正则匹配 [类型:内容]
     // 改进正则：允许内容中包含换行符，且支持 "发送了表情包" 这种 AI 常见错误格式
-    const regex = /\[(消息|表情包|发送了表情包|语音|图片|旁白)\s*:\s*([\s\S]*?)\]/g;
+    const regex = /\[(消息|表情包|发送了表情包|发送了一个表情包|语音|图片|旁白)\s*:\s*([\s\S]*?)\]/g;
     
     let lastIndex = 0;
     let match;
@@ -2045,7 +2045,7 @@ function parseMixedContent(content) {
 
         // 2. 添加当前匹配项
         let type = match[1];
-        if (type === '发送了表情包') type = '表情包'; // 归一化类型
+        if (type === '发送了表情包' || type === '发送了一个表情包') type = '表情包'; // 归一化类型
 
         results.push({
             type: type, // 消息/表情包/语音...
