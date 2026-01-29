@@ -237,6 +237,20 @@ function initPhoneGrid() {
             overflow: hidden !important;
         }
 
+        /* 闲鱼 (灰底) */
+        #phone-xianyu {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            height: 100vh !important; /* 强制使用 vh */
+            bottom: 0 !important;
+            z-index: 210 !important;
+            background-color: #f6f6f6 !important; /* 灰底 */
+            overflow: hidden !important;
+        }
+
         /* 修复查手机内App底部漏出问题 - 微信 (灰底) */
         #phone-wechat {
             position: fixed !important;
@@ -285,6 +299,9 @@ function initPhoneGrid() {
                     if (window.renderBrowserDownloads) window.renderBrowserDownloads(currentCheckPhoneContactId);
                     if (window.renderBrowserShare) window.renderBrowserShare(currentCheckPhoneContactId);
                 }
+            } else if (appId === 'phone-xianyu') {
+                document.getElementById('phone-xianyu').classList.remove('hidden');
+                window.switchXianyuTab('messages'); // Default to messages to show the list
             } else {
                 originalHandleAppClick(appId, appName);
             }
@@ -416,13 +433,53 @@ function loadPhoneLayout(contactId) {
     
     if (layout && Array.isArray(layout) && layout.length > 0) {
         phoneScreenData = JSON.parse(JSON.stringify(layout)); // Deep copy
+
+        // 补丁：确保必有的应用（如闲鱼）存在
+        const requiredApps = [
+            { appId: 'phone-xianyu', name: '闲鱼', iconClass: 'fas fa-fish', color: '#FFDA44', type: 'app' }
+        ];
+
+        requiredApps.forEach(app => {
+            if (!phoneScreenData.some(item => item.appId === app.appId)) {
+                // 寻找空位
+                let freeIndex = -1;
+                const maxSearch = 100; // 搜索范围
+                for (let i = 0; i < maxSearch; i++) {
+                    let occupied = false;
+                    // 尝试使用全局检测函数
+                    if (window.getOccupiedSlots && window.isCollision) {
+                        const slots = window.getOccupiedSlots(i, '1x1');
+                        if (slots) {
+                            occupied = phoneScreenData.some(existing => window.isCollision(existing, slots));
+                        }
+                    } else {
+                        occupied = phoneScreenData.some(item => item.index === i);
+                    }
+                    
+                    if (!occupied) {
+                        freeIndex = i;
+                        break;
+                    }
+                }
+
+                if (freeIndex !== -1) {
+                    phoneScreenData.push({
+                        index: freeIndex,
+                        ...app,
+                        _internalId: Math.random().toString(36).substr(2, 9)
+                    });
+                }
+            }
+        });
+
     } else {
         // 如果没有，使用默认布局
         phoneScreenData = [
             { index: 0, type: 'app', name: '微信', iconClass: 'fab fa-weixin', color: '#07C160', appId: 'phone-wechat' },
             { index: 1, type: 'app', name: '微博', iconClass: 'fab fa-weibo', color: '#E6162D', appId: 'phone-weibo' },
             { index: 2, type: 'app', name: 'iCity', iconClass: 'fas fa-building', color: '#FF9500', appId: 'phone-icity' },
-            { index: 3, type: 'app', name: '浏览器', iconClass: 'fab fa-safari', color: '#007AFF', appId: 'phone-browser' }
+            { index: 3, type: 'app', name: '浏览器', iconClass: 'fab fa-safari', color: '#007AFF', appId: 'phone-browser' },
+            { index: 4, type: 'app', name: '闲鱼', iconClass: 'fas fa-fish', color: '#FFDA44', appId: 'phone-xianyu' }
         ];
     }
     
@@ -941,11 +998,13 @@ function setupPhoneAppListeners() {
     const btnWeibo = document.getElementById('generate-weibo-btn');
     const btnIcity = document.getElementById('generate-icity-btn');
     const btnBrowser = document.getElementById('generate-browser-btn');
+    const btnXianyu = document.getElementById('generate-xianyu-btn');
 
     if (btnWechat) btnWechat.onclick = () => handlePhoneAppGenerate('wechat');
     if (btnWeibo) btnWeibo.onclick = () => handlePhoneAppGenerate('weibo');
     if (btnIcity) btnIcity.onclick = () => handlePhoneAppGenerate('icity');
     if (btnBrowser) btnBrowser.onclick = () => handlePhoneAppGenerate('browser');
+    if (btnXianyu) btnXianyu.onclick = () => handlePhoneAppGenerate('xianyu');
 }
 
 window.switchPhoneWechatTab = function(tabName) {
@@ -2343,3 +2402,129 @@ window.generatePhoneBrowserHistory = generatePhoneBrowserHistory;
 window.generateBrowserContent = generateBrowserContent;
 window.enterBrowserSearchMode = enterBrowserSearchMode;
 window.exitBrowserSearchMode = exitBrowserSearchMode;
+
+// --- 闲鱼应用逻辑 ---
+
+window.switchXianyuTab = function(tabName) {
+    const messagesTab = document.getElementById('xianyu-tab-messages');
+    const meTab = document.getElementById('xianyu-tab-me');
+    // 获取 tab items: 0=首页, 1=金华, 2=卖闲置, 3=消息, 4=我的
+    const tabs = document.querySelectorAll('.xianyu-tab-bar .tab-item');
+    
+    if (!tabs || tabs.length < 5) return;
+
+    const tabMsgBtn = tabs[3]; 
+    const tabMeBtn = tabs[4];
+
+    if (tabName === 'messages') {
+        if (messagesTab) messagesTab.style.display = 'block';
+        if (meTab) meTab.style.display = 'none';
+        
+        tabMsgBtn.classList.add('active');
+        tabMsgBtn.style.color = '#333';
+        tabMeBtn.classList.remove('active');
+        tabMeBtn.style.color = '#999';
+        
+        if (currentCheckPhoneContactId) window.renderXianyuMessages(currentCheckPhoneContactId);
+    } else if (tabName === 'me') {
+        if (messagesTab) messagesTab.style.display = 'none';
+        if (meTab) meTab.style.display = 'block';
+        
+        tabMsgBtn.classList.remove('active');
+        tabMsgBtn.style.color = '#999';
+        tabMeBtn.classList.add('active');
+        tabMeBtn.style.color = '#333';
+        
+        if (currentCheckPhoneContactId) window.renderXianyuMe(currentCheckPhoneContactId);
+    }
+};
+
+window.renderXianyuMe = function(contactId) {
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+    
+    const avatarEl = document.getElementById('xianyu-me-avatar');
+    const nameEl = document.getElementById('xianyu-me-name');
+    
+    if (avatarEl) {
+        let avatar = contact.avatar;
+        if (!avatar || (!avatar.startsWith('http') && !avatar.startsWith('data:'))) {
+             avatar = window.getSmartAvatar(contact.name);
+        }
+        avatarEl.src = avatar;
+    }
+    if (nameEl) nameEl.textContent = contact.name;
+};
+
+window.renderXianyuMessages = function(contactId) {
+    const list = document.getElementById('xianyu-messages-list');
+    if (!list) return;
+    
+    // 这里使用静态 Mock 数据，后续可接生成
+    // 模仿截图结构
+    const mockChats = [
+        { name: "酸莓挞挞自制", tag: "等待买家收货", tagColor: "#FF6600", msg: "[卖家已发货]", time: "13小时前", img: "https://placehold.co/100x100/f0f0f0/999?text=Dress" },
+        { name: "1颜卿1", tag: "等待买家发货", tagColor: "#FF6600", msg: "✓", time: "14小时前", img: "https://placehold.co/100x100/e0e0e0/999?text=Toy" },
+        { name: "盒册对我很重要", tag: "", tagColor: "", msg: "想要卖家更快回复？平台帮你催促...", time: "14小时前", img: "https://placehold.co/100x100/d0d0d0/999?text=Box" },
+        { name: "芒果蛋黄", tag: "交易成功", tagColor: "#00CC66", msg: "快给ta一个评价吧~", time: "17小时前", img: "https://placehold.co/100x100/c0c0c0/999?text=Doll" },
+        { name: "热门活动", isOfficial: true, msg: "🔥 前方高能上新！低价手慢无！", time: "18小时前" },
+        { name: "国王大道沉迷洗衣...", tag: "等待买家发货", tagColor: "#FF6600", msg: "已收到对方转账", time: "01-25", img: "https://placehold.co/100x100/b0b0b0/999?text=Clothes" },
+        { name: "coco发大财", tag: "交易成功", tagColor: "#00CC66", msg: "[我完成了评价]", time: "01-25", img: "https://placehold.co/100x100/a0a0a0/999?text=Cat" },
+        { name: "Ahan手作娃衣", tag: "等待买家发货", tagColor: "#FF6600", msg: "藏青色没现货 要下星期[捂脸哭]", time: "01-23", img: "https://placehold.co/100x100/909090/999?text=Bag" }
+    ];
+
+    let html = '';
+    mockChats.forEach(chat => {
+        if (chat.isOfficial) {
+            html += `
+            <div style="display: flex; padding: 12px 15px; background: #fff; margin-bottom: 1px;">
+                <div style="margin-right: 12px; position: relative;">
+                    <div style="width: 48px; height: 48px; background: #FF4400; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 14px;">HOT</div>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span style="font-size: 16px; font-weight: 700; color: #000;">${chat.name}</span>
+                            <span style="background: #f0f0f0; color: #999; font-size: 10px; padding: 1px 4px; border-radius: 4px;">服务号</span>
+                        </div>
+                        <i class="far fa-bell-slash" style="color: #ccc; font-size: 12px;"></i>
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 4px;">${chat.msg}</div>
+                    <div style="font-size: 11px; color: #999;">${chat.time}</div>
+                </div>
+            </div>`;
+        } else {
+            let tagHtml = '';
+            if (chat.tag) {
+                const color = chat.tagColor || '#999';
+                let icon = 'fa-clock';
+                if (chat.tag === '交易成功') icon = 'fa-check-circle';
+                
+                tagHtml = `<span style="color: ${color}; font-size: 12px; margin-left: 6px; font-weight: 400; display: flex; align-items: center;"><i class="far ${icon}" style="font-size: 11px; margin-right: 3px;"></i> ${chat.tag}</span>`;
+            }
+
+            // 使用本地生成图片作为fallback
+            const fallbackImg = window.getSmartImage(chat.name);
+
+            html += `
+            <div style="display: flex; padding: 12px 15px; background: #fff; margin-bottom: 1px;">
+                <div style="margin-right: 12px;">
+                    <img src="${window.getSmartAvatar(chat.name)}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">
+                </div>
+                <div style="flex: 1; margin-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="margin-bottom: 4px; display: flex; align-items: center;">
+                        <span style="font-size: 16px; font-weight: 700; color: #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">${chat.name}</span>
+                        ${tagHtml}
+                    </div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${chat.msg}</div>
+                    <div style="font-size: 11px; color: #999;">${chat.time}</div>
+                </div>
+                <div>
+                    <img src="${chat.img}" onerror="this.src='${fallbackImg}'" style="width: 48px; height: 48px; border-radius: 4px; object-fit: cover;">
+                </div>
+            </div>`;
+        }
+    });
+    
+    list.innerHTML = html;
+};

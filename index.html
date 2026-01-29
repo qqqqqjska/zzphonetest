@@ -2630,6 +2630,141 @@
         </div>
     </div>
 
+    <!-- 查手机 - 闲鱼 -->
+    <div id="phone-xianyu" class="sub-screen hidden" style="z-index: 200; background-color: #f6f6f6;">
+        <div class="app-body" style="padding: 0; padding-bottom: 80px; overflow-y: auto; height: 100%;">
+            
+            <!-- Tab: 消息 -->
+            <div id="xianyu-tab-messages" class="xianyu-tab-content" style="display: none; padding-top: max(47px, env(safe-area-inset-top));">
+                <div style="padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: #f6f6f6;">
+                    <div onclick="document.getElementById('phone-xianyu').classList.add('hidden')" style="font-size: 24px; font-weight: 800; color: #000; cursor: pointer;">消息</div>
+                    <div style="display: flex; gap: 15px;">
+                        <i class="fas fa-shopping-bag" style="font-size: 20px; color: #000;"></i>
+                        <i id="generate-xianyu-btn" class="fas fa-hexagon" style="font-size: 20px; color: #000; cursor: pointer;"></i>
+                    </div>
+                </div>
+                
+                <div id="xianyu-messages-list" style="padding-bottom: 20px;">
+                    <!-- 消息列表由JS渲染 -->
+                </div>
+            </div>
+
+            <!-- Tab: 我的 -->
+            <div id="xianyu-tab-me" class="xianyu-tab-content" style="display: block;">
+                <!-- 顶部背景 -->
+                <div style="background-color: #f6f6f6; padding: 15px; padding-top: max(50px, env(safe-area-inset-top));">
+                    <!-- 用户信息行 -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <img id="xianyu-me-avatar" src="" style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid #fff; object-fit: cover;">
+                            <div style="display: flex; flex-direction: column;">
+                                <span id="xianyu-me-name" style="font-size: 20px; font-weight: 800; color: #000;">用户名</span>
+                                <div style="display: flex; align-items: center; gap: 5px; margin-top: 4px;">
+                                    <span style="background: #e0e0e0; color: #333; font-size: 11px; padding: 2px 6px; border-radius: 10px;">再也不跨尺寸了 ></span>
+                                </div>
+                                <div style="margin-top: 4px;">
+                                    <span style="background: #e0e0e0; color: #666; font-size: 10px; padding: 1px 6px; border-radius: 4px;">鱼力值 839</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 15px; margin-top: 5px;">
+                            <i class="far fa-smile" style="font-size: 20px; color: #000;"></i>
+                            <i class="fas fa-cog" style="font-size: 20px; color: #000;"></i>
+                        </div>
+                    </div>
+
+                    <!-- 闲鱼会员卡片 (装饰) -->
+                    <div style="background: linear-gradient(90deg, #E0F0FF, #C0E0FF); border-radius: 12px; padding: 12px; margin-bottom: 15px; position: relative; overflow: hidden; height: 60px;">
+                        <div style="position: absolute; top: 10px; left: 15px; font-weight: 800; font-size: 16px; color: #0055AA; font-style: italic;">闲鱼会员 X8</div>
+                        <div style="position: absolute; bottom: 10px; left: 15px; font-size: 11px; color: #004488;">今日500经验值待领取，来加速升级吧 ></div>
+                        <div style="position: absolute; right: -10px; bottom: -10px; font-size: 80px; color: #FFD700; opacity: 0.5;"><i class="fas fa-fish"></i></div>
+                    </div>
+
+                    <!-- 统计数据 -->
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 18px; font-weight: 700;">280</span>
+                            <span style="font-size: 12px; color: #666;">我的收藏</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 18px; font-weight: 700;">2872</span>
+                            <span style="font-size: 12px; color: #666;">历史浏览</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 18px; font-weight: 700;">25</span>
+                            <span style="font-size: 12px; color: #666;">我的关注</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-size: 18px; font-weight: 700;">3</span>
+                            <span style="font-size: 12px; color: #666;">红包卡券</span>
+                        </div>
+                    </div>
+
+                    <!-- 搜索提示条 -->
+                    <div style="background: #fff; border-radius: 20px; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: #FF4400; color: #fff; border-radius: 4px; padding: 1px 4px; font-size: 10px;">U</span>
+                            <span style="font-size: 13px; color: #333;">不用再搜，你最近看过的商品都在这</span>
+                        </div>
+                        <span style="font-size: 12px; color: #999;">去看看 ></span>
+                    </div>
+
+                    <!-- 我的交易 -->
+                    <div style="background: #fff; border-radius: 16px; padding: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="display: flex; align-items: baseline; gap: 5px;">
+                                <span style="font-size: 16px; font-weight: 700;">我的交易</span>
+                                <span style="font-size: 12px; color: #999;">在闲鱼赚了 30293.97 元</span>
+                            </div>
+                            <span style="background: #FFF5E0; color: #FF6600; font-size: 11px; padding: 4px 8px; border-radius: 12px;">今日曝光 43 ></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-around;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <i class="fas fa-shopping-bag" style="font-size: 24px; color: #333;"></i>
+                                <span style="font-size: 12px; color: #333;">我发布的 4</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <i class="fas fa-yen-sign" style="font-size: 24px; color: #333; border: 2px solid #333; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"></i>
+                                <span style="font-size: 12px; color: #333;">我卖出的 142</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <i class="fas fa-check-circle" style="font-size: 24px; color: #333;"></i>
+                                <span style="font-size: 12px; color: #333;">我买到的 331</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <i class="fas fa-tag" style="font-size: 24px; color: #333;"></i>
+                                <span style="font-size: 12px; color: #333;">我可卖的</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 底部 Tab 栏 -->
+        <div class="xianyu-tab-bar" style="position: absolute; bottom: 0; left: 0; width: 100%; background: #fff; display: flex; align-items: center; justify-content: space-around; padding-bottom: max(10px, env(safe-area-inset-bottom)); padding-top: 10px; border-top: 1px solid #f0f0f0;">
+            <div class="tab-item" style="color: #999; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                <span style="font-size: 16px; font-weight: bold;">首页</span>
+            </div>
+            <div class="tab-item" style="color: #999; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                <span style="font-size: 16px; font-weight: bold;">金华</span>
+            </div>
+            <div class="tab-item" style="margin-top: -10px;">
+                <div style="background: #FFDA44; border-radius: 20px; padding: 8px 16px; display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 5px rgba(255, 218, 68, 0.4);">
+                    <i class="fas fa-plus"></i> 卖闲置
+                </div>
+            </div>
+            <div class="tab-item active" onclick="switchXianyuTab('messages')" style="color: #333; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; cursor: pointer;">
+                <span style="font-size: 16px; font-weight: bold;">消息</span>
+                <div style="position: absolute; top: 0; right: -5px; width: 8px; height: 8px; background: #FF3B30; border-radius: 50%;"></div>
+            </div>
+            <div class="tab-item" onclick="switchXianyuTab('me')" style="color: #999; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+                <span style="font-size: 16px; font-weight: bold;">我的</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 音频元素 -->
     <audio id="bg-music" loop></audio>
 

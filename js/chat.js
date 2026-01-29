@@ -1451,6 +1451,14 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
         }
     }
 
+    // 处理气泡尾巴逻辑：如果是连续消息且没有时间戳分隔，移除上一条消息的尾巴
+    if (!showTimestamp && lastMsg && lastMsg.classList.contains('chat-message')) {
+        const lastIsUser = lastMsg.classList.contains('user');
+        if (lastIsUser === isUser) {
+            lastMsg.classList.remove('has-tail');
+        }
+    }
+
     if (showTimestamp) {
         const timeDiv = document.createElement('div');
         timeDiv.className = 'chat-time-stamp';
@@ -1476,7 +1484,8 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
         return;
     }
 
-    msgDiv.className = `chat-message ${isUser ? 'user' : 'other'}`;
+    // 默认给新消息添加 has-tail 类，因为它目前是最后一条
+    msgDiv.className = `chat-message ${isUser ? 'user' : 'other'} has-tail`;
     if (!isHistory) {
         msgDiv.classList.add('new');
     }
