@@ -450,6 +450,60 @@ function setupIOSFullScreen() {
     }, false);
 }
 
+window.analyzeStorageUsage = function() {
+    if (!state) return;
+    
+    let totalSize = 0;
+    const breakdown = [];
+
+    // 计算每个主要模块的大小
+    for (const key in state) {
+        if (Object.prototype.hasOwnProperty.call(state, key)) {
+            try {
+                // 将对象转换为JSON字符串来估算大小
+                const jsonStr = JSON.stringify(state[key]);
+                const size = jsonStr ? jsonStr.length : 0;
+                totalSize += size;
+                breakdown.push({ key, size });
+            } catch (e) {
+                console.error(`Error calculating size for ${key}:`, e);
+            }
+        }
+    }
+
+    // 按大小降序排序
+    breakdown.sort((a, b) => b.size - a.size);
+
+    // 格式化显示
+    let msg = "【存储占用分析】\n\n";
+    msg += `总计 (估算): ${(totalSize / 1024 / 1024).toFixed(2)} MB\n`;
+    msg += "----------------\n";
+    
+    // 只显示前 15 个占用最大的模块
+    breakdown.slice(0, 15).forEach(item => {
+        const sizeMB = (item.size / 1024 / 1024).toFixed(2);
+        const percent = ((item.size / totalSize) * 100).toFixed(1);
+        let alias = item.key;
+        
+        if (item.key === 'chatHistory') alias = '聊天记录 (chatHistory)';
+        if (item.key === 'moments') alias = '朋友圈 (moments)';
+        if (item.key === 'music') alias = '音乐 (music)';
+        if (item.key === 'contacts') alias = '联系人 (contacts)';
+        if (item.key === 'wallpapers') alias = '壁纸 (wallpapers)';
+        if (item.key === 'fonts') alias = '字体 (fonts)';
+        
+        msg += `${alias}: ${sizeMB} MB (${percent}%)\n`;
+    });
+
+    msg += "\n提示：\n";
+    msg += "1. 如果 'music' 很大，可能是因为上传了完整的音乐文件。\n";
+    msg += "2. 如果 'contacts' 或 'moments' 很大，可能是图片未压缩。\n";
+    msg += "3. 建议使用'压缩图片数据'功能，或手动删除不必要的大文件。";
+
+    alert(msg);
+    console.table(breakdown);
+};
+
 // 数据管理
 function saveConfig() {
     try {
@@ -570,13 +624,51 @@ function handleClearAllData() {
 }
 
 function exportJSON() {
-    const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'iphone-sim-config.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    const exportAsZip = document.getElementById('export-as-zip');
+    if (exportAsZip && exportAsZip.checked) {
+        exportZIP();
+    } else {
+        const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'iphone-sim-config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+function exportZIP() {
+    if (typeof JSZip === 'undefined') {
+        alert('JSZip 库加载失败，无法导出 ZIP。将回退到 JSON 导出。');
+        const exportAsZip = document.getElementById('export-as-zip');
+        if (exportAsZip) exportAsZip.checked = false;
+        exportJSON();
+        return;
+    }
+
+    const zip = new JSZip();
+    zip.file("iphone-sim-config.json", JSON.stringify(state));
+
+    zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+            level: 9
+        }
+    })
+        .then(function(content) {
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'iphone-sim-config.zip';
+            a.click();
+            URL.revokeObjectURL(url);
+        })
+        .catch(function(err) {
+            console.error('导出 ZIP 失败:', err);
+            alert('导出 ZIP 失败');
+        });
 }
 
 function importJSON(e) {
@@ -653,6 +745,9 @@ async function init() {
 
     const optimizeStorageBtn = document.getElementById('optimize-storage');
     if (optimizeStorageBtn) optimizeStorageBtn.addEventListener('click', window.optimizeStorage);
+
+    const analyzeStorageBtn = document.getElementById('analyze-storage');
+    if (analyzeStorageBtn) analyzeStorageBtn.addEventListener('click', window.analyzeStorageUsage);
 
     // 执行各模块的初始化监听器
     window.appInitFunctions.forEach(func => {

@@ -206,6 +206,8 @@ function renderContactList(filterGroup = 'all') {
                     lastMsgText = '[转账]';
                 } else if (lastMsg.type === 'voice') {
                     lastMsgText = '[语音]';
+                } else if (lastMsg.type === 'gift_card') {
+                    lastMsgText = '[礼物]';
                 } else if (lastMsg.type === 'voice_call_text') {
                     lastMsgText = '[通话]';
                 }
@@ -373,7 +375,8 @@ function openChat(contactId) {
     if (contact.customCss) {
         const style = document.createElement('style');
         style.id = 'chat-custom-css';
-        style.textContent = contact.customCss;
+        // Scope CSS to chat screen to prevent affecting settings page
+        style.textContent = `#chat-screen { ${contact.customCss} }`;
         document.head.appendChild(style);
     }
 
@@ -1223,7 +1226,8 @@ function handleSaveChatSettings() {
         if (contact.customCss) {
             const style = document.createElement('style');
             style.id = 'chat-custom-css';
-            style.textContent = contact.customCss;
+            // Scope CSS to chat screen to prevent affecting settings page
+            style.textContent = `#chat-screen { ${contact.customCss} }`;
             document.head.appendChild(style);
         }
 
@@ -1632,6 +1636,26 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
         extraClass = 'virtual-image-msg';
     } else if (type === 'image') {
         extraClass = 'image-msg';
+    } else if (type === 'gift_card') {
+        extraClass = 'gift-card-msg';
+        let giftData = typeof text === 'string' ? JSON.parse(text) : text;
+        contentHtml = `
+            <div class="gift-card" style="background: #fff; border-radius: 8px; padding: 12px 12px 10px 12px; width: 220px; height: 110px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: -45px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="display: flex; gap: 10px;">
+                    <div style="width: 50px; height: 50px; border-radius: 4px; background: #FFDA44; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <i class="fas fa-gift" style="font-size: 24px; color: #333;"></i>
+                    </div>
+                    <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 14px; font-weight: bold; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;">${giftData.title}</div>
+                        <div style="font-size: 14px; color: #000000; font-weight: bold; margin-top: 4px;">¥${giftData.price}</div>
+                    </div>
+                </div>
+                <div style="border-top: 1px solid #f0f0f0; padding-top: 8px; font-size: 12px; color: #666; display: flex; align-items: center;">
+                    <i class="fas fa-heart" style="color: #FF3B30; margin-right: 5px;"></i> 
+                    <span>闲鱼收藏礼物</span>
+                </div>
+            </div>
+        `;
     }
 
     let replyHtml = '';
@@ -2449,6 +2473,14 @@ ${contact.showThought ? '- **强制执行**：请务必在回复的最后（所�
                                    .replace(/{{.*?}}/g, '') // 移除其他可能的标签
                                    .trim();
                 return { role: h.role, content: callText };
+            } else if (h.type === 'gift_card') {
+                let giftData = {};
+                try {
+                    giftData = typeof content === 'string' ? JSON.parse(content) : content;
+                } catch(e) {
+                    giftData = { title: '礼物', price: '0' };
+                }
+                return { role: h.role, content: `[送出礼物：${giftData.title}，价值：${giftData.price}元] (这是我在闲鱼上看到你收藏的商品，特意买来送给你的)` };
             } else {
                 if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
                      try {

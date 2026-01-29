@@ -2130,8 +2130,8 @@ textarea {
 .message-content.transfer-msg {
     padding: 0;
     background-color: #ffffff !important;
-    width: 240px !important;
-    height: 80px !important;
+    width: 220px !important;
+    height: 90px !important;
     overflow: hidden;
     border-radius: 12px !important;
     cursor: pointer;
@@ -2204,6 +2204,7 @@ textarea {
     flex: 1;
     margin-top: 0 !important;
     justify-content: center;
+    min-width: 0; /* 关键修复：允许 flex 子项收缩，使 text-overflow 生效 */
 }
 
 .transfer-amount {
@@ -3187,6 +3188,14 @@ input:checked + .slider:before {
     padding: 0; /* 移除内边距 */
     border-radius: 0; /* 移除圆角 */
     box-shadow: none; /* 移除阴影 */
+}
+
+/* Gift Card Message Style */
+.message-content.gift-card-msg {
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
 .message-content.sticker-msg img {

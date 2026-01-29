@@ -1168,6 +1168,8 @@ async function handlePhoneAppGenerate(appType) {
         await generatePhoneWechatMoments(contact);
     } else if (appType === 'browser') {
         await generatePhoneBrowserHistory(contact);
+    } else if (appType === 'xianyu') {
+        await generatePhoneXianyuAll(contact);
     } else {
         alert(`正在生成 ${contact.name} 的 ${appType} 内容...\n(功能开发中)`);
     }
@@ -2408,7 +2410,7 @@ window.exitBrowserSearchMode = exitBrowserSearchMode;
 window.switchXianyuTab = function(tabName) {
     const messagesTab = document.getElementById('xianyu-tab-messages');
     const meTab = document.getElementById('xianyu-tab-me');
-    // 获取 tab items: 0=首页, 1=金华, 2=卖闲置, 3=消息, 4=我的
+    // 获取 tab items: 0=首页, 1=位置, 2=卖闲置, 3=消息, 4=我的
     const tabs = document.querySelectorAll('.xianyu-tab-bar .tab-item');
     
     if (!tabs || tabs.length < 5) return;
@@ -2453,25 +2455,110 @@ window.renderXianyuMe = function(contactId) {
         }
         avatarEl.src = avatar;
     }
-    if (nameEl) nameEl.textContent = contact.name;
+    
+    if (nameEl) {
+        // 使用AI生成的闲鱼昵称，如果没有则使用默认
+        let nickname = "昵称";
+        if (contact.xianyuData && contact.xianyuData.profile && contact.xianyuData.profile.nickname) {
+            nickname = contact.xianyuData.profile.nickname;
+        }
+        nameEl.textContent = nickname;
+    }
+    
+    // 更新统计数据
+    if (contact.xianyuData && contact.xianyuData.profile) {
+        const profile = contact.xianyuData.profile;
+        
+        // 更新收藏数
+        const favoritesEl = document.querySelector('[onclick="openXianyuFavorites()"] span:first-child');
+        if (favoritesEl) {
+            const favoritesCount = contact.xianyuData.favorites ? contact.xianyuData.favorites.length : (profile.favorites || 280);
+            favoritesEl.textContent = favoritesCount;
+        }
+        
+        // 更新历史浏览数
+        const viewsEl = document.querySelector('div:nth-child(2) > span:first-child');
+        if (viewsEl && profile.views) {
+            viewsEl.textContent = profile.views;
+        }
+        
+        // 更新关注数
+        const followingEl = document.querySelector('div:nth-child(3) > span:first-child');
+        if (followingEl && profile.following) {
+            followingEl.textContent = profile.following;
+        }
+        
+        // 更新红包卡券数
+        const couponsEl = document.querySelector('div:nth-child(4) > span:first-child');
+        if (couponsEl && profile.coupons) {
+            couponsEl.textContent = profile.coupons;
+        }
+        
+        // 更新鱼力值
+        const fishPowerEl = document.querySelector('[style*="鱼力值"]');
+        if (fishPowerEl && profile.fishPower) {
+            fishPowerEl.textContent = `鱼力值 ${profile.fishPower}`;
+        }
+        
+        // 更新发布数量
+        const publishedCountEl = document.querySelector('[onclick="openXianyuPublished()"] span');
+        if (publishedCountEl && contact.xianyuData.published) {
+            publishedCountEl.textContent = `我发布的 ${contact.xianyuData.published.length}`;
+        }
+        
+        // 更新卖出数量
+        const soldCountEl = document.querySelector('[onclick="openXianyuSold()"] span');
+        if (soldCountEl && contact.xianyuData.sold) {
+            soldCountEl.textContent = `我卖出的 ${contact.xianyuData.sold.length}`;
+        }
+        
+        // 更新买到数量
+        const boughtCountEl = document.querySelector('[onclick="openXianyuBought()"] span');
+        if (boughtCountEl && contact.xianyuData.bought) {
+            boughtCountEl.textContent = `我买到的 ${contact.xianyuData.bought.length}`;
+        }
+    }
 };
 
 window.renderXianyuMessages = function(contactId) {
     const list = document.getElementById('xianyu-messages-list');
     if (!list) return;
     
-    // 这里使用静态 Mock 数据，后续可接生成
-    // 模仿截图结构
-    const mockChats = [
-        { name: "酸莓挞挞自制", tag: "等待买家收货", tagColor: "#FF6600", msg: "[卖家已发货]", time: "13小时前", img: "https://placehold.co/100x100/f0f0f0/999?text=Dress" },
-        { name: "1颜卿1", tag: "等待买家发货", tagColor: "#FF6600", msg: "✓", time: "14小时前", img: "https://placehold.co/100x100/e0e0e0/999?text=Toy" },
-        { name: "盒册对我很重要", tag: "", tagColor: "", msg: "想要卖家更快回复？平台帮你催促...", time: "14小时前", img: "https://placehold.co/100x100/d0d0d0/999?text=Box" },
-        { name: "芒果蛋黄", tag: "交易成功", tagColor: "#00CC66", msg: "快给ta一个评价吧~", time: "17小时前", img: "https://placehold.co/100x100/c0c0c0/999?text=Doll" },
-        { name: "热门活动", isOfficial: true, msg: "🔥 前方高能上新！低价手慢无！", time: "18小时前" },
-        { name: "国王大道沉迷洗衣...", tag: "等待买家发货", tagColor: "#FF6600", msg: "已收到对方转账", time: "01-25", img: "https://placehold.co/100x100/b0b0b0/999?text=Clothes" },
-        { name: "coco发大财", tag: "交易成功", tagColor: "#00CC66", msg: "[我完成了评价]", time: "01-25", img: "https://placehold.co/100x100/a0a0a0/999?text=Cat" },
-        { name: "Ahan手作娃衣", tag: "等待买家发货", tagColor: "#FF6600", msg: "藏青色没现货 要下星期[捂脸哭]", time: "01-23", img: "https://placehold.co/100x100/909090/999?text=Bag" }
-    ];
+    // 获取当前联系人的闲鱼数据
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    let mockChats = [];
+    
+    if (contact && contact.xianyuData && contact.xianyuData.messages) {
+        // 使用AI生成的数据
+        mockChats = contact.xianyuData.messages.map(item => ({
+            name: item.name,
+            tag: item.tag || "",
+            tagColor: item.tag ? (item.tag === "交易成功" ? "#00CC66" : "#FF6600") : "",
+            msg: item.message,
+            time: item.time,
+            img: item.img || window.getSmartImage(item.name.substring(0, 3))
+        }));
+        
+        // 添加一个官方消息
+        mockChats.splice(2, 0, {
+            name: "热门活动",
+            isOfficial: true,
+            msg: "🔥 本周热门商品排行榜出炉！",
+            time: "18小时前"
+        });
+    } else {
+        // 使用默认Mock数据
+        mockChats = [
+            { name: "快乐小狗", tag: "等待买家收货", tagColor: "#FF6600", msg: "[卖家已发货] 亲，这边已经帮您发货了哦", time: "13小时前", img: window.getSmartImage("闲置书籍") },
+            { name: "数码爱好者", tag: "等待买家发货", tagColor: "#FF6600", msg: "好的，我明天寄出", time: "14小时前", img: window.getSmartImage("鼠标") },
+            { name: "闲置清理", tag: "", tagColor: "", msg: "还在吗？诚心要", time: "14小时前", img: window.getSmartImage("自行车") },
+            { name: "橘子汽水", tag: "交易成功", tagColor: "#00CC66", msg: "东西收到了，很喜欢！", time: "17小时前", img: window.getSmartImage("帆布包") },
+            { name: "热门活动", isOfficial: true, msg: "🔥 本周热门商品排行榜出炉！", time: "18小时前" },
+            { name: "VintageShop", tag: "等待买家发货", tagColor: "#FF6600", msg: "已付款，请尽快发货", time: "01-25", img: window.getSmartImage("外套") },
+            { name: "好运连连", tag: "交易成功", tagColor: "#00CC66", msg: "[系统] 交易成功", time: "01-25", img: window.getSmartImage("手机") },
+            { name: "手工达人", tag: "等待买家发货", tagColor: "#FF6600", msg: "这个可以定制颜色吗？", time: "01-23", img: window.getSmartImage("手工艺品") }
+        ];
+    }
 
     let html = '';
     mockChats.forEach(chat => {
@@ -2527,4 +2614,1398 @@ window.renderXianyuMessages = function(contactId) {
     });
     
     list.innerHTML = html;
+    
+    // 增强消息列表，添加点击聊天功能
+    setTimeout(() => {
+        window.enhanceXianyuMessagesList();
+    }, 100);
 };
+
+window.openXianyuSold = function() {
+    const page = document.getElementById('xianyu-page-sold');
+    if (page) {
+        page.classList.remove('hidden');
+        renderXianyuSoldList();
+    }
+};
+
+window.renderXianyuSoldList = function() {
+    const list = document.getElementById('xianyu-sold-list');
+    if (!list) return;
+
+    // 获取当前联系人的闲鱼数据
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    let items = [];
+    
+    if (contact && contact.xianyuData && contact.xianyuData.sold) {
+        // 使用AI生成的数据
+        items = contact.xianyuData.sold.map(item => ({
+            ...item,
+            img: item.img || window.getSmartImage(item.title.substring(0, 6)),
+            statusColor: "#FF6600",
+            actions: item.status === "交易成功" ? ["联系买家", "查看评价"] : ["联系买家", "催评价"],
+            isSold: true
+        }));
+    } else {
+        // 使用默认Mock数据
+        items = [
+            {
+                buyer: "FilmFanatic", status: "交易成功", statusColor: "#FF6600",
+                title: "Canon AE-1 胶片相机 银色机身", price: "1500",
+                img: window.getSmartImage("胶片相机"),
+                actions: ["联系买家", "查看评价", "删除订单"],
+                isSold: true
+            },
+            {
+                buyer: "CoffeeLover", status: "交易成功", statusColor: "#FF6600",
+                title: "星巴克星礼卡 面值100元", price: "80",
+                img: window.getSmartImage("星礼卡"),
+                actions: ["联系买家", "查看评价"],
+                isSold: true
+            },
+            {
+                buyer: "WinterIsComing", status: "等待买家评价", statusColor: "#FF6600",
+                title: "手工编织围巾 羊毛 红色", price: "120",
+                img: window.getSmartImage("红围巾"),
+                actions: ["联系买家", "催评价"],
+                isSold: true
+            }
+        ];
+    }
+
+    let html = '';
+    items.forEach(item => {
+        let actionsHtml = item.actions.map((action, idx) => {
+            const isHighlight = idx === item.actions.length - 1 && action !== "删除订单";
+            const style = isHighlight 
+                ? "background: #FFDA44; border: 1px solid #FFDA44; padding: 6px 14px; border-radius: 18px; font-size: 13px; color: #333; font-weight: bold;"
+                : "background: #fff; border: 1px solid #ccc; padding: 6px 14px; border-radius: 18px; font-size: 13px; color: #333;";
+            return `<button style="${style}">${action}</button>`;
+        }).join('');
+
+        // 详情页使用的是当前联系人（卖家）的信息，所以这里不传递 seller 属性给 openXianyuDetail
+        html += `
+        <div onclick='openXianyuDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center;">
+                    <img src="${window.getSmartAvatar(item.buyer)}" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px;">
+                    <span style="font-weight: bold; font-size: 14px;">${item.buyer}</span>
+                </div>
+                <span style="color: ${item.statusColor}; font-size: 14px;">${item.status}</span>
+            </div>
+            
+            <!-- Content -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <img src="${item.img}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0;">
+                    <div style="font-size: 15px; font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.title}</div>
+                    <div style="text-align: right; color: #000; font-weight: bold; font-size: 14px;">¥${item.price}</div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #999; font-size: 12px;">更多</span>
+                <div style="display: flex; gap: 8px;" onclick="event.stopPropagation();">
+                    ${actionsHtml}
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    list.innerHTML = html;
+};
+
+// --- 闲鱼子页面逻辑 ---
+
+window.openXianyuPublished = function() {
+    const page = document.getElementById('xianyu-page-published');
+    if (page) {
+        page.classList.remove('hidden');
+        renderXianyuPublishedList();
+    }
+};
+
+window.renderXianyuPublishedList = function() {
+    const list = document.getElementById('xianyu-published-list');
+    if (!list) return;
+
+    // 获取当前联系人的闲鱼数据
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    let items = [];
+    
+    if (contact && contact.xianyuData && contact.xianyuData.published) {
+        // 使用AI生成的数据
+        items = contact.xianyuData.published.map(item => ({
+            ...item,
+            img: item.img || window.getSmartImage(item.title.substring(0, 6)),
+            isPublished: true
+        }));
+    } else {
+        // 使用默认Mock数据
+        items = [
+            { title: "Switch 日版续航版 灰色手柄", price: "850", exposure: 419, views: 34, want: 0, tag: "闲鱼币抵扣", img: window.getSmartImage("游戏机"), isPublished: true },
+            { title: "宜家书桌 白色 九成新 需自提", price: "120", exposure: "1.8万", views: 687, want: 5, tag: "", img: window.getSmartImage("书桌"), isPublished: true },
+            { title: "JBL GO3 蓝牙音箱 红色", price: "150", exposure: 2315, views: 155, want: 1, tag: "", img: window.getSmartImage("音箱"), isPublished: true }
+        ];
+    }
+
+    let html = '';
+    items.forEach((item, index) => {
+        let tagHtml = '';
+        if (item.tag) {
+            tagHtml = `<span style="background: #FFF5E0; color: #FF6600; font-size: 10px; padding: 1px 4px; border-radius: 4px; margin-right: 5px;">${item.tag}</span>`;
+        }
+
+        html += `
+        <div onclick='openXianyuDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer;">
+            <!-- 顶部提示条 (模拟) -->
+            ${index === 0 ? `<div style="background: #F5F7FA; padding: 8px; border-radius: 8px; margin-bottom: 10px; font-size: 12px; color: #333; display: flex; align-items: center;"><i class="fas fa-lightbulb" style="color: #FF6600; margin-right: 5px;"></i> 解锁提效包，分析商品流量变化... <i class="fas fa-chevron-right" style="margin-left: auto; color: #ccc;"></i></div>` : ''}
+            
+            <div style="display: flex; gap: 10px;">
+                <img src="${item.img}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div style="font-size: 15px; font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.title}</div>
+                    <div style="font-size: 11px; color: #999;">曝光${item.exposure} 浏览${item.views} 想要${item.want}</div>
+                    <div style="color: #FF3B30; font-weight: bold; font-size: 16px;">¥${item.price}</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; margin-top: 10px;">
+                <i class="fas fa-ellipsis-h" style="color: #999; margin-right: 10px;"></i>
+                ${tagHtml}
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button style="background: #fff; border: 1px solid #eee; padding: 4px 12px; border-radius: 16px; font-size: 12px; color: #333;">次元优惠</button>
+                    <button style="background: #fff; border: 1px solid #eee; padding: 4px 12px; border-radius: 16px; font-size: 12px; color: #333;">降价</button>
+                    <button style="background: #fff; border: 1px solid #eee; padding: 4px 12px; border-radius: 16px; font-size: 12px; color: #333;">编辑</button>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    list.innerHTML = html;
+};
+
+// 生成个性化商品描述
+function generateItemDescription(item) {
+    const title = item.title.toLowerCase();
+    let description = "";
+    
+    // 根据商品类型生成不同的描述
+    if (title.includes('手机') || title.includes('phone') || title.includes('iphone') || title.includes('华为') || title.includes('小米')) {
+        const conditions = ['九成新', '八成新', '九五成新', '几乎全新'];
+        const condition = conditions[Math.floor(Math.random() * conditions.length)];
+        description = `${condition}，功能完好，无拆无修。屏幕无划痕，电池健康度良好。配件齐全，包装盒说明书都在。`;
+        description += `\n\n使用感受：手感很好，性能流畅，日常使用完全没问题。因为换新机了所以出售。`;
+        description += `\n\n发货说明：顺丰包邮，当天发货。支持验货，不满意可退。`;
+    } else if (title.includes('电脑') || title.includes('笔记本') || title.includes('laptop') || title.includes('macbook')) {
+        description = `配置还很不错，日常办公、学习、轻度游戏都没问题。外观有轻微使用痕迹，但不影响使用。`;
+        description += `\n\n硬件状态：CPU、内存、硬盘都正常，散热良好，运行稳定。已重装系统，激活正版。`;
+        description += `\n\n包装：原装充电器，包装盒还在。同城可面交，外地走闲鱼担保。`;
+    } else if (title.includes('衣服') || title.includes('裙子') || title.includes('外套') || title.includes('鞋') || title.includes('包')) {
+        description = `基本没怎么穿，尺码不合适所以出售。面料质感很好，做工精细。`;
+        description += `\n\n尺码信息：请仔细看图片中的尺码标签，不接受因尺码问题退换。`;
+        description += `\n\n发货：48小时内发货，包装仔细。介意二手勿拍。`;
+    } else if (title.includes('书') || title.includes('教材') || title.includes('小说')) {
+        description = `内容完整，无缺页。有少量笔记和划线，不影响阅读。适合学习或收藏。`;
+        description += `\n\n保存状态：书页干净，封面有轻微磨损。存放在干燥环境，无异味。`;
+        description += `\n\n邮费：重量较轻，邮费便宜。支持合并邮寄多本书籍。`;
+    } else if (title.includes('游戏') || title.includes('switch') || title.includes('ps') || title.includes('xbox')) {
+        description = `成色如图，功能正常。手柄无漂移，按键灵敏。游戏运行流畅。`;
+        description += `\n\n配件：原装手柄、充电线、说明书等都在。部分游戏卡带一起出。`;
+        description += `\n\n使用情况：平时爱护使用，无摔无进水。因为工作忙没时间玩了。`;
+    } else if (title.includes('家具') || title.includes('桌子') || title.includes('椅子') || title.includes('柜子')) {
+        description = `实物比图片好看，质量很好。因为搬家/换新所以出售。`;
+        description += `\n\n尺寸：请看图片中的详细尺寸，购买前请确认家里空间。`;
+        description += `\n\n自提：比较重，建议同城自提。可以帮忙搬到楼下。`;
+    } else {
+        // 通用描述
+        const conditions = ['九成新', '八成新', '九五成新', '成色很好'];
+        const condition = conditions[Math.floor(Math.random() * conditions.length)];
+        description = `${condition}，功能正常，使用感良好。因为闲置所以出售。`;
+        description += `\n\n物品状态：保存完好，无明显瑕疵。实物与图片一致。`;
+        description += `\n\n交易说明：支持验货，不满意可退。诚心出售，价格可小刀。`;
+    }
+    
+    // 添加通用结尾
+    description += `\n\n❌ 不退不换，看好再拍\n⚡ 急用钱，诚心出售\n📦 包装仔细，放心购买`;
+    
+    return description;
+}
+
+window.openXianyuDetail = function(item) {
+    console.log('打开闲鱼商品详情页，商品信息:', item);
+    const page = document.getElementById('xianyu-page-detail');
+    if (!page) {
+        console.error('找不到闲鱼详情页元素');
+        return;
+    }
+
+    window.currentXianyuDetailItem = item;
+    console.log('设置全局商品信息:', window.currentXianyuDetailItem);
+
+    // Populate data
+    document.getElementById('xianyu-detail-price').textContent = item.price;
+    
+    // 使用AI生成的描述或生成个性化描述
+    let description = item.title;
+    if (item.description) {
+        description = item.description;
+    } else {
+        // 生成个性化的宝贝描述
+        description += "\n\n宝贝描述：\n" + generateItemDescription(item);
+    }
+    document.getElementById('xianyu-detail-desc').textContent = description;
+    
+    // Image
+    const imgContainer = document.getElementById('xianyu-detail-images');
+    if (imgContainer) {
+        imgContainer.innerHTML = `<img src="${item.img}" style="width: 100%; border-radius: 8px; margin-bottom: 10px;">`;
+    }
+
+    // User Info (Seller)
+    let locationInfo = "刚刚来过 | 位置"; // 默认位置
+    let sellerNameForId = "昵称"; // 用于显示闲鱼号
+    
+    if (item.seller) {
+        // If item has specific seller info (e.g. from Bought list), use it
+        document.getElementById('xianyu-detail-avatar').src = window.getSmartAvatar(item.seller);
+        document.getElementById('xianyu-detail-username').textContent = item.seller;
+        sellerNameForId = item.seller;
+    } else if (currentCheckPhoneContactId) {
+        // Otherwise (e.g. from Published/Sold list), use current contact as seller
+        const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+        if (contact) {
+            const avatar = contact.avatar || window.getSmartAvatar(contact.name);
+            document.getElementById('xianyu-detail-avatar').src = avatar;
+            
+            // 使用AI生成的闲鱼昵称和位置信息
+            let nickname = "昵称";
+            if (contact.xianyuData && contact.xianyuData.profile) {
+                if (contact.xianyuData.profile.nickname) {
+                    nickname = contact.xianyuData.profile.nickname;
+                }
+                if (contact.xianyuData.profile.location) {
+                    locationInfo = `刚刚来过 | ${contact.xianyuData.profile.location}`;
+                }
+            }
+            document.getElementById('xianyu-detail-username').textContent = nickname;
+            sellerNameForId = nickname;
+        }
+    }
+
+    // 更新闲鱼号
+    const idTextEl = document.getElementById('xianyu-detail-id-text');
+    if (idTextEl) {
+        idTextEl.textContent = `闲鱼号：${sellerNameForId}`;
+    }
+    
+    // 更新位置信息
+    const locationEl = document.getElementById('xianyu-detail-location');
+    if (locationEl) {
+        locationEl.textContent = locationInfo;
+    }
+
+    // Handle Sold Out state - 使用更精确的选择器
+    let targetBottomBar = page.querySelector('div[style*="position: fixed"][style*="bottom: 0"]');
+    
+    // 备用选择器 - 如果第一个选择器失败，尝试其他方法
+    if (!targetBottomBar) {
+        // 尝试通过类名或其他属性查找
+        targetBottomBar = page.querySelector('div[style*="position: fixed"]');
+        console.log('使用备用选择器找到底部栏:', targetBottomBar);
+    }
+    
+    console.log('闲鱼详情页底部栏元素:', targetBottomBar);
+    console.log('商品信息:', item);
+
+    if (targetBottomBar) {
+        if (item.isSold) {
+            targetBottomBar.innerHTML = `
+                <div style="flex: 1;"></div>
+                <button style="background: #e0e0e0; color: #999; border: none; padding: 10px 30px; border-radius: 20px; font-weight: bold; cursor: default;">卖掉了</button>
+            `;
+        } else if (item.isPublished) {
+            targetBottomBar.innerHTML = `
+                <div style="display: flex; gap: 20px; margin-left: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-star" style="font-size: 20px;"></i> 0
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-eye" style="font-size: 20px;"></i> 35
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="fas fa-user-slash" style="font-size: 20px;"></i> 无人在蹲
+                    </div>
+                </div>
+                <button style="background: #f0f0f0; border: none; padding: 10px 30px; border-radius: 20px; font-weight: bold; color: #333;">管理</button>
+            `;
+        } else {
+            // Restore default bottom bar
+            targetBottomBar.innerHTML = `
+                <div style="display: flex; gap: 20px; margin-left: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-star" style="font-size: 20px;"></i> 10
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-eye" style="font-size: 20px;"></i> 156
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="fas fa-user-slash" style="font-size: 20px;"></i> 无人在蹲
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button style="background: #FFDA44; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; color: #333;">聊一聊</button>
+                    <button onclick="window.handleXianyuPurchase(window.currentXianyuDetailItem)" style="background: #FF3B30; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; color: #fff;">立即购买</button>
+                </div>
+            `;
+        }
+    }
+
+    page.classList.remove('hidden');
+};
+
+window.openXianyuFavorites = function() {
+    const page = document.getElementById('xianyu-page-favorites');
+    if (page) {
+        page.classList.remove('hidden');
+        renderXianyuFavoritesList();
+    }
+};
+
+window.renderXianyuFavoritesList = function() {
+    const list = document.getElementById('xianyu-favorites-list');
+    if (!list) return;
+
+    // 获取当前联系人的闲鱼数据
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    let items = [];
+    
+    if (contact && contact.xianyuData && contact.xianyuData.favorites) {
+        // 使用AI生成的数据
+        items = contact.xianyuData.favorites.map(item => ({
+            ...item,
+            img: item.img || window.getSmartImage(item.title.substring(0, 6))
+        }));
+    } else {
+        // 使用默认Mock数据
+        items = [
+            {
+                title: "猫咪围巾",
+                price: "38",
+                seller: "Lucky",
+                img: window.getSmartImage("围巾"),
+                isSold: false
+            },
+            {
+                title: "大衣",
+                price: "1120",
+                seller: "芒果",
+                img: window.getSmartImage("大衣"),
+                isSold: true,
+                want: 2
+            },
+            {
+                title: "徽章",
+                price: "85",
+                seller: "adam",
+                img: window.getSmartImage("徽章"),
+                isSold: true,
+                want: 6
+            },
+            {
+                title: "azone",
+                price: "2999",
+                seller: "天天开心",
+                img: window.getSmartImage("娃娃"),
+                isSold: true,
+                want: 4
+            },
+            {
+                title: "全新azone2代3代体 白肌手组a+b 一对",
+                price: "120",
+                seller: "小红",
+                img: window.getSmartImage("配件"),
+                isSold: true,
+                want: 1
+            },
+            {
+                title: "包邮 截单——",
+                price: "999",
+                seller: "小9",
+                img: window.getSmartImage("套装"),
+                isSold: false,
+                want: 168
+            }
+        ];
+    }
+
+    let html = '';
+    items.forEach(item => {
+        let overlay = '';
+        if (item.isSold) {
+            overlay = `<div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); color: #fff; font-size: 12px; padding: 2px 6px; border-radius: 4px;">卖掉了</div>`;
+        }
+
+        let actionBtn = '';
+        if (item.isSold) {
+            actionBtn = `<div style="color: #999; font-size: 12px; display: flex; align-items: center;"><i class="fas fa-expand" style="margin-right: 4px;"></i> 找相似</div>`;
+        } else {
+            actionBtn = `
+                <div style="display: flex; gap: 8px;" onclick="event.stopPropagation();">
+                    <button style="border: 1px solid #ddd; background: #fff; padding: 4px 12px; border-radius: 14px; font-size: 12px;">聊一聊</button>
+                    <button onclick="window.handleXianyuPurchase(${JSON.stringify(item).replace(/"/g, '&quot;')})" style="background: #FFDA44; border: none; padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: bold;">立即购买</button>
+                </div>
+            `;
+        }
+
+        let infoLine = '';
+        if (item.want) {
+            infoLine = `<div style="font-size: 11px; color: #999; margin-top: 4px;">${item.want}人想要</div>`;
+        }
+
+        html += `
+        <div onclick='openXianyuDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 10px; display: flex; gap: 12px; cursor: pointer;">
+            <div style="position: relative; width: 100px; height: 100px; flex-shrink: 0;">
+                <img src="${item.img}" style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover;" onerror="this.src=window.getSmartImage('${item.title}')">
+                ${overlay}
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="font-size: 15px; font-weight: 500; color: #333; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                        ${item.isSold ? '<span style="color: #999;">[失效] </span>' : '<span style="background: #FF4400; color: #fff; font-size: 10px; padding: 0 2px; border-radius: 2px; margin-right: 4px;">包邮</span>'}${item.title}
+                    </div>
+                    <div style="font-size: 16px; font-weight: bold; color: #FF3B30; margin-top: 6px;">¥${item.price}</div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <img src="${window.getSmartAvatar(item.seller)}" style="width: 16px; height: 16px; border-radius: 50%;">
+                        <span style="font-size: 11px; color: #666;">${item.seller}</span>
+                        ${infoLine ? '' : ''}
+                    </div>
+                    ${actionBtn}
+                </div>
+                ${infoLine}
+            </div>
+        </div>
+        `;
+    });
+
+    list.innerHTML = html;
+};
+
+window.openXianyuBought = function() {
+    const page = document.getElementById('xianyu-page-bought');
+    if (page) {
+        page.classList.remove('hidden');
+        renderXianyuBoughtList();
+    }
+};
+
+window.renderXianyuBoughtList = function() {
+    const list = document.getElementById('xianyu-bought-list');
+    if (!list) return;
+
+    // 获取当前联系人的闲鱼数据
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    let items = [];
+    
+    if (contact && contact.xianyuData && contact.xianyuData.bought) {
+        // 使用AI生成的数据
+        items = contact.xianyuData.bought.map(item => {
+            let actions = ["联系卖家"];
+            if (item.status === "交易成功") {
+                actions.push("去评价", "卖了换钱");
+            } else if (item.status === "等待卖家发货") {
+                actions.push("再次购买", "提醒发货");
+            } else {
+                actions.push("查看物流", "确认收货");
+            }
+            
+            return {
+                ...item,
+                img: item.img || window.getSmartImage(item.title.substring(0, 6)),
+                statusColor: "#FF6600",
+                actions: actions,
+                isSold: true
+            };
+        });
+    } else {
+        // 使用默认Mock数据
+        items = [
+            {
+                seller: "TechGeek", sellerTag: "鱼小铺", status: "等待卖家发货", statusColor: "#FF6600",
+                title: "Sony WH-1000XM5 无线降噪耳机 黑色", price: "1800",
+                img: window.getSmartImage("耳机"),
+                actions: ["联系卖家", "再次购买", "提醒发货"],
+                isSold: true
+            },
+            {
+                seller: "KeyboardFan", status: "交易成功", statusColor: "#FF6600",
+                title: "PBT热升华键帽 机械键盘通用", price: "99",
+                img: window.getSmartImage("键帽"),
+                actions: ["联系卖家", "去评价", "卖了换钱"],
+                isSold: true
+            },
+            {
+                seller: "MoveOutSale", status: "等待见面交易", statusColor: "#FF6600",
+                title: "宜家落地灯 九成新 自提", price: "50",
+                img: window.getSmartImage("落地灯"),
+                actions: ["联系卖家", "再次购买", "确认收货"],
+                isSold: true
+            },
+            {
+                seller: "ClosetClear", status: "等待买家收货", statusColor: "#FF6600",
+                title: "优衣库纯棉T恤 白色 L码", price: "30",
+                img: window.getSmartImage("T恤"),
+                actions: ["联系卖家", "查看物流", "延长收货"],
+                isSold: true
+            }
+        ];
+    }
+
+    let html = '';
+    items.forEach(item => {
+        let sellerTagHtml = item.sellerTag ? `<span style="background: #E0F0FF; color: #007AFF; font-size: 10px; padding: 1px 4px; border-radius: 4px; margin-left: 5px;">${item.sellerTag}</span>` : '';
+        
+        let actionsHtml = item.actions.map((action, idx) => {
+            // Highlight the last action
+            const isHighlight = idx === item.actions.length - 1;
+            const style = isHighlight 
+                ? "background: #fff; border: 1px solid #FFDA44; padding: 6px 14px; border-radius: 18px; font-size: 13px; color: #333; font-weight: bold; background-color: #FFDA44;"
+                : "background: #fff; border: 1px solid #ccc; padding: 6px 14px; border-radius: 18px; font-size: 13px; color: #333;";
+            return `<button style="${style}">${action}</button>`;
+        }).join('');
+
+        html += `
+        <div onclick='openXianyuDetail(${JSON.stringify(item).replace(/'/g, "&#39;")})' style="background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 10px; cursor: pointer;">
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; align-items: center;">
+                    <img src="${window.getSmartAvatar(item.seller)}" style="width: 24px; height: 24px; border-radius: 50%; margin-right: 8px;">
+                    <span style="font-weight: bold; font-size: 14px;">${item.seller}</span>
+                    ${sellerTagHtml}
+                    <i class="fas fa-chevron-right" style="color: #ccc; font-size: 12px; margin-left: 5px;"></i>
+                </div>
+                <span style="color: ${item.statusColor}; font-size: 14px;">${item.status}</span>
+            </div>
+            
+            <!-- Content -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <img src="${item.img}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0;">
+                    <div style="font-size: 15px; font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.title}</div>
+                    <div style="text-align: right; color: #000; font-weight: bold; font-size: 14px;">¥${item.price}</div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #999; font-size: 12px;">更多</span>
+                <div style="display: flex; gap: 8px;" onclick="event.stopPropagation();">
+                    ${actionsHtml}
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    list.innerHTML = html;
+};
+
+// --- 闲鱼AI生成功能 ---
+
+async function generatePhoneXianyuAll(contact) {
+    const btn = document.getElementById('generate-xianyu-btn');
+    // 不再替换内容，只添加动画类
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('generating-pulse');
+    }
+
+    // 获取用户设定和世界书信息
+    const userPersona = window.iphoneSimState.userProfile?.persona || '';
+    const worldBook = window.iphoneSimState.worldBook || '';
+    const chatHistory = window.iphoneSimState.chatHistory[contact.id] || [];
+    const recentChats = chatHistory.slice(-10).map(msg => `${msg.role}: ${msg.content}`).join('\n');
+
+    const systemPrompt = `你是一个虚拟手机内容生成器。请为角色【${contact.name}】生成闲鱼应用的完整内容。
+
+【角色设定】
+联系人信息：${contact.persona || '无特殊设定'}
+用户身份：${userPersona}
+世界书背景：${worldBook}
+
+【参考资料：最近微信聊天记录】
+${recentChats}
+(注意：此聊天记录仅用于判断用户是否提到过"想要"、"喜欢"某样物品。如果用户明确表达了想要某个东西，请让角色在闲鱼"我买到的"或"消息"中体现正在购买该物品作为礼物。除此之外，闲鱼的聊天内容绝不能与微信聊天内容相似或模仿，必须是完全独立的二手交易对话。)
+
+【任务要求】
+生成一个完整的闲鱼用户档案，包含以下内容：
+
+1. **我发布的商品** (published) - 3-6个商品
+   - 根据角色设定生成符合其身份的二手商品
+   - 每个商品包含：标题、价格、描述、图片关键词、曝光数、浏览数、想要数
+   - 价格要合理，符合二手市场行情
+   - 价格字段请只返回纯数字，不要包含"¥"、"￥"或"元"等符号
+
+2. **我卖出的商品** (sold) - 2-4个已售商品
+   - 包含买家信息、交易状态、商品信息
+   - 状态可以是：交易成功、等待买家评价等
+
+3. **我买到的商品** (bought) - 2-5个购买记录
+   - 包含卖家信息、交易状态、商品信息
+   - 状态可以是：等待卖家发货、等待买家收货、交易成功等
+
+4. **我收藏的商品** (favorites) - 4-8个收藏商品
+   - 包含卖家信息、商品信息、价格、收藏状态
+   - 部分商品可能已经卖掉了（isSold: true）
+   - 包含想要人数等信息
+
+5. **消息列表** (messages) - 5-8条聊天记录
+   - 包含与买家/卖家的对话
+   - 显示交易状态标签（等待买家收货、等待卖家发货、交易成功等）
+   - 包含最近的聊天消息
+   - 【重要】每条消息必须包含对应的商品信息（title, price）用于聊天页面显示
+   - 【重要】每条消息必须包含详细的聊天记录数组（chatMessages）
+   - 【重要】每条消息必须包含交易方向信息（isBuying: true表示${contact.name}是买家，false表示${contact.name}是卖家）
+   - 【重要】每条聊天记录需要包含 "isRead" (boolean) 字段，表示对方是否已读（主要是针对我方发出的消息）。
+   - 【重要】交易流程必须完整且符合逻辑：通常"已拍下"后面会紧跟"已付款"。
+     - 如果是交易成功的状态，聊天记录应包含：咨询 -> 拍下(卡片) -> 付款(卡片) -> 发货(系统) -> 收货(系统/评价)。
+     - 拍下消息示例："我已拍下，等待付款"
+     - 付款消息示例："我已付款，等待你发货"
+
+6. **用户信息** (profile)
+   - 闲鱼昵称（有趣且符合角色特点）
+   - 位置信息（随机生成中国城市）
+   - 鱼力值、收藏数等统计数据
+
+【重要规则】
+- 【严禁】闲鱼聊天列表中的消息绝不能出现和用户在微信聊天上下文相似的对话。
+- 【严禁】不要生成任何与"用户"、"玩家"、"你"相关的对话，只生成与其他NPC角色的对话。
+- 仅当用户在微信聊天中明确表达想要某物时，才可以在闲鱼中生成购买该物品的记录（作为送给用户的礼物），除此之外，闲鱼内容必须与微信聊天完全隔离。
+- 所有商品和对话都要符合角色设定和世界书背景
+- 价格要现实合理，不要过高或过低
+- 商品描述要生动有趣，体现闲鱼用户的特色
+- 聊天消息要自然，包含买卖双方的真实对话
+- 图片使用英文关键词格式，如："laptop computer|笔记本电脑"
+- 每个消息条目必须包含完整的聊天记录，确保聊天页面内容与列表显示一致
+- 在chatMessages中，使用"me"表示${contact.name}，"other"表示对话的另一方
+- 付款相关的特殊消息需要标记：isPayment: true（我已拍下/我已付款），isShipping: true（发货相关）
+
+【返回格式】
+必须返回合法的JSON对象：
+{
+  "profile": {
+    "nickname": "闲鱼昵称",
+    "location": "城市名",
+    "fishPower": 数字,
+    "favorites": 数字,
+    "views": 数字,
+    "following": 数字,
+    "coupons": 数字
+  },
+  "published": [
+    {
+      "title": "商品标题",
+      "price": "价格",
+      "description": "详细描述",
+      "image": "image keyword|中文描述",
+      "exposure": 曝光数,
+      "views": 浏览数,
+      "want": 想要数,
+      "tag": "标签（可选）"
+    }
+  ],
+  "sold": [
+    {
+      "buyer": "买家昵称",
+      "status": "交易状态",
+      "title": "商品标题",
+      "price": "价格",
+      "image": "image keyword|中文描述"
+    }
+  ],
+  "bought": [
+    {
+      "seller": "卖家昵称",
+      "status": "交易状态",
+      "title": "商品标题",
+      "price": "价格",
+      "image": "image keyword|中文描述"
+    }
+  ],
+  "favorites": [
+    {
+      "title": "商品标题",
+      "price": "价格",
+      "seller": "卖家昵称",
+      "image": "image keyword|中文描述",
+      "isSold": false,
+      "want": 想要人数（可选）
+    }
+  ],
+  "messages": [
+    {
+      "name": "对话者昵称",
+      "tag": "交易状态标签（可选）",
+      "message": "最新消息内容",
+      "time": "时间描述",
+      "image": "商品图片关键词|中文描述",
+      "title": "对应商品标题",
+      "price": "对应商品价格",
+      "isBuying": false,
+      "chatMessages": [
+        {
+          "type": "me|other|system",
+          "content": "消息内容",
+          "time": "时间",
+          "isPayment": false,
+          "isShipping": false,
+          "isRead": true
+        }
+      ]
+    }
+  ]
+}`;
+
+    await callAiGeneration(contact, systemPrompt, 'xianyu_all', btn, null);
+}
+
+async function callAiGeneration(contact, systemPrompt, type, btn, originalContent = null) {
+    const settings = window.iphoneSimState.aiSettings.url ? window.iphoneSimState.aiSettings : window.iphoneSimState.aiSettings2;
+    
+    if (!settings.url || !settings.key) {
+        alert('请先配置 AI API');
+        if (btn) {
+            btn.classList.remove('generating-pulse');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            if (originalContent) {
+                btn.innerHTML = originalContent;
+            }
+        }
+        return;
+    }
+
+    try {
+        let fetchUrl = settings.url;
+        if (!fetchUrl.endsWith('/chat/completions')) {
+            fetchUrl = fetchUrl.endsWith('/') ? fetchUrl + 'chat/completions' : fetchUrl + '/chat/completions';
+        }
+
+        const response = await fetch(fetchUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${settings.key}`
+            },
+            body: JSON.stringify({
+                model: settings.model,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: '开始生成' }
+                ],
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) throw new Error('API Error: ' + response.status);
+
+        const data = await response.json();
+        let content = data.choices[0].message.content.trim();
+        
+        // JSON提取和清理逻辑
+        let jsonStr = content;
+        jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        
+        const lines = jsonStr.split('\n');
+        let startIndex = -1;
+        let endIndex = -1;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (startIndex === -1 && line.startsWith('{')) {
+                startIndex = i;
+            }
+            if (line.endsWith('}')) {
+                endIndex = i;
+            }
+        }
+        
+        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+            jsonStr = lines.slice(startIndex, endIndex + 1).join('\n');
+        }
+        
+        if (!jsonStr.trim().startsWith('{')) {
+            const firstBrace = content.indexOf('{');
+            const lastBrace = content.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                jsonStr = content.substring(firstBrace, lastBrace + 1);
+            }
+        }
+        
+        // 清理多余字符
+        jsonStr = jsonStr.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+        
+        const result = JSON.parse(jsonStr);
+        
+        if (type === 'xianyu_all') {
+            // 保存生成的闲鱼数据到联系人
+            if (!contact.xianyuData) contact.xianyuData = {};
+            
+            // 处理图片关键词和价格
+            // Helper to process item
+            const processItem = (item) => {
+                // Process Image
+                if (item.image && item.image.includes('|')) {
+                    const [keyword, desc] = item.image.split('|');
+                    // 使用中文描述生成图片
+                    item.img = window.getSmartImage(desc.trim());
+                    item.imageDesc = desc.trim();
+                } else if (item.image) {
+                    item.img = window.getSmartImage(item.image);
+                } else if (item.title) {
+                    item.img = window.getSmartImage(item.title);
+                }
+                
+                // Process Price - Remove currency symbols
+                if (item.price) {
+                    item.price = item.price.toString().replace(/[¥￥元\s]/g, '');
+                }
+            };
+
+            if (result.published) result.published.forEach(processItem);
+            if (result.sold) result.sold.forEach(processItem);
+            if (result.bought) result.bought.forEach(processItem);
+            if (result.favorites) result.favorites.forEach(processItem);
+            if (result.messages) result.messages.forEach(processItem);
+            
+            contact.xianyuData = result;
+            saveConfig();
+            
+            // 刷新当前显示的内容
+            if (currentCheckPhoneContactId === contact.id) {
+                window.renderXianyuMe(contact.id);
+                window.renderXianyuMessages(contact.id);
+                // 如果收藏页面正在显示，也刷新它
+                const favoritesPage = document.getElementById('xianyu-page-favorites');
+                if (favoritesPage && !favoritesPage.classList.contains('hidden')) {
+                    window.renderXianyuFavoritesList();
+                }
+            }
+            
+            alert(`已为 ${contact.name} 生成闲鱼内容！\n包含：${result.published?.length || 0}个发布商品，${result.sold?.length || 0}个卖出记录，${result.bought?.length || 0}个购买记录，${result.favorites?.length || 0}个收藏商品，${result.messages?.length || 0}条消息`);
+        }
+        
+    } catch (error) {
+        console.error('AI生成失败:', error);
+        alert('生成失败: ' + error.message);
+    } finally {
+        if (btn) {
+            btn.classList.remove('generating-pulse');
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            if (originalContent) {
+                btn.innerHTML = originalContent;
+            }
+        }
+    }
+}
+
+// --- 闲鱼聊天功能 ---
+
+window.openXianyuChat = function(chatData) {
+    const page = document.getElementById('xianyu-page-chat');
+    if (!page) return;
+    
+    // 设置聊天对象信息
+    document.getElementById('xianyu-chat-username').textContent = chatData.name;
+    document.getElementById('xianyu-chat-status').textContent = chatData.tag || '在线';
+    
+    // 显示交易卡片（如果有商品信息）
+    const tradeCard = document.getElementById('xianyu-chat-trade-card');
+    if (chatData.img && chatData.title && chatData.price) {
+        tradeCard.style.display = 'block';
+        document.getElementById('xianyu-chat-trade-img').src = chatData.img;
+        document.getElementById('xianyu-chat-trade-title').textContent = chatData.title || '商品标题';
+        document.getElementById('xianyu-chat-trade-price').textContent = `¥${chatData.price || '0'}`;
+        
+        // 设置交易状态
+        const statusEl = document.getElementById('xianyu-chat-trade-status');
+        if (chatData.tag) {
+            statusEl.textContent = chatData.tag;
+            if (chatData.tag === '交易成功') {
+                statusEl.style.background = '#E8F5E8';
+                statusEl.style.color = '#00CC66';
+            } else {
+                statusEl.style.background = '#FFF5E0';
+                statusEl.style.color = '#FF6600';
+            }
+        } else {
+            statusEl.textContent = '商品咨询中';
+        }
+    } else {
+        tradeCard.style.display = 'none';
+    }
+    
+    // 生成聊天消息
+    renderXianyuChatMessages(chatData);
+    
+    page.classList.remove('hidden');
+};
+
+function renderXianyuChatMessages(chatData) {
+    const container = document.getElementById('xianyu-chat-messages');
+    if (!container) return;
+    
+    // 优先使用AI生成的聊天记录
+    let messages = [];
+    
+    if (chatData.chatMessages && Array.isArray(chatData.chatMessages) && chatData.chatMessages.length > 0) {
+        // 使用AI生成的聊天记录
+        messages = chatData.chatMessages;
+    } else {
+        // 根据交易状态生成默认的聊天内容
+        if (chatData.tag === '等待买家收货') {
+            messages = [
+                { type: 'other', content: '你好，这个还在吗？', time: '昨天 14:32' },
+                { type: 'me', content: '在的，成色如图，功能正常', time: '昨天 14:35', isRead: true },
+                { type: 'other', content: '好的，我要了', time: '昨天 14:36' },
+                { type: 'system', content: '我已拍下，等待付款', time: '昨天 14:36' },
+                { type: 'me', content: '我已付款，等待你发货', time: '昨天 14:37', isPayment: true, isRead: true },
+                { type: 'other', content: '好的，我今天就发货', time: '昨天 15:20' },
+                { type: 'system', content: '卖家已发货', time: '今天 09:15' },
+                { type: 'other', content: '请包装好商品，并按我在闲鱼上提供的地址发货', time: '今天 09:15', isShipping: true }
+            ];
+        } else if (chatData.tag === '等待卖家发货') {
+            messages = [
+                { type: 'me', content: '你好，请问这个商品还在吗？', time: '2小时前', isRead: true },
+                { type: 'other', content: '在的，全新未拆封', time: '2小时前' },
+                { type: 'me', content: '好的，我要了', time: '2小时前', isRead: true },
+                { type: 'system', content: '我已拍下，等待付款', time: '2小时前' },
+                { type: 'me', content: '我已付款，等待你发货', time: '2小时前', isPayment: true, isRead: false },
+                { type: 'other', content: '好的，我明天寄出', time: '1小时前' }
+            ];
+        } else if (chatData.tag === '交易成功') {
+            messages = [
+                { type: 'other', content: '你好，这个多少钱？', time: '3天前' },
+                { type: 'me', content: `${chatData.price || '100'}元，包邮`, time: '3天前', isRead: true },
+                { type: 'other', content: '好的，我要了', time: '3天前' },
+                { type: 'system', content: '交易成功', time: '2天前' },
+                { type: 'other', content: '东西收到了，很喜欢！', time: '2天前' },
+                { type: 'me', content: '好的，记得给个好评哦', time: '2天前', isRead: true }
+            ];
+        } else {
+            // 普通咨询
+            messages = [
+                { type: 'other', content: '你好，请问这个还在吗？', time: '30分钟前' },
+                { type: 'me', content: '在的，有什么问题可以问我', time: '25分钟前', isRead: true },
+                { type: 'other', content: chatData.message || '还在吗？诚心要', time: '10分钟前' }
+            ];
+        }
+    }
+    
+    let html = '';
+    messages.forEach(msg => {
+        const content = msg.content || "";
+        
+        // 逻辑：判断显示类型 (normal, system, card)
+        let displayType = 'normal';
+        
+        // 强制显示为系统通知的类型
+        if (content.includes("已发货") || content.includes("已确认收货") || content.includes("交易成功")) {
+            displayType = 'system';
+        } 
+        // 强制显示为卡片的类型 (已拍下、已付款)
+        else if (content.includes("已拍下") || content.includes("已付款") || msg.isPayment || msg.isShipping) {
+            displayType = 'card';
+        }
+        // 如果没有特定关键词，但类型是system，则显示为系统
+        else if (msg.type === 'system') {
+            displayType = 'system';
+        }
+
+        if (displayType === 'system') {
+            html += `
+            <div style="text-align: center; margin: 15px 0;">
+                <span style="background: #f0f0f0; color: #666; font-size: 12px; padding: 4px 8px; border-radius: 12px;">${content}</span>
+                <div style="font-size: 10px; color: #999; margin-top: 2px;">${msg.time}</div>
+            </div>`;
+        } else if (displayType === 'card') {
+            // 判断是"我"还是"对方"
+            let isMe = false;
+            if (msg.type === 'me') {
+                isMe = true;
+            } else if (msg.type === 'other') {
+                isMe = false;
+            } else {
+                // 如果是 system 类型但被当作卡片显示 (如 AI 生成的 '买家已付款')
+                if (chatData.isBuying) isMe = true; // 我是买家 -> 是我做的
+                else isMe = false; // 我是卖家 -> 是对方做的
+            }
+
+            const cardColor = isMe ? '#FFDA44' : '#fff';
+            const justifyContent = isMe ? 'flex-end' : 'flex-start';
+            const borderStyle = isMe ? 'none' : '1px solid #eee';
+            
+            // 卡片标题和描述
+            let cardTitle = "交易状态";
+            let cardDesc = content;
+            
+            if (content.includes("已拍下")) {
+                cardTitle = "已拍下";
+                cardDesc = "等待付款";
+            } else if (content.includes("已付款")) {
+                cardTitle = "已付款";
+                cardDesc = "等待发货";
+            }
+
+            // 状态显示 (仅当我方发送时显示已读/未读)
+            let statusHtml = '';
+            if (isMe) {
+                const isRead = msg.isRead !== false; // 默认为已读
+                const statusText = isRead ? '已读' : '未读';
+                statusHtml = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; margin-right: 5px; height: 100%;">
+                        <div style="font-size: 10px; color: #999;">${statusText}</div>
+                        <div style="font-size: 10px; color: #999;">${msg.time}</div>
+                    </div>`;
+            } else {
+                statusHtml = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; margin-left: 5px; height: 100%;">
+                        <div style="font-size: 10px; color: #999;">${msg.time}</div>
+                    </div>`;
+            }
+
+            // 布局：对方：[Avatar] [Bubble] [Time] | 我方：[Status+Time] [Bubble]
+            if (!isMe) {
+                html += `
+                <div style="display: flex; justify-content: flex-start; margin: 10px 0; align-items: flex-end;">
+                    <img src="${window.getSmartAvatar(chatData.name)}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 8px;">
+                    <div style="background: ${cardColor}; border-radius: 12px; padding: 10px 14px; max-width: 85%; position: relative; border: ${borderStyle}; min-width: 240px;">
+                        <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">${cardTitle}</div>
+                        <div style="font-size: 12px; color: #333;">${cardDesc}</div>
+                        <div style="border-top: 1px solid rgba(0,0,0,0.05); margin-top: 8px; padding-top: 8px; font-size: 12px; color: #666; display: flex; justify-content: space-between;">
+                            <span>查看详情</span>
+                            <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+                        </div>
+                    </div>
+                    ${statusHtml}
+                </div>`;
+            } else {
+                html += `
+                <div style="display: flex; justify-content: flex-end; margin: 10px 0; align-items: flex-end;">
+                    ${statusHtml}
+                    <div style="background: ${cardColor}; border-radius: 12px; padding: 10px 14px; max-width: 85%; position: relative; border: ${borderStyle}; min-width: 240px;">
+                        <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">${cardTitle}</div>
+                        <div style="font-size: 12px; color: #333;">${cardDesc}</div>
+                        <div style="border-top: 1px solid rgba(0,0,0,0.05); margin-top: 8px; padding-top: 8px; font-size: 12px; color: #666; display: flex; justify-content: space-between;">
+                            <span>查看详情</span>
+                            <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+        } else {
+            // 普通消息
+            const isMe = msg.type === 'me';
+            
+            // 状态显示 (仅当我方发送时显示已读/未读)
+            let statusHtml = '';
+            if (isMe) {
+                const isRead = msg.isRead !== false; // 默认为已读
+                const statusText = isRead ? '已读' : '未读';
+                statusHtml = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; margin-right: 5px; height: 100%;">
+                        <div style="font-size: 10px; color: #999;">${statusText}</div>
+                        <div style="font-size: 10px; color: #999;">${msg.time}</div>
+                    </div>`;
+            } else {
+                statusHtml = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; margin-left: 5px; height: 100%;">
+                        <div style="font-size: 10px; color: #999;">${msg.time}</div>
+                    </div>`;
+            }
+
+            if (!isMe) {
+                html += `
+                <div style="display: flex; justify-content: flex-start; margin: 10px 0; align-items: flex-end;">
+                    <img src="${window.getSmartAvatar(chatData.name)}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 8px;">
+                    <div style="background: #fff; border-radius: 12px; padding: 10px; max-width: 70%;">
+                        <div style="font-size: 14px; line-height: 1.4;">${content}</div>
+                    </div>
+                    ${statusHtml}
+                </div>`;
+            } else {
+                html += `
+                <div style="display: flex; justify-content: flex-end; margin: 10px 0; align-items: flex-end;">
+                    ${statusHtml}
+                    <div style="background: #FFDA44; border-radius: 12px; padding: 10px; max-width: 70%;">
+                        <div style="font-size: 14px; line-height: 1.4;">${content}</div>
+                    </div>
+                </div>`;
+            }
+        }
+    });
+    
+    container.innerHTML = html;
+    
+    // 滚动到底部
+    setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+    }, 100);
+}
+
+// 修改消息列表点击事件，添加聊天功能
+function enhanceXianyuMessagesList() {
+    const messageItems = document.querySelectorAll('#xianyu-messages-list > div');
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    
+    messageItems.forEach((item, index) => {
+        if (!item.onclick && !item.querySelector('.fa-bell-slash')) { // 不是官方消息
+            item.style.cursor = 'pointer';
+            item.onclick = function() {
+                // 从消息项中提取信息
+                const nameEl = item.querySelector('span[style*="font-weight: 700"]');
+                const msgEl = item.querySelector('div[style*="font-size: 14px"][style*="color: #666"]');
+                const imgEl = item.querySelector('img[style*="width: 48px"][style*="border-radius: 4px"]');
+                const tagEl = item.querySelector('span[style*="margin-left: 6px"]');
+                
+                if (nameEl && msgEl) {
+                    let chatData = {
+                        name: nameEl.textContent,
+                        message: msgEl.textContent,
+                        img: imgEl ? imgEl.src : '',
+                        tag: tagEl ? tagEl.textContent.replace(/.*\s/, '') : '',
+                        title: '商品标题', // 默认值
+                        price: '100' // 默认值
+                    };
+                    
+                    // 尝试从AI生成的数据中获取完整的聊天信息
+                    if (contact && contact.xianyuData && contact.xianyuData.messages) {
+                        const messageData = contact.xianyuData.messages.find(msg =>
+                            msg.name === chatData.name ||
+                            msg.message === chatData.message
+                        );
+                        
+                        if (messageData) {
+                            chatData = {
+                                ...chatData,
+                                ...messageData,
+                                // 确保有这些必要字段
+                                title: messageData.title || chatData.title,
+                                price: messageData.price || chatData.price,
+                                img: messageData.img || chatData.img
+                            };
+                        }
+                    }
+                    
+                    window.openXianyuChat(chatData);
+                }
+            };
+        }
+    });
+}
+
+// 处理闲鱼购买逻辑
+window.handleXianyuPurchase = function(item) {
+    console.log('立即购买按钮被点击，商品信息:', item);
+    if (!item) {
+        console.error('商品信息为空');
+        alert('商品信息错误');
+        return;
+    }
+    
+    // Check wallet - 初始化钱包并给予一些初始余额
+    if (!window.iphoneSimState.wallet) {
+        window.iphoneSimState.wallet = { balance: 5000, transactions: [] };
+        console.log('初始化钱包，余额: ¥5000');
+    }
+    
+    // Parse price (handle potential non-numeric characters just in case)
+    const priceStr = item.price.toString().replace(/[^\d.]/g, '');
+    const price = parseFloat(priceStr);
+    
+    console.log('商品价格:', price, '钱包余额:', window.iphoneSimState.wallet.balance);
+    
+    if (isNaN(price)) {
+        console.error('价格解析失败:', item.price);
+        alert('商品价格无效');
+        return;
+    }
+    
+    if (window.iphoneSimState.wallet.balance < price) {
+        console.log('余额不足，当前余额:', window.iphoneSimState.wallet.balance, '需要:', price);
+        alert(`余额不足，当前余额: ¥${window.iphoneSimState.wallet.balance.toFixed(2)}，需要: ¥${price.toFixed(2)}\n请去微信-我-钱包充值`);
+        return;
+    }
+    
+    showXianyuPaymentModal(item, price);
+};
+
+function showXianyuPaymentModal(item, price) {
+    console.log('显示支付模态框，商品:', item, '价格:', price);
+    const modal = document.getElementById('xianyu-payment-modal');
+    if (!modal) {
+        console.error('找不到支付模态框元素');
+        return;
+    }
+    
+    // 确保模态框在body的根级别
+    if (modal.parentNode !== document.body) {
+        console.log('将模态框移动到body根级别');
+        document.body.appendChild(modal);
+    }
+    
+    const amountEl = document.getElementById('xianyu-payment-amount');
+    const balanceEl = document.getElementById('xianyu-payment-balance');
+    
+    console.log('支付模态框元素检查:');
+    console.log('- 模态框:', modal);
+    console.log('- 金额元素:', amountEl);
+    console.log('- 余额元素:', balanceEl);
+    
+    if (amountEl) amountEl.textContent = price.toFixed(2);
+    if (balanceEl) balanceEl.textContent = `(¥${window.iphoneSimState.wallet.balance.toFixed(2)})`;
+    
+    const confirmBtn = document.getElementById('confirm-xianyu-payment-btn');
+    const closeBtn = document.getElementById('close-xianyu-payment-btn');
+    
+    console.log('- 确认按钮:', confirmBtn);
+    console.log('- 关闭按钮:', closeBtn);
+    
+    // Remove old listeners to prevent multiple bindings
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    
+    const newCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    
+    newConfirmBtn.onclick = () => {
+        handleXianyuPaymentConfirm(item, price);
+    };
+    
+    newCloseBtn.onclick = () => {
+        modal.classList.add('hidden');
+    };
+    
+    console.log('准备显示支付模态框...');
+    console.log('模态框当前类名:', modal.className);
+    console.log('模态框当前样式:', modal.style.cssText);
+    
+    modal.classList.remove('hidden');
+    
+    console.log('移除hidden类后的类名:', modal.className);
+    console.log('移除hidden类后的样式:', modal.style.cssText);
+    
+    // 强制显示模态框
+    modal.style.display = 'flex';
+    
+    console.log('强制设置display:flex后的样式:', modal.style.cssText);
+}
+
+function handleXianyuPaymentConfirm(item, price) {
+    // Deduct balance
+    window.iphoneSimState.wallet.balance -= price;
+    window.iphoneSimState.wallet.transactions.unshift({
+        id: Date.now(),
+        type: 'expense',
+        amount: price,
+        title: '闲鱼购物',
+        time: Date.now(),
+        relatedId: null
+    });
+    if (window.saveConfig) window.saveConfig();
+    
+    document.getElementById('xianyu-payment-modal').classList.add('hidden');
+    
+    // Show Success Modal
+    showXianyuPurchaseSuccessModal(item);
+}
+
+function showXianyuPurchaseSuccessModal(item) {
+    console.log('显示购买成功模态框，商品:', item);
+    const modal = document.getElementById('xianyu-purchase-modal');
+    if (!modal) {
+        console.error('找不到购买成功模态框元素');
+        return;
+    }
+    
+    // 确保模态框在body的根级别
+    if (modal.parentNode !== document.body) {
+        console.log('将购买成功模态框移动到body根级别');
+        document.body.appendChild(modal);
+    }
+    
+    // Bind "Tell TA" button
+    const tellBtn = document.getElementById('xianyu-tell-ta-btn');
+    if (tellBtn) {
+        tellBtn.onclick = () => {
+            notifyContactAboutGift(item);
+            modal.classList.add('hidden');
+        };
+    }
+    
+    // Bind Close button
+    const closeBtn = document.getElementById('close-xianyu-purchase-btn');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            modal.classList.add('hidden');
+        };
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function notifyContactAboutGift(item) {
+    console.log('告诉TA功能被调用，商品:', item, '联系人ID:', currentCheckPhoneContactId);
+    if (!currentCheckPhoneContactId) {
+        console.error('没有当前联系人ID');
+        return;
+    }
+    const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+    if (!contact) {
+        console.error('找不到联系人:', currentCheckPhoneContactId);
+        return;
+    }
+    console.log('找到联系人:', contact.name);
+    
+    // Switch to WeChat Chat
+    document.getElementById('phone-app').classList.add('hidden');
+    document.getElementById('wechat-app').classList.remove('hidden');
+    
+    // Ensure "WeChat" tab is active in WeChat app
+    const contactsTab = document.querySelector('.wechat-tab-item[data-tab="contacts"]');
+    if (contactsTab) contactsTab.click();
+    
+    // Open specific chat
+    if (window.openChat) {
+        window.openChat(contact.id);
+        
+        // Send gift card message
+        setTimeout(() => {
+            const giftData = {
+                title: item.title,
+                price: item.price
+            };
+            // Send as 'gift_card' type
+            if (window.sendMessage) {
+                window.sendMessage(JSON.stringify(giftData), true, 'gift_card');
+            }
+        }, 500);
+    }
+}
+
+// 导出函数供全局使用
+window.generatePhoneXianyuAll = generatePhoneXianyuAll;
+window.openXianyuChat = openXianyuChat;
+window.enhanceXianyuMessagesList = enhanceXianyuMessagesList;
+window.handleXianyuPurchase = handleXianyuPurchase;
+window.notifyContactAboutGift = notifyContactAboutGift;
+window.notifyContactAboutGift = notifyContactAboutGift;

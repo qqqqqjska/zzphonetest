@@ -391,16 +391,28 @@
                         <button id="save-all-settings" class="ios-btn-block">保存所有配置</button>
                     </div>
                     <div class="list-item">
+                        <div class="list-content">
+                            <label>压缩导出 (ZIP)</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="export-as-zip" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="list-item">
                         <div class="button-row full-width">
                             <button id="export-json" class="ios-btn-block secondary">导出数据</button>
                             <label for="import-json" class="ios-btn-block secondary file-label">
                                 导入数据
-                                <input type="file" id="import-json" accept=".json" style="display: none;">
+                                <input type="file" id="import-json" accept=".json,.zip" style="display: none;">
                             </label>
                         </div>
                     </div>
                     <div class="list-item">
                         <button id="optimize-storage" class="ios-btn-block">压缩图片数据</button>
+                    </div>
+                    <div class="list-item">
+                        <button id="analyze-storage" class="ios-btn-block">存储占用分析</button>
                     </div>
                     <div class="list-item">
                         <button id="clear-all-data" class="ios-btn-block danger">清空所有数据</button>
@@ -943,6 +955,47 @@
                 </div>
             </div>
         </div>
+
+            <!-- 闲鱼付款方式选择弹窗 -->
+            <div id="xianyu-payment-modal" class="modal hidden" style="z-index: 290; align-items: flex-end;">
+                <div class="modal-content" style="height: auto; border-radius: 12px 12px 0 0; width: 100%; max-width: 100%; background-color: #fff; padding: 0;">
+                    <div style="padding: 15px; border-bottom: 1px solid #eee; text-align: center; font-weight: bold; position: relative;">
+                        确认付款
+                        <button id="close-xianyu-payment-btn" style="position: absolute; left: 15px; top: 15px; background: none; border: none; font-size: 16px;"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <div style="font-size: 30px; font-weight: bold;">¥<span id="xianyu-payment-amount">0.00</span></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f0f0;">
+                            <span style="color: #666;">付款方式</span>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <i class="fab fa-weixin" style="color: #07C160;"></i>
+                                <span>微信钱包余额</span>
+                                <span style="color: #999; font-size: 12px;" id="xianyu-payment-balance">(¥0.00)</span>
+                                <i class="fas fa-chevron-right" style="color: #ccc; font-size: 12px;"></i>
+                            </div>
+                        </div>
+                        
+                        <button id="confirm-xianyu-payment-btn" class="ios-btn-block" style="background-color: #07C160; margin-top: 20px;">立即付款</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 闲鱼购买成功弹窗 -->
+            <div id="xianyu-purchase-modal" class="modal hidden" style="z-index: 300; align-items: center;">
+                <div class="modal-content" style="height: auto; border-radius: 12px; width: 85%; max-width: 320px; background-color: #fff; padding: 20px; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 60px; height: 60px; background: #E8F5E8; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                        <i class="fas fa-check" style="font-size: 30px; color: #00CC66;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px;">购买成功</h3>
+                    <p style="color: #666; font-size: 14px; margin: 0 0 20px 0;">等待卖家发货</p>
+                    
+                    <button id="xianyu-tell-ta-btn" class="ios-btn-block" style="background-color: #07C160;">告诉TA</button>
+                    <button id="close-xianyu-purchase-btn" class="ios-btn-block secondary" style="margin-top: 10px;">关闭</button>
+                </div>
+            </div>
 
             <!-- 聊天页面 -->
             <div id="chat-screen" class="sub-screen hidden">
@@ -2632,6 +2685,220 @@
 
     <!-- 查手机 - 闲鱼 -->
     <div id="phone-xianyu" class="sub-screen hidden" style="z-index: 200; background-color: #f6f6f6;">
+        <!-- 子页面：我卖出的 -->
+        <div id="xianyu-page-sold" class="sub-screen hidden" style="z-index: 210; background-color: #f6f6f6; overflow-y: auto;">
+            <div class="app-header" style="background: #f6f6f6; border-bottom: none; justify-content: space-between; padding-left: 10px; padding-right: 10px; padding-top: max(10px, env(safe-area-inset-top)); height: auto; padding-bottom: 5px; flex-shrink: 0;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-sold').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <div style="background: #fff; border-radius: 16px; padding: 6px 15px; flex: 1; margin: 0 10px; color: #999; font-size: 14px; display: flex; align-items: center;"><i class="fas fa-search" style="margin-right: 6px;"></i> 搜索卖出的宝贝</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #333; width: 40px; white-space: nowrap;">
+                        <i class="far fa-file-alt" style="font-size: 16px;"></i> <span style="transform: scale(0.8);">账单</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #333; width: 30px;">
+                        <i class="fas fa-filter" style="font-size: 16px;"></i> <span style="transform: scale(0.8);">筛选</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; justify-content: space-around; padding: 10px 0; background: #f6f6f6; font-size: 14px; color: #666; overflow-x: auto; flex-shrink: 0; min-height: 40px;">
+                <span style="color: #000; font-weight: bold; font-size: 16px; position: relative; flex-shrink: 0; padding: 0 10px;">全部<div style="width: 100%; height: 3px; background: #FFDA44; position: absolute; bottom: -5px; left: 0; border-radius: 2px;"></div></span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待付款</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待发货</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待收货</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待评价</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">退款/售后</span>
+            </div>
+            
+            <div id="xianyu-sold-list" style="padding: 10px; padding-top: 0;">
+                <!-- JS 生成 -->
+            </div>
+        </div>
+
+        <!-- 子页面：我买到的 -->
+        <div id="xianyu-page-bought" class="sub-screen hidden" style="z-index: 210; background-color: #f6f6f6; overflow-y: auto;">
+            <div class="app-header" style="background: #f6f6f6; border-bottom: none; justify-content: space-between; padding-left: 10px; padding-right: 10px; padding-top: max(10px, env(safe-area-inset-top)); height: auto; padding-bottom: 5px; flex-shrink: 0;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-bought').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <div style="background: #fff; border-radius: 16px; padding: 6px 15px; flex: 1; margin: 0 10px; color: #999; font-size: 14px; display: flex; align-items: center;"><i class="fas fa-search" style="margin-right: 6px;"></i> 搜索买过的宝贝</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #333; width: 40px; white-space: nowrap;">
+                        <i class="far fa-file-alt" style="font-size: 16px;"></i> <span style="transform: scale(0.8);">其他订单</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #333; width: 30px;">
+                        <i class="fas fa-filter" style="font-size: 16px;"></i> <span style="transform: scale(0.8);">筛选</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; justify-content: space-around; padding: 10px 0; background: #f6f6f6; font-size: 14px; color: #666; overflow-x: auto; flex-shrink: 0; min-height: 40px;">
+                <span style="color: #000; font-weight: bold; font-size: 16px; position: relative; flex-shrink: 0; padding: 0 10px;">全部<div style="width: 100%; height: 3px; background: #FFDA44; position: absolute; bottom: -5px; left: 0; border-radius: 2px;"></div></span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待付款</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待发货</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待收货</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">待评价</span>
+                <span style="flex-shrink: 0; padding: 0 10px;">退款/售后</span>
+            </div>
+            
+            <div id="xianyu-bought-list" style="padding: 10px; padding-top: 0;">
+                <!-- JS 生成 -->
+            </div>
+        </div>
+
+        <!-- 子页面：我的收藏 -->
+        <div id="xianyu-page-favorites" class="sub-screen hidden" style="z-index: 210; background-color: #f6f6f6; overflow-y: auto;">
+            <div class="app-header" style="background: #f6f6f6; border-bottom: none; justify-content: space-between; padding-left: 10px; padding-right: 10px; padding-top: max(10px, env(safe-area-inset-top)); height: auto; padding-bottom: 5px; flex-shrink: 0;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-favorites').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <div style="font-size: 18px; font-weight: bold; color: #000;">收藏的宝贝 <span style="font-size: 14px; color: #999; font-weight: normal;">280</span></div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-search" style="font-size: 18px; color: #333;"></i>
+                    <span style="font-size: 14px; color: #333;">管理</span>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; padding: 10px 15px; background: #f6f6f6; gap: 15px;">
+                <span style="background: #fff; padding: 6px 12px; border-radius: 15px; font-size: 13px; font-weight: bold;">降价宝贝</span>
+                <span style="background: #fff; padding: 6px 12px; border-radius: 15px; font-size: 13px; font-weight: bold;">有效宝贝</span>
+                <span style="background: #fff; padding: 6px 12px; border-radius: 15px; font-size: 13px; font-weight: bold;">失效宝贝</span>
+            </div>
+            
+            <div id="xianyu-favorites-list" style="padding: 10px; padding-top: 0;">
+                <!-- JS 生成 -->
+            </div>
+        </div>
+
+        <!-- 子页面：我发布的 -->
+        <div id="xianyu-page-published" class="sub-screen hidden" style="z-index: 210; background-color: #f6f6f6; overflow-y: auto;">
+            <div class="app-header" style="background: #f6f6f6; border-bottom: none; justify-content: space-between; padding-left: 10px; padding-right: 10px;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-published').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <h3 style="font-size: 18px; font-weight: bold; color: #000;">我发布的</h3>
+                <div style="font-size: 14px; color: #333; background: #e0e0e0; padding: 4px 8px; border-radius: 12px;"><i class="fas fa-th-large"></i> 营销工具</div>
+            </div>
+            
+            <div style="padding: 10px;">
+                <!-- 数据卡片 -->
+                <div style="background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <span style="font-weight: bold; font-size: 16px;">昨日数据 <span style="font-size: 10px; background: #E0F0FF; color: #007AFF; padding: 1px 4px; border-radius: 4px;">鱼小铺</span></span>
+                        <span style="font-size: 12px; color: #999;">鱼小铺工作台 ></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div><div style="font-size: 20px; font-weight: bold;">62</div><div style="font-size: 12px; color: #999;">宝贝曝光</div></div>
+                        <div><div style="font-size: 20px; font-weight: bold;">12</div><div style="font-size: 12px; color: #999;">宝贝浏览</div></div>
+                        <div><div style="font-size: 20px; font-weight: bold;">0</div><div style="font-size: 12px; color: #999;">支付金额</div></div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button style="flex: 1; background: #FFDA44; border: none; padding: 10px; border-radius: 20px; font-weight: bold;">一键擦亮</button>
+                        <button style="flex: 1; background: #f0f0f0; border: none; padding: 10px; border-radius: 20px;">赚曝光</button>
+                    </div>
+                </div>
+
+                <!-- 列表 Tabs -->
+                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+                    <span style="font-size: 18px; font-weight: bold; position: relative;">在卖<span style="font-size: 10px; position: absolute; top: 0; right: -8px;">4</span><div style="width: 100%; height: 3px; background: #FFDA44; position: absolute; bottom: -5px; border-radius: 2px;"></div></span>
+                    <span style="font-size: 16px; color: #666;">草稿</span>
+                    <span style="font-size: 16px; color: #666;">已下架</span>
+                    <i class="fas fa-search" style="margin-left: auto; color: #333;"></i>
+                </div>
+
+                <!-- 商品列表 -->
+                <div id="xianyu-published-list">
+                    <!-- JS 生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 子页面：闲鱼聊天 -->
+        <div id="xianyu-page-chat" class="sub-screen hidden" style="z-index: 220; background-color: #f6f6f6; display: flex; flex-direction: column;">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: space-between; padding-left: 10px; padding-right: 10px; flex-shrink: 0;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-chat').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div id="xianyu-chat-username" style="font-weight: bold; font-size: 16px; color: #000;"></div>
+                    <div id="xianyu-chat-status" style="font-size: 12px; color: #999;"></div>
+                </div>
+                <button class="icon-btn" style="color: #000;"><i class="fas fa-ellipsis-h"></i></button>
+            </div>
+            
+            <!-- 交易状态卡片 -->
+            <div id="xianyu-chat-trade-card" style="background: #fff; margin: 10px; border-radius: 12px; padding: 15px; display: none; flex-shrink: 0;">
+                <div style="display: flex; gap: 10px;">
+                    <img id="xianyu-chat-trade-img" src="" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover;">
+                    <div style="flex: 1;">
+                        <div id="xianyu-chat-trade-title" style="font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px;"></div>
+                        <div id="xianyu-chat-trade-price" style="color: #FF3B30; font-weight: bold; font-size: 16px;"></div>
+                    </div>
+                </div>
+                <div id="xianyu-chat-trade-status" style="margin-top: 10px; padding: 8px; background: #FFF5E0; border-radius: 8px; text-align: center; color: #FF6600; font-size: 14px; font-weight: bold;"></div>
+            </div>
+            
+            <!-- 聊天消息区域 -->
+            <div id="xianyu-chat-messages" style="padding: 10px; flex: 1; overflow-y: auto;">
+                <!-- 消息由JS生成 -->
+            </div>
+            
+            <!-- 底部输入栏 -->
+            <div style="width: 100%; background: #fff; padding: 10px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 10px; padding-bottom: max(10px, env(safe-area-inset-bottom)); flex-shrink: 0;">
+                <button style="background: none; border: none; font-size: 20px; color: #999;"><i class="fas fa-plus"></i></button>
+                <input type="text" placeholder="说点什么..." style="flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 8px 15px; font-size: 14px;">
+                <button style="background: #FFDA44; border: none; border-radius: 20px; padding: 8px 15px; color: #333; font-weight: bold;">发送</button>
+            </div>
+        </div>
+
+        <!-- 子页面：商品详情 -->
+        <div id="xianyu-page-detail" class="sub-screen hidden" style="z-index: 220; background-color: #fff; overflow-y: auto; padding-bottom: 60px;">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: space-between; padding-left: 10px; padding-right: 10px;">
+                <button class="icon-btn" onclick="document.getElementById('xianyu-page-detail').classList.add('hidden')" style="color: #000;"><i class="fas fa-chevron-left"></i></button>
+                <div style="background: #f0f0f0; border-radius: 16px; padding: 5px 15px; flex: 1; margin: 0 10px; color: #999; font-size: 14px;"><i class="fas fa-search"></i> 搜索</div>
+                <button class="icon-btn" style="color: #000;"><i class="fas fa-share"></i></button>
+            </div>
+            
+            <div style="padding: 15px;">
+                <!-- 用户栏 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <img id="xianyu-detail-avatar" src="" style="width: 40px; height: 40px; border-radius: 50%;">
+                        <div>
+                            <div id="xianyu-detail-username" style="font-weight: bold; font-size: 16px;"></div>
+                            <div id="xianyu-detail-location" style="font-size: 10px; color: #999;">刚刚来过 | 浙江</div>
+                        </div>
+                    </div>
+                    <span style="border: 1px solid #eee; padding: 4px 8px; border-radius: 12px; font-size: 12px;">看看大家卖多少 ></span>
+                </div>
+
+                <!-- 价格与标题 -->
+                <div style="margin-bottom: 15px;">
+                    <div style="color: #FF3B30; font-size: 24px; font-weight: bold; margin-bottom: 10px;">¥<span id="xianyu-detail-price"></span></div>
+                    <div id="xianyu-detail-desc" style="font-size: 16px; line-height: 1.5; margin-bottom: 15px;"></div>
+                </div>
+
+                <!-- 图片 -->
+                <div id="xianyu-detail-images">
+                    <img id="xianyu-detail-main-img" src="" style="width: 100%; border-radius: 8px;">
+                </div>
+                
+                <div id="xianyu-detail-id-text" style="margin-top: 20px; text-align: right; font-size: 12px; color: #999;">
+                    闲鱼号：昵称
+                </div>
+            </div>
+
+            <!-- 底部栏 -->
+            <div style="position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 10px 20px; border-top: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; padding-bottom: max(10px, env(safe-area-inset-bottom));">
+                <div style="display: flex; gap: 20px; margin-left: 10px;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-star" style="font-size: 20px;"></i> 10
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="far fa-eye" style="font-size: 20px;"></i> 156
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666;">
+                        <i class="fas fa-user-slash" style="font-size: 20px;"></i> 无人在蹲
+                    </div>
+                </div>
+                <button style="background: #f0f0f0; border: none; padding: 10px 30px; border-radius: 20px; font-weight: bold;">管理</button>
+            </div>
+        </div>
+
         <div class="app-body" style="padding: 0; padding-bottom: 80px; overflow-y: auto; height: 100%;">
             
             <!-- Tab: 消息 -->
@@ -2639,8 +2906,9 @@
                 <div style="padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; background: #f6f6f6;">
                     <div onclick="document.getElementById('phone-xianyu').classList.add('hidden')" style="font-size: 24px; font-weight: 800; color: #000; cursor: pointer;">消息</div>
                     <div style="display: flex; gap: 15px;">
-                        <i class="fas fa-shopping-bag" style="font-size: 20px; color: #000;"></i>
-                        <i id="generate-xianyu-btn" class="fas fa-hexagon" style="font-size: 20px; color: #000; cursor: pointer;"></i>
+                        <button id="generate-xianyu-btn" style="background: transparent; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center;">
+                            <i class="fas fa-shopping-bag" style="font-size: 20px; color: #000;"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -2652,7 +2920,9 @@
             <!-- Tab: 我的 -->
             <div id="xianyu-tab-me" class="xianyu-tab-content" style="display: block;">
                 <!-- 顶部背景 -->
-                <div style="background-color: #f6f6f6; padding: 15px; padding-top: max(50px, env(safe-area-inset-top));">
+                <div style="background-color: #f6f6f6; padding: 15px; padding-top: max(10px, env(safe-area-inset-top));">
+                    <!-- 返回按钮 -->
+                    <button class="icon-btn" onclick="document.getElementById('phone-xianyu').classList.add('hidden')" style="color: #000; margin-bottom: 10px;"><i class="fas fa-chevron-left"></i></button>
                     <!-- 用户信息行 -->
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
@@ -2660,7 +2930,7 @@
                             <div style="display: flex; flex-direction: column;">
                                 <span id="xianyu-me-name" style="font-size: 20px; font-weight: 800; color: #000;">用户名</span>
                                 <div style="display: flex; align-items: center; gap: 5px; margin-top: 4px;">
-                                    <span style="background: #e0e0e0; color: #333; font-size: 11px; padding: 2px 6px; border-radius: 10px;">再也不跨尺寸了 ></span>
+                                    <span style="background: #f0f0f0; color: #999; font-size: 11px; padding: 2px 6px; border-radius: 10px;">点击添加简介 ></span>
                                 </div>
                                 <div style="margin-top: 4px;">
                                     <span style="background: #e0e0e0; color: #666; font-size: 10px; padding: 1px 6px; border-radius: 4px;">鱼力值 839</span>
@@ -2682,7 +2952,7 @@
 
                     <!-- 统计数据 -->
                     <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
-                        <div style="display: flex; flex-direction: column; align-items: center;">
+                        <div onclick="openXianyuFavorites()" style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
                             <span style="font-size: 18px; font-weight: 700;">280</span>
                             <span style="font-size: 12px; color: #666;">我的收藏</span>
                         </div>
@@ -2719,15 +2989,15 @@
                             <span style="background: #FFF5E0; color: #FF6600; font-size: 11px; padding: 4px 8px; border-radius: 12px;">今日曝光 43 ></span>
                         </div>
                         <div style="display: flex; justify-content: space-around;">
-                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                            <div onclick="openXianyuPublished()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
                                 <i class="fas fa-shopping-bag" style="font-size: 24px; color: #333;"></i>
                                 <span style="font-size: 12px; color: #333;">我发布的 4</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                                <i class="fas fa-yen-sign" style="font-size: 24px; color: #333; border: 2px solid #333; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;"></i>
+                            <div onclick="openXianyuSold()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+                                <i class="fas fa-clipboard-check" style="font-size: 24px; color: #333;"></i>
                                 <span style="font-size: 12px; color: #333;">我卖出的 142</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                            <div onclick="openXianyuBought()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
                                 <i class="fas fa-check-circle" style="font-size: 24px; color: #333;"></i>
                                 <span style="font-size: 12px; color: #333;">我买到的 331</span>
                             </div>
@@ -2748,9 +3018,9 @@
                 <span style="font-size: 16px; font-weight: bold;">首页</span>
             </div>
             <div class="tab-item" style="color: #999; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                <span style="font-size: 16px; font-weight: bold;">金华</span>
+                <span style="font-size: 16px; font-weight: bold;">位置</span>
             </div>
-            <div class="tab-item" style="margin-top: -10px;">
+            <div class="tab-item">
                 <div style="background: #FFDA44; border-radius: 20px; padding: 8px 16px; display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 14px; box-shadow: 0 2px 5px rgba(255, 218, 68, 0.4);">
                     <i class="fas fa-plus"></i> 卖闲置
                 </div>
@@ -2770,6 +3040,8 @@
 
     <!-- 引入 localForage 用于存储大文件 (可选，如果需要) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <!-- 引入 JSZip 用于压缩导出 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Bmob SDK (本地文件) -->
     <script src="js/bmob.min.js"></script>
     <!-- 资格码验证 -->
