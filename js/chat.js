@@ -859,9 +859,19 @@ function handleClearChatHistory() {
     if (!window.iphoneSimState.currentChatContactId) return;
     
     if (confirm('确定要清空与该联系人的所有聊天记录吗？此操作不可恢复。')) {
-        window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId] = [];
+        const contactId = window.iphoneSimState.currentChatContactId;
+        window.iphoneSimState.chatHistory[contactId] = [];
+        
+        // 重置总结和行程生成索引，确保清空后能重新触发
+        const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+        if (contact) {
+            contact.lastSummaryIndex = 0;
+            contact.lastItineraryIndex = 0;
+            contact.messagesSinceLastItinerary = 0;
+        }
+        
         saveConfig();
-        renderChatHistory(window.iphoneSimState.currentChatContactId);
+        renderChatHistory(contactId);
         alert('聊天记录已清空');
         document.getElementById('chat-settings-screen').classList.add('hidden');
     }

@@ -39,6 +39,146 @@ let phoneTouchDraggedItem = null;
 // 查手机当前联系人
 let currentCheckPhoneContactId = null;
 
+// 改进的JSON提取函数
+function extractValidJson(content) {
+    console.log('开始提取JSON，原始内容长度:', content.length);
+    
+    // 首先移除markdown代码块标记
+    let jsonStr = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    // 移除可能的前后文本说明
+    jsonStr = jsonStr.replace(/^[^{\[]*/, '').replace(/[^}\]]*$/, '');
+    
+    // 尝试找到JSON的开始和结束位置
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    
+    let extractedJson = '';
+    
+    // 优先尝试提取对象格式
+    if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+        // 检查是否有嵌套的大括号，确保提取完整的JSON对象
+        let braceCount = 0;
+        let startPos = firstBrace;
+        let endPos = -1;
+        
+        for (let i = firstBrace; i < jsonStr.length; i++) {
+            if (jsonStr[i] === '{') {
+                braceCount++;
+            } else if (jsonStr[i] === '}') {
+                braceCount--;
+                if (braceCount === 0) {
+                    endPos = i;
+                    break;
+                }
+            }
+        }
+        
+        if (endPos !== -1) {
+            extractedJson = jsonStr.substring(startPos, endPos + 1);
+        } else {
+            extractedJson = jsonStr.substring(firstBrace, lastBrace + 1);
+        }
+    }
+    // 如果没有找到对象，尝试数组格式
+    else if (firstBracket !== -1 && lastBracket !== -1 && firstBracket < lastBracket) {
+        // 检查是否有嵌套的方括号，确保提取完整的JSON数组
+        let bracketCount = 0;
+        let startPos = firstBracket;
+        let endPos = -1;
+        
+        for (let i = firstBracket; i < jsonStr.length; i++) {
+            if (jsonStr[i] === '[') {
+                bracketCount++;
+            } else if (jsonStr[i] === ']') {
+                bracketCount--;
+                if (bracketCount === 0) {
+                    endPos = i;
+                    break;
+                }
+            }
+        }
+        
+        if (endPos !== -1) {
+            extractedJson = jsonStr.substring(startPos, endPos + 1);
+        } else {
+            extractedJson = jsonStr.substring(firstBracket, lastBracket + 1);
+        }
+    }
+    
+    // 清理可能的多余字符和控制字符
+    extractedJson = extractedJson
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
+        .replace(/\r\n/g, '\n') // 统一换行符
+        .trim();
+    
+    console.log('提取的JSON长度:', extractedJson.length);
+    console.log('JSON前100字符:', extractedJson.substring(0, 100));
+    
+    return extractedJson;
+}
+
+// 改进的JSON解析函数，带有多重修复策略
+function parseJsonWithFallback(jsonStr) {
+    console.log('尝试解析JSON，长度:', jsonStr.length);
+    
+    // 第一次尝试：直接解析
+    try {
+        const result = JSON.parse(jsonStr);
+        console.log('JSON解析成功 - 直接解析');
+        return result;
+    } catch (e) {
+        console.warn('直接解析失败:', e.message);
+    }
+    
+    // 第二次尝试：修复常见的JSON格式问题
+    try {
+        let fixedJson = jsonStr
+            // 修复未加引号的键
+            .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":')
+            // 修复未加引号的字符串值（但不影响数字、布尔值、null）
+            .replace(/:\s*([a-zA-Z_$][a-zA-Z0-9_$\s]*?)(?=\s*[,}\]])/g, (match, value) => {
+                const trimmedValue = value.trim();
+                if (trimmedValue === 'true' || trimmedValue === 'false' ||
+                    trimmedValue === 'null' || /^\d+(\.\d+)?$/.test(trimmedValue)) {
+                    return ': ' + trimmedValue;
+                }
+                return ': "' + trimmedValue + '"';
+            })
+            // 移除多余的逗号
+            .replace(/,(\s*[}\]])/g, '$1')
+            // 移除注释
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/\/\/.*$/gm, '');
+        
+        const result = JSON.parse(fixedJson);
+        console.log('JSON解析成功 - 修复后解析');
+        return result;
+    } catch (e) {
+        console.warn('修复后解析失败:', e.message);
+    }
+    
+    // 第三次尝试：更激进的修复
+    try {
+        let aggressiveFixed = jsonStr
+            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除所有控制字符
+            .replace(/\n/g, ' ') // 移除换行符
+            .replace(/\s+/g, ' ') // 压缩空格
+            .replace(/,(\s*[}\]])/g, '$1') // 移除多余逗号
+            .trim();
+        
+        const result = JSON.parse(aggressiveFixed);
+        console.log('JSON解析成功 - 激进修复后解析');
+        return result;
+    } catch (e) {
+        console.error('所有JSON修复尝试都失败了:', e.message);
+        console.error('最终JSON字符串:', jsonStr);
+        throw new Error(`JSON解析失败: ${e.message}。请检查AI返回的内容格式是否正确。`);
+    }
+}
+
 // --- 辅助函数：生成本地头像和图片 ---
 window.getSmartAvatar = function(name) {
     const initial = (name || 'U').charAt(0).toUpperCase();
@@ -99,6 +239,28 @@ window.getSmartImage = function(text) {
         iconSvg = `<path d="M200 120 C190 110, 170 110, 170 130 C170 150, 200 170, 200 170 C200 170, 230 150, 230 130 C230 110, 210 110, 200 120 Z" fill="rgba(255,255,255,0.7)"/>`;
     }
     
+    // 智能文本换行与截断
+    let textSvg = '';
+    const MAX_LINE_CHARS = 10; // 每行最大字符数
+    
+    if (str.length <= MAX_LINE_CHARS) {
+        // 单行情况
+        textSvg = `<text x="50%" y="75%" dy=".3em" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-weight="500" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${str}</text>`;
+    } else {
+        // 多行情况
+        let line1 = str.substring(0, MAX_LINE_CHARS);
+        let line2 = str.substring(MAX_LINE_CHARS);
+        
+        if (line2.length > MAX_LINE_CHARS) {
+            line2 = line2.substring(0, MAX_LINE_CHARS - 1) + '...';
+        }
+        
+        textSvg = `<text x="50%" y="70%" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="20" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-weight="500" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+            <tspan x="50%" dy="0">${line1}</tspan>
+            <tspan x="50%" dy="1.2em">${line2}</tspan>
+        </text>`;
+    }
+    
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
         <defs>
             <linearGradient id="grad${hash}" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -109,7 +271,7 @@ window.getSmartImage = function(text) {
         </defs>
         <rect width="400" height="300" fill="url(#grad${hash})"/>
         ${iconSvg}
-        <text x="50%" y="75%" dy=".3em" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-weight="500" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${str}</text>
+        ${textSvg}
     </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
 };
@@ -1082,15 +1244,16 @@ function showPhoneWechatGenerateMenu(event) {
         return;
     }
 
+    const rect = event.currentTarget.getBoundingClientRect();
     const menu = document.createElement('div');
     menu.id = 'phone-generate-menu';
     menu.style.cssText = `
-        position: absolute;
-        top: 50px;
+        position: fixed;
+        top: ${rect.bottom + 5}px;
         right: 10px;
         background: #4c4c4c;
         border-radius: 6px;
-        z-index: 1000;
+        z-index: 10000;
         box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         overflow: hidden;
     `;
@@ -1136,7 +1299,7 @@ function showPhoneWechatGenerateMenu(event) {
         menu.appendChild(item);
     });
 
-    document.getElementById('phone-wechat').appendChild(menu);
+    document.body.appendChild(menu);
 
     // 点击其他地方关闭
     const closeMenu = (e) => {
@@ -1213,23 +1376,74 @@ async function generatePhoneWechatAll(contact) {
     await callAiGeneration(contact, systemPrompt, 'all', btn);
 }
 
-async function callAiGeneration(contact, systemPrompt, type, btn) {
+// 检查AI API配置
+function validateAiSettings(settings) {
+    const errors = [];
+    
+    if (!settings.url) {
+        errors.push('缺少API URL');
+    } else {
+        try {
+            new URL(settings.url);
+        } catch (e) {
+            errors.push('API URL格式无效');
+        }
+    }
+    
+    if (!settings.key) {
+        errors.push('缺少API密钥');
+    } else if (settings.key.length < 10) {
+        errors.push('API密钥长度过短');
+    }
+    
+    if (!settings.model) {
+        errors.push('缺少模型名称');
+    }
+    
+    return errors;
+}
+
+async function callAiGeneration(contact, systemPrompt, type, btn, originalContent = null) {
     const settings = window.iphoneSimState.aiSettings.url ? window.iphoneSimState.aiSettings : window.iphoneSimState.aiSettings2;
     
-    if (!settings.url || !settings.key) {
-        alert('请先配置 AI API');
+    // 验证AI设置
+    const configErrors = validateAiSettings(settings);
+    if (configErrors.length > 0) {
+        const errorMsg = 'AI配置错误：\n' + configErrors.join('\n') + '\n\n请在设置中检查AI配置';
+        alert(errorMsg);
         if (btn) {
             btn.classList.remove('generating-pulse');
             btn.disabled = false;
+            if (originalContent) {
+                btn.innerHTML = originalContent;
+            }
         }
         return;
     }
 
     try {
+        console.log('=== 开始AI生成流程 ===');
+        console.log('联系人:', contact.name, 'ID:', contact.id);
+        console.log('生成类型:', type);
+        console.log('按钮元素:', btn);
+        
         let fetchUrl = settings.url;
         if (!fetchUrl.endsWith('/chat/completions')) {
             fetchUrl = fetchUrl.endsWith('/') ? fetchUrl + 'chat/completions' : fetchUrl + '/chat/completions';
         }
+
+        console.log('开始AI生成请求:', {
+            url: fetchUrl,
+            model: settings.model,
+            type: type,
+            contactName: contact.name
+        });
+
+        // 创建带超时的fetch请求
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort('Request timed out after 180 seconds');
+        }, 180000); // 180秒超时
 
         const response = await fetch(fetchUrl, {
             method: 'POST',
@@ -1244,99 +1458,117 @@ async function callAiGeneration(contact, systemPrompt, type, btn) {
                     { role: 'user', content: '开始生成' }
                 ],
                 temperature: 0.7
-            })
+            }),
+            signal: controller.signal
         });
 
-        if (!response.ok) throw new Error('API Error: ' + response.status);
+        clearTimeout(timeoutId);
+
+        console.log('AI API响应状态:', response.status, response.statusText);
+
+        if (!response.ok) {
+            let errorMsg = `API请求失败 (${response.status})`;
+            try {
+                const errorData = await response.text();
+                console.error('API错误响应:', errorData);
+                errorMsg += `: ${errorData}`;
+            } catch (e) {
+                console.error('无法读取错误响应:', e);
+            }
+            throw new Error(errorMsg);
+        }
 
         const data = await response.json();
+        console.log('AI API响应数据结构:', {
+            hasChoices: !!data.choices,
+            choicesLength: data.choices?.length,
+            hasMessage: !!data.choices?.[0]?.message,
+            hasContent: !!data.choices?.[0]?.message?.content
+        });
+        
+        // 验证响应数据结构
+        if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+            throw new Error('AI响应格式错误：缺少choices数组');
+        }
+        
+        if (!data.choices[0].message || !data.choices[0].message.content) {
+            throw new Error('AI响应格式错误：缺少message内容');
+        }
+        
         let content = data.choices[0].message.content.trim();
+        console.log('AI响应内容长度:', content.length);
+        console.log('AI响应内容预览:', content.substring(0, 200) + (content.length > 200 ? '...' : ''));
+        
+        if (!content) {
+            throw new Error('AI返回了空内容');
+        }
         
         // 改进的JSON提取逻辑
-        let jsonStr = content;
+        let jsonStr = extractValidJson(content);
         
-        // 首先移除markdown代码块标记
-        jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        console.log('开始JSON提取，原始内容长度:', content.length);
+        console.log('提取后JSON字符串长度:', jsonStr.length);
+        console.log('JSON字符串前100字符:', jsonStr.substring(0, 100));
         
-        // 移除可能的前后文本说明
-        const lines = jsonStr.split('\n');
-        let startIndex = -1;
-        let endIndex = -1;
-        
-        // 查找JSON开始和结束位置
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (startIndex === -1 && (line.startsWith('{') || line.startsWith('['))) {
-                startIndex = i;
-            }
-            if (line.endsWith('}') || line.endsWith(']')) {
-                endIndex = i;
-            }
-        }
-        
-        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
-            jsonStr = lines.slice(startIndex, endIndex + 1).join('\n');
-        }
-        
-        // 如果还是找不到合适的JSON，尝试用大括号或方括号定位
-        if (!jsonStr.trim().startsWith('{') && !jsonStr.trim().startsWith('[')) {
-            const firstBrace = content.indexOf('{');
-            const lastBrace = content.lastIndexOf('}');
-            const firstBracket = content.indexOf('[');
-            const lastBracket = content.lastIndexOf(']');
-            
-            // 根据type判断期望的JSON格式
-            if (type === 'browser_all' || type === 'all') {
-                // 期望对象格式
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    jsonStr = content.substring(firstBrace, lastBrace + 1);
-                }
-            } else {
-                // 期望数组格式
-                if (firstBracket !== -1 && lastBracket !== -1) {
-                    jsonStr = content.substring(firstBracket, lastBracket + 1);
-                }
-            }
-        }
-        
-        // 清理可能的多余字符
-        jsonStr = jsonStr.trim();
-        
-        // 尝试解析JSON，如果失败则提供更详细的错误信息
+        // 使用改进的JSON解析逻辑
         let result;
         try {
             console.log('尝试解析JSON，类型:', type);
-            console.log('提取的JSON字符串长度:', jsonStr.length);
-            console.log('JSON字符串前200字符:', jsonStr.substring(0, 200));
-            result = JSON.parse(jsonStr);
+            result = parseJsonWithFallback(jsonStr);
             console.log('JSON解析成功，结果类型:', typeof result, '是否为数组:', Array.isArray(result));
+            console.log('解析结果的键:', Object.keys(result));
+            if (result.chats) console.log('chats数组长度:', result.chats.length);
+            if (result.moments) console.log('moments数组长度:', result.moments.length);
         } catch (parseError) {
-            console.error('JSON解析失败，原始内容:', content);
+            console.error('JSON解析完全失败');
+            console.error('原始AI响应内容:', content);
             console.error('提取的JSON字符串:', jsonStr);
-            console.error('解析错误:', parseError);
-            throw new Error(`JSON解析失败: ${parseError.message}\n提取的内容: ${jsonStr.substring(0, 200)}...`);
+            console.error('解析错误详情:', parseError);
+            
+            // 提供更有用的错误信息
+            let errorDetails = `JSON解析失败: ${parseError.message}`;
+            if (parseError.message.includes('Unexpected token') || parseError.message.includes('Unexpected non-whitespace')) {
+                errorDetails += '\n\n可能原因：AI返回的内容在JSON后包含额外字符';
+            } else if (parseError.message.includes('Unexpected end')) {
+                errorDetails += '\n\n可能原因：JSON内容不完整';
+            }
+            
+            errorDetails += '\n\n建议解决方案：';
+            errorDetails += '\n1. 在AI设置中降低Temperature值（建议0.3-0.7）';
+            errorDetails += '\n2. 检查网络连接是否稳定';
+            errorDetails += '\n3. 尝试重新生成';
+            errorDetails += '\n4. 如果问题持续，请检查AI模型是否支持JSON格式输出';
+            
+            throw new Error(errorDetails);
         }
 
         if (!window.iphoneSimState.phoneContent[contact.id]) {
             window.iphoneSimState.phoneContent[contact.id] = {};
         }
 
+        console.log('开始处理解析结果，类型:', type);
+        
         if (type === 'moments' && Array.isArray(result)) {
+            console.log('处理moments类型，数组长度:', result.length);
             window.iphoneSimState.phoneContent[contact.id].wechatMoments = result;
             renderPhoneWechatMoments(contact.id);
             window.switchPhoneWechatTab('moments');
         } else if (type === 'chats' && Array.isArray(result)) {
+            console.log('处理chats类型，数组长度:', result.length);
             window.iphoneSimState.phoneContent[contact.id].wechatChats = result;
             renderPhoneWechatContacts(contact.id);
             window.switchPhoneWechatTab('contacts');
         } else if (type === 'all' && result.chats && result.moments) {
+            console.log('处理all类型，chats长度:', result.chats.length, 'moments长度:', result.moments.length);
             window.iphoneSimState.phoneContent[contact.id].wechatChats = result.chats;
             window.iphoneSimState.phoneContent[contact.id].wechatMoments = result.moments;
             // 渲染并保持当前 Tab (或者默认去微信页)
+            console.log('开始渲染联系人和朋友圈');
             renderPhoneWechatContacts(contact.id);
             renderPhoneWechatMoments(contact.id);
             // 刷新当前页面状态
             const currentTab = document.getElementById('phone-wechat-tab-contacts').style.display === 'block' ? 'contacts' : 'moments';
+            console.log('切换到标签页:', currentTab);
             window.switchPhoneWechatTab(currentTab);
         } else if (type === 'browser' && Array.isArray(result)) {
             window.iphoneSimState.phoneContent[contact.id].browserHistory = result;
@@ -1355,24 +1587,120 @@ async function callAiGeneration(contact, systemPrompt, type, btn) {
             
             if (window.showChatToast) window.showChatToast('浏览器内容生成完成');
             else alert('浏览器内容生成完成');
+        } else if (type === 'xianyu_all') {
+             // 保存生成的闲鱼数据到联系人
+            if (!contact.xianyuData) contact.xianyuData = {};
+            
+            // 处理图片关键词和价格
+            // Helper to process item
+            const processItem = (item) => {
+                // Process Image
+                if (item.image && item.image.includes('|')) {
+                    const [keyword, desc] = item.image.split('|');
+                    // 使用中文描述生成图片
+                    item.img = window.getSmartImage(desc.trim());
+                    item.imageDesc = desc.trim();
+                } else if (item.image) {
+                    item.img = window.getSmartImage(item.image);
+                } else if (item.title) {
+                    item.img = window.getSmartImage(item.title);
+                }
+                
+                // Process Price - Remove currency symbols
+                if (item.price) {
+                    item.price = item.price.toString().replace(/[¥￥元\s]/g, '');
+                }
+            };
+
+            if (result.published) result.published.forEach(processItem);
+            if (result.sold) result.sold.forEach(processItem);
+            if (result.bought) result.bought.forEach(processItem);
+            if (result.favorites) result.favorites.forEach(processItem);
+            if (result.messages) result.messages.forEach(processItem);
+            
+            contact.xianyuData = result;
+            if (window.saveConfig) window.saveConfig();
+            
+            // 刷新当前显示的内容
+            if (currentCheckPhoneContactId === contact.id) {
+                window.renderXianyuMe(contact.id);
+                window.renderXianyuMessages(contact.id);
+                // 如果收藏页面正在显示，也刷新它
+                const favoritesPage = document.getElementById('xianyu-page-favorites');
+                if (favoritesPage && !favoritesPage.classList.contains('hidden')) {
+                    window.renderXianyuFavoritesList();
+                }
+            }
+            
+            alert(`已为 ${contact.name} 生成闲鱼内容！\n包含：${result.published?.length || 0}个发布商品，${result.sold?.length || 0}个卖出记录，${result.bought?.length || 0}个购买记录，${result.favorites?.length || 0}个收藏商品，${result.messages?.length || 0}条消息`);
         } else {
-            console.error('未知的生成类型或格式不正确:', { type, result });
-            throw new Error(`返回格式不正确。类型: ${type}, 结果类型: ${typeof result}, 是否为数组: ${Array.isArray(result)}`);
+            console.error('未知的生成类型或格式不正确:', {
+                type,
+                resultType: typeof result,
+                isArray: Array.isArray(result),
+                hasChats: !!result.chats,
+                hasMoments: !!result.moments,
+                resultKeys: Object.keys(result || {})
+            });
+            throw new Error(`返回格式不正确。类型: ${type}, 结果类型: ${typeof result}, 是否为数组: ${Array.isArray(result)}, 包含的键: ${Object.keys(result || {}).join(', ')}`);
         }
 
         if (window.saveConfig) window.saveConfig();
 
     } catch (error) {
-        console.error('Generation Error', error);
-        alert('生成失败：' + error.message);
+        console.error('=== AI生成过程中发生错误 ===');
+        console.error('错误对象:', error);
+        console.error('错误详情:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+            type: type,
+            contactId: contact.id,
+            contactName: contact.name,
+            timestamp: new Date().toISOString()
+        });
+        
+        // 检查是否是网络错误
+        if (error.name === 'AbortError') {
+            console.error('请求被中止（可能是超时）');
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            console.error('网络请求失败');
+        }
+        
+        // 显示更详细的错误信息
+        let errorMsg = '生成失败：' + error.message;
+        if (error.message.includes('JSON')) {
+            errorMsg += '\n\n建议：\n1. 检查AI设置中的Temperature是否过高\n2. 尝试重新生成\n3. 检查网络连接';
+        } else if (error.message.includes('API')) {
+            errorMsg += '\n\n建议：\n1. 检查AI API配置\n2. 检查网络连接\n3. 确认API密钥有效';
+        }
+        alert(errorMsg);
     } finally {
         if (btn) {
             btn.classList.remove('generating-pulse');
             btn.disabled = false;
-            // 重新绑定事件，防止丢失
-            // 获取当前 active tab
-            const currentTab = document.getElementById('phone-wechat-tab-contacts').style.display === 'block' ? 'contacts' : 'moments';
-            window.switchPhoneWechatTab(currentTab);
+            
+            if (originalContent) {
+                 btn.innerHTML = originalContent;
+            }
+
+            // 根据生成类型重新绑定事件
+            if (type === 'moments' || type === 'chats' || type === 'all') {
+                // 微信相关生成，重新绑定微信Tab事件
+                try {
+                    const currentTab = document.getElementById('phone-wechat-tab-contacts').style.display === 'block' ? 'contacts' : 'moments';
+                    window.switchPhoneWechatTab(currentTab);
+                } catch (tabError) {
+                    console.warn('重新绑定微信Tab事件失败:', tabError);
+                }
+            } else if (type === 'browser' || type === 'browser_all') {
+                // 浏览器相关生成，重新绑定浏览器按钮事件
+                try {
+                    btn.onclick = () => handlePhoneAppGenerate('browser');
+                } catch (browserError) {
+                    console.warn('重新绑定浏览器按钮事件失败:', browserError);
+                }
+            }
         }
     }
 }
@@ -1407,7 +1735,7 @@ async function generatePhoneWechatMoments(contact) {
 - 内容风格：晒娃、抱怨加班、心灵鸡汤、微商广告、旅游打卡等。
 
 【返回格式示例】
-必须是 JSON 数组，请参考以下结构（包含好友和自己）：
+必须是严谨的 JSON 数组。所有Key和String Value必须用双引号包裹。
 [
   {
     "isSelf": false,
@@ -1711,7 +2039,7 @@ async function generatePhoneWechatChats(contact) {
 1. 必须是纯 JSON 数组。
 2. 不要包含任何开场白（如“好的”、“这是...”）。
 3. 不要包含 Markdown 代码块标记。
-4. 直接返回 [ 开头，] 结尾的 JSON 字符串。
+4. 严格遵守 JSON 语法，所有字符串必须用双引号包裹。
 
 JSON 格式示例：
 [
@@ -2402,6 +2730,77 @@ window.renderBrowserDownloads = renderBrowserDownloads;
 window.renderBrowserShare = renderBrowserShare;
 window.generatePhoneBrowserHistory = generatePhoneBrowserHistory;
 window.generateBrowserContent = generateBrowserContent;
+
+// 调试函数：检查生成功能状态
+window.debugPhoneGeneration = function() {
+    console.log('=== 查手机生成功能调试信息 ===');
+    console.log('当前联系人ID:', currentCheckPhoneContactId);
+    
+    if (currentCheckPhoneContactId) {
+        const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+        console.log('当前联系人:', contact);
+    }
+    
+    // 检查AI设置
+    const settings1 = window.iphoneSimState.aiSettings;
+    const settings2 = window.iphoneSimState.aiSettings2;
+    console.log('AI设置1:', settings1);
+    console.log('AI设置2:', settings2);
+    
+    const activeSettings = settings1.url ? settings1 : settings2;
+    console.log('当前使用的AI设置:', activeSettings);
+    
+    const configErrors = validateAiSettings(activeSettings);
+    console.log('AI配置验证结果:', configErrors.length === 0 ? '通过' : configErrors);
+    
+    // 检查按钮状态
+    const wechatBtn = document.getElementById('generate-wechat-btn');
+    const browserBtn = document.getElementById('generate-browser-btn');
+    
+    console.log('微信生成按钮状态:', {
+        exists: !!wechatBtn,
+        disabled: wechatBtn?.disabled,
+        hasGeneratingClass: wechatBtn?.classList.contains('generating-pulse'),
+        onclick: typeof wechatBtn?.onclick
+    });
+    
+    console.log('浏览器生成按钮状态:', {
+        exists: !!browserBtn,
+        disabled: browserBtn?.disabled,
+        hasGeneratingClass: browserBtn?.classList.contains('generating-pulse'),
+        onclick: typeof browserBtn?.onclick
+    });
+    
+    // 检查网络连接
+    console.log('网络状态:', navigator.onLine ? '在线' : '离线');
+    
+    console.log('=== 调试信息结束 ===');
+    
+    return {
+        contactId: currentCheckPhoneContactId,
+        aiConfigValid: configErrors.length === 0,
+        networkOnline: navigator.onLine,
+        buttonsReady: !!wechatBtn && !!browserBtn
+    };
+};
+
+// 重置按钮状态的函数
+window.resetGenerationButtons = function() {
+    const wechatBtn = document.getElementById('generate-wechat-btn');
+    const browserBtn = document.getElementById('generate-browser-btn');
+    
+    if (wechatBtn) {
+        wechatBtn.classList.remove('generating-pulse');
+        wechatBtn.disabled = false;
+        console.log('微信生成按钮状态已重置');
+    }
+    
+    if (browserBtn) {
+        browserBtn.classList.remove('generating-pulse');
+        browserBtn.disabled = false;
+        console.log('浏览器生成按钮状态已重置');
+    }
+};
 window.enterBrowserSearchMode = enterBrowserSearchMode;
 window.exitBrowserSearchMode = exitBrowserSearchMode;
 
@@ -3075,7 +3474,7 @@ window.renderXianyuFavoritesList = function() {
             </div>
             <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <div style="font-size: 15px; font-weight: 500; color: #333; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                    <div style="font-size: 15px; font-weight: 500; color: #000; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                         ${item.isSold ? '<span style="color: #999;">[失效] </span>' : '<span style="background: #FF4400; color: #fff; font-size: 10px; padding: 0 2px; border-radius: 2px; margin-right: 4px;">包邮</span>'}${item.title}
                     </div>
                     <div style="font-size: 16px; font-weight: bold; color: #FF3B30; margin-top: 6px;">¥${item.price}</div>
@@ -3198,7 +3597,7 @@ window.renderXianyuBoughtList = function() {
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <img src="${item.img}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover;">
                 <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0;">
-                    <div style="font-size: 15px; font-weight: bold; color: #333; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.title}</div>
+                    <div style="font-size: 15px; font-weight: bold; color: #000; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${item.title}</div>
                     <div style="text-align: right; color: #000; font-weight: bold; font-size: 14px;">¥${item.price}</div>
                 </div>
             </div>
@@ -3376,146 +3775,6 @@ ${recentChats}
     await callAiGeneration(contact, systemPrompt, 'xianyu_all', btn, null);
 }
 
-async function callAiGeneration(contact, systemPrompt, type, btn, originalContent = null) {
-    const settings = window.iphoneSimState.aiSettings.url ? window.iphoneSimState.aiSettings : window.iphoneSimState.aiSettings2;
-    
-    if (!settings.url || !settings.key) {
-        alert('请先配置 AI API');
-        if (btn) {
-            btn.classList.remove('generating-pulse');
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            if (originalContent) {
-                btn.innerHTML = originalContent;
-            }
-        }
-        return;
-    }
-
-    try {
-        let fetchUrl = settings.url;
-        if (!fetchUrl.endsWith('/chat/completions')) {
-            fetchUrl = fetchUrl.endsWith('/') ? fetchUrl + 'chat/completions' : fetchUrl + '/chat/completions';
-        }
-
-        const response = await fetch(fetchUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${settings.key}`
-            },
-            body: JSON.stringify({
-                model: settings.model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: '开始生成' }
-                ],
-                temperature: 0.7
-            })
-        });
-
-        if (!response.ok) throw new Error('API Error: ' + response.status);
-
-        const data = await response.json();
-        let content = data.choices[0].message.content.trim();
-        
-        // JSON提取和清理逻辑
-        let jsonStr = content;
-        jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '');
-        
-        const lines = jsonStr.split('\n');
-        let startIndex = -1;
-        let endIndex = -1;
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (startIndex === -1 && line.startsWith('{')) {
-                startIndex = i;
-            }
-            if (line.endsWith('}')) {
-                endIndex = i;
-            }
-        }
-        
-        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
-            jsonStr = lines.slice(startIndex, endIndex + 1).join('\n');
-        }
-        
-        if (!jsonStr.trim().startsWith('{')) {
-            const firstBrace = content.indexOf('{');
-            const lastBrace = content.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
-                jsonStr = content.substring(firstBrace, lastBrace + 1);
-            }
-        }
-        
-        // 清理多余字符
-        jsonStr = jsonStr.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-        
-        const result = JSON.parse(jsonStr);
-        
-        if (type === 'xianyu_all') {
-            // 保存生成的闲鱼数据到联系人
-            if (!contact.xianyuData) contact.xianyuData = {};
-            
-            // 处理图片关键词和价格
-            // Helper to process item
-            const processItem = (item) => {
-                // Process Image
-                if (item.image && item.image.includes('|')) {
-                    const [keyword, desc] = item.image.split('|');
-                    // 使用中文描述生成图片
-                    item.img = window.getSmartImage(desc.trim());
-                    item.imageDesc = desc.trim();
-                } else if (item.image) {
-                    item.img = window.getSmartImage(item.image);
-                } else if (item.title) {
-                    item.img = window.getSmartImage(item.title);
-                }
-                
-                // Process Price - Remove currency symbols
-                if (item.price) {
-                    item.price = item.price.toString().replace(/[¥￥元\s]/g, '');
-                }
-            };
-
-            if (result.published) result.published.forEach(processItem);
-            if (result.sold) result.sold.forEach(processItem);
-            if (result.bought) result.bought.forEach(processItem);
-            if (result.favorites) result.favorites.forEach(processItem);
-            if (result.messages) result.messages.forEach(processItem);
-            
-            contact.xianyuData = result;
-            saveConfig();
-            
-            // 刷新当前显示的内容
-            if (currentCheckPhoneContactId === contact.id) {
-                window.renderXianyuMe(contact.id);
-                window.renderXianyuMessages(contact.id);
-                // 如果收藏页面正在显示，也刷新它
-                const favoritesPage = document.getElementById('xianyu-page-favorites');
-                if (favoritesPage && !favoritesPage.classList.contains('hidden')) {
-                    window.renderXianyuFavoritesList();
-                }
-            }
-            
-            alert(`已为 ${contact.name} 生成闲鱼内容！\n包含：${result.published?.length || 0}个发布商品，${result.sold?.length || 0}个卖出记录，${result.bought?.length || 0}个购买记录，${result.favorites?.length || 0}个收藏商品，${result.messages?.length || 0}条消息`);
-        }
-        
-    } catch (error) {
-        console.error('AI生成失败:', error);
-        alert('生成失败: ' + error.message);
-    } finally {
-        if (btn) {
-            btn.classList.remove('generating-pulse');
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            if (originalContent) {
-                btn.innerHTML = originalContent;
-            }
-        }
-    }
-}
 
 // --- 闲鱼聊天功能 ---
 
