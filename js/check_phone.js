@@ -4180,6 +4180,47 @@ function handleXianyuPaymentConfirm(item, price) {
         time: Date.now(),
         relatedId: null
     });
+
+    // Update item status to "Sold Out"
+    if (currentCheckPhoneContactId) {
+        const contact = window.iphoneSimState.contacts.find(c => c.id === currentCheckPhoneContactId);
+        if (contact && contact.xianyuData && contact.xianyuData.favorites) {
+            const foundItem = contact.xianyuData.favorites.find(fav => 
+                fav.title === item.title && 
+                parseFloat(fav.price) === parseFloat(item.price)
+            );
+            
+            if (foundItem) {
+                foundItem.isSold = true;
+                // Also update the current detail item object to reflect the change immediately if used elsewhere
+                if (window.currentXianyuDetailItem) {
+                    window.currentXianyuDetailItem.isSold = true;
+                }
+                
+                // Refresh favorites list if it's open underneath
+                const favoritesPage = document.getElementById('xianyu-page-favorites');
+                if (favoritesPage && !favoritesPage.classList.contains('hidden')) {
+                    renderXianyuFavoritesList();
+                }
+                
+                // Update Detail Page UI if open
+                const detailPage = document.getElementById('xianyu-page-detail');
+                if (detailPage && !detailPage.classList.contains('hidden')) {
+                    // Re-render detail page button area
+                    // We can reuse openXianyuDetail but we need to pass the updated item
+                    // Or just manually update the button for smoother experience
+                    const bottomBar = detailPage.querySelector('div[style*="position: fixed"]');
+                    if (bottomBar) {
+                        bottomBar.innerHTML = `
+                            <div style="flex: 1;"></div>
+                            <button style="background: #e0e0e0; color: #999; border: none; padding: 10px 30px; border-radius: 20px; font-weight: bold; cursor: default;">卖掉了</button>
+                        `;
+                    }
+                }
+            }
+        }
+    }
+
     if (window.saveConfig) window.saveConfig();
     
     document.getElementById('xianyu-payment-modal').classList.add('hidden');
