@@ -78,7 +78,7 @@
 /* Chat Notification Banner (New Message Popup) */
 .chat-notification-banner {
     position: absolute;
-    top: 10px;
+    top: 60px;
     left: 10px;
     right: 10px;
     background-color: rgba(255, 255, 255, 0.95);
@@ -3978,6 +3978,39 @@ input.msg-select-checkbox {
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     backdrop-filter: blur(2px);
     z-index: 3;
+}
+
+/* --- iCity Mobile Layout Fixes --- */
+#icity-app {
+    height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height for mobile */
+    width: 100vw;
+    overflow: hidden;
+    position: fixed; /* Force fixed positioning */
+    bottom: 0;
+    left: 0;
+}
+
+.icity-tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    /* Auto height based on content + padding, but ensure it covers safe area */
+    height: calc(50px + env(safe-area-inset-bottom)); 
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #fff;
+    border-top: 1px solid #eee;
+    z-index: 20;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-sizing: border-box; /* Important: padding included in height */
+}
+
+/* Ensure tab content clears the tab bar */
+.icity-tab-content .app-body {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom)) !important;
 }
 
 /* --- 适配旧组件到网格中 --- */
