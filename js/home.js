@@ -124,16 +124,52 @@ function checkAndShowUpdateModal() {
                 桌面布局已更新（iCity 移至第二页）。<br>
                 请点击下方按钮恢复默认布局以生效。
             </p>
-            <button id="confirm-reset-layout" style="width: 100%; padding: 12px; background: #007AFF; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">恢复默认布局并进入</button>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="confirm-reset-layout" style="width: 100%; padding: 12px; background: #007AFF; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">只恢复第二页布局</button>
+                <button id="confirm-direct-enter" style="width: 100%; padding: 12px; background: #f2f2f7; color: #007AFF; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">直接进入</button>
+            </div>
         `;
         
         modal.appendChild(content);
         document.body.appendChild(modal);
         
         document.getElementById('confirm-reset-layout').onclick = () => {
-            localStorage.removeItem('myIOS_HomeScreen');
+            // Partial Reset: Keep Page 1 (indices < 24), Reset Page 2 (indices >= 24)
+            // Default Page 2 items
+            const defaultPage2 = [
+                { index: 24, type: 'app', name: 'icity', iconClass: 'fas fa-book', color: '#333', appId: 'icity-app', _internalId: generateId() }
+            ];
+            
+            // Filter current data to keep only Page 1
+            const page1Items = homeScreenData.filter(item => item.index < 24);
+            
+            // Merge
+            homeScreenData = [...page1Items, ...defaultPage2];
+            
+            saveLayout();
             localStorage.setItem('layout_version', currentVersion);
             location.reload();
+        };
+
+        document.getElementById('confirm-direct-enter').onclick = () => {
+            // Check if slot 24 (Page 2, Slot 1) is occupied
+            const isOccupied = homeScreenData.some(item => {
+                // Check if item starts at 24
+                if (item.index === 24) return true;
+                // Check if item covers 24
+                const slots = getOccupiedSlots(item.index, item.size || '1x1');
+                return slots && slots.includes(24);
+            });
+
+            if (isOccupied) {
+                if (confirm("第二页主屏幕的第一个位置（索引24）似乎被占用了，直接进入可能会导致布局错乱。确定要继续吗？")) {
+                    localStorage.setItem('layout_version', currentVersion);
+                    modal.remove(); // Close modal instead of reload to keep state
+                }
+            } else {
+                localStorage.setItem('layout_version', currentVersion);
+                modal.remove();
+            }
         };
     }
 }
