@@ -101,6 +101,11 @@ const state = {
         img2: 'https://placehold.co/300x300/eee/999?text=Photo',
         text2: '美好回忆'
     },
+    icityProfile: {
+        avatar: '',
+        bgImage: ''
+    },
+    icityDiaries: [], // { id, content, visibility, time, likes, comments }
     stickerCategories: [], // { id, name, list: [{ url, desc }] }
     currentStickerCategoryId: 'all',
     isStickerManageMode: false,
@@ -759,6 +764,11 @@ async function init() {
     } catch (e) {
         console.error('加载配置失败:', e);
     }
+
+    // 更新 icity 资料卡
+    if (window.renderIcityProfile) window.renderIcityProfile();
+    if (window.renderIcityDiaryList) window.renderIcityDiaryList();
+    if (window.renderIcityWorld) window.renderIcityWorld(); // Initialize world view content
 
     // 调用美化中心的UI更新（确保输入框显示当前值）
     if (window.updateThemeUi) window.updateThemeUi();

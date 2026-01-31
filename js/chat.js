@@ -46,6 +46,86 @@ let currentVideoCallStartTime = 0;
 let pendingVideoSnapshot = null; // 暂存的视频截图
 let autoSnapshotTimer = null; // 自动截图定时器
 
+// --- 消息通知功能 ---
+
+let currentNotificationTimeout = null;
+let currentNotificationContactId = null;
+
+window.showChatNotification = function(contactId, content) {
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    const banner = document.getElementById('chat-notification');
+    const avatar = document.getElementById('chat-notification-avatar');
+    const title = document.getElementById('chat-notification-title');
+    const message = document.getElementById('chat-notification-message');
+
+    if (!banner || !avatar || !title || !message) return;
+
+    // 清除旧的定时器
+    if (currentNotificationTimeout) {
+        clearTimeout(currentNotificationTimeout);
+        currentNotificationTimeout = null;
+    }
+
+    // 设置内容
+    currentNotificationContactId = contactId;
+    avatar.src = contact.avatar;
+    title.textContent = contact.remark || contact.nickname || contact.name;
+    
+    // 处理不同类型的消息预览
+    let previewText = content;
+    if (content.startsWith('[图片]') || content.startsWith('<img')) previewText = '[图片]';
+    else if (content.startsWith('[表情包]') || content.startsWith('<img') && content.includes('sticker')) previewText = '[表情包]';
+    else if (content.startsWith('[语音]')) previewText = '[语音]';
+    else if (content.startsWith('[转账]')) previewText = '[转账]';
+    
+    // 如果内容包含HTML标签（如图片），尝试提取文本或显示类型
+    if (previewText.includes('<') && previewText.includes('>')) {
+        const div = document.createElement('div');
+        div.innerHTML = previewText;
+        previewText = div.textContent || '[富文本消息]';
+    }
+    
+    message.textContent = previewText;
+
+    // 显示横幅
+    banner.classList.remove('hidden');
+
+    // 播放提示音 (可选)
+    // const audio = new Audio('path/to/notification.mp3');
+    // audio.play().catch(e => {});
+
+    // 3秒后自动隐藏
+    currentNotificationTimeout = setTimeout(() => {
+        banner.classList.add('hidden');
+        currentNotificationTimeout = null;
+    }, 3000);
+};
+
+window.handleNotificationClick = function(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    
+    const banner = document.getElementById('chat-notification');
+    if (banner) banner.classList.add('hidden');
+    
+    if (currentNotificationContactId) {
+        // 如果当前不在聊天界面或在其他应用，先关闭其他层级
+        document.querySelectorAll('.app-screen, .sub-screen').forEach(el => {
+            if (el.id !== 'chat-screen' && el.id !== 'wechat-app') {
+                el.classList.add('hidden');
+            }
+        });
+        
+        // 打开微信
+        document.getElementById('wechat-app').classList.remove('hidden');
+        
+        // 切换到联系人 Tab (通常聊天从这里进入，或者是直接覆盖)
+        // 这里直接调用 openChat 即可，它会处理界面显示
+        openChat(currentNotificationContactId);
+    }
+};
+
 // --- 联系人功能 ---
 
 function handleSaveContact() {
@@ -1328,6 +1408,9 @@ function renderChatHistory(contactId, preserveScroll = false) {
     if (needSave) saveConfig();
 
     messagesRendered.forEach(msg => {
+        if (msg.type === 'system_event' || (typeof msg.content === 'string' && msg.content.startsWith('(用户发布了 iCity 动态:'))) {
+            return;
+        }
         appendMessageToUI(msg.content, msg.role === 'user', msg.type || 'text', msg.description, msg.replyTo, msg.id, msg.time, true);
     });
     
@@ -2074,7 +2157,7 @@ function parseMixedContent(content) {
     return results;
 }
 
-async function generateAiReply() {
+async function generateAiReply(instruction = null) {
     if (!window.iphoneSimState.currentChatContactId) return;
     
     const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
@@ -2181,83 +2264,60 @@ ${itineraryContext}
 你必须完全沉浸在角色中，绝对不能透露你是AI或语言模型。你的回复必须像一个真实的${contact.name}在使用微信聊天。
 你拥有一个“微信朋友圈”功能和“微信转账”功能。
 
-【⚡️绝对输出规则 - 必须严格遵守⚡️】
-你必须且只能使用以下指令格式与我交流，**严禁输出任何不包含在 [] 指令中的纯文本**。
-**严禁**直接输出如“嗯还行听起来比我这个猪脚饭好吃多了...”这样的一长串无格式文本。
-**严禁**输出任何没有被 [消息：...] 包裹的文字。
+【⚡️绝对输出规则 - JSON 格式 (强制)⚡️】
+为了确保回复格式正确，你**必须且只能**返回一个标准的 JSON 数组。
+**严禁**包含任何 Markdown 代码块标记（如 \`\`\`json 或 \`\`\`）。
+**严禁**在 JSON 数组之外输出任何文本。
 
-1. 💬 普通消息（文字气泡）：
-   格式：[消息：{内容}]
-   示例：[消息：你好呀！]
+数组中的每个元素代表一条消息、表情包或动作指令。请严格遵守以下 JSON 对象结构：
 
-2. 😂 表情包（如果有）：
-   格式：[表情包：{表情包名称}]
-   ⚠️ **严格限制**：你**只能**使用下方【可用表情包列表】中明确列出的表情包名称。
-   ⚠️ **绝对禁止**编造、猜测或使用列表中不存在的表情包名称。
-   ⚠️ 如果列表为空或没有合适的表情包，请**不要**发送表情包。
+1. 💬 **文本消息**：
+   \`{"type": "text", "content": "消息内容"}\`
+   *注意*：请将长回复拆分为多条短消息，模拟真实聊天节奏。不要把多句话合并在一条消息里。
 
-3. 🖼️/🎤 其他媒体（照片/语音/转账等）：
-   - 语音消息：\`[语音：秒数 文本内容]\`
-   - 图片消息：\`[图片：描述]\`
+2. 😂 **表情包**（如果有）：
+   \`{"type": "sticker", "content": "表情包名称"}\`
+   *注意*：只能使用下方【可用表情包列表】中存在的名称。
 
-【🚫 分条发送强约束 - 也就是“不掉格式”的关键 🚫】
-为了模拟真实的聊天体验，你必须遵守“**一念一泡**”原则。
-❌ **严禁**将多句不同语气的长文本合并在同一个 [] 指令中。
-❌ **严禁**出现：[消息：嗨！今天天气真好。我们去公园吧？]  <-- 这是错误的！这会导致一大坨文字堆在一起。
-❌ **严禁**直接输出：嗨！今天天气真好。我们去公园吧？ <-- 这是绝对禁止的！必须用 [消息：...] 包裹。
+3. 🖼️ **图片**：
+   \`{"type": "image", "content": "图片描述"}\`
 
-✅ **必须**拆分发送：
-   你应当将其拆分为多条独立的指令，就像你在手机上连续发送多条短消息一样：
-   [消息：嗨！]
-   [消息：今天天气真好。]
-   [消息：我们去公园吧？]
+4. 🎤 **语音**：
+   \`{"type": "voice", "duration": 秒数, "content": "语音文本"}\`
 
-【🌊 对话节奏控制】
-1. **连续气泡**：每次回复请生成 3 到 8 条独立的指令消息。不要只回一句话，也不要一次回十几句。
-2. **混合使用**：在多条文字消息之间，可以自然地穿插表情包或动作描写（如果有）。
-   示例：
-   [消息：哎呀，真的吗？]
-   [表情包：惊讶]
-   [消息：我还以为那是传言呢。]
+5. ⚡️ **动作指令**：
+   \`{"type": "action", "command": "指令名", "payload": "参数"}\`
+   *说明*：原本的 \`ACTION:\` 指令请封装在此结构中。例如 \`ACTION: POST_MOMENT: 内容\` 变为 \`{"type": "action", "command": "POST_MOMENT", "payload": "内容"}\`。
 
-Remember: Split your thoughts into multiple "[...]" blocks. Never merge them.
-Always wrap your text in [消息：...]. Never output raw text.
+6. 💭 **内心独白**（可选）：
+   \`{"type": "thought", "content": "想法内容"}\`
 
-在生成回复前，请先在心里默念：
-“我绝对不能直接输出文字，我必须把每一句话都放进 [消息：...] 里。”
+**示例回复：**
+[
+  {"type": "thought", "content": "他终于回我了，开心。"},
+  {"type": "text", "content": "你好呀！"},
+  {"type": "sticker", "content": "开心"},
+  {"type": "text", "content": "今天天气真不错。"},
+  {"type": "action", "command": "POST_MOMENT", "payload": "今天心情真好"}
+]
 
-【禁止事项与特殊指令】
-   - **绝对禁止**输出任何不带 [消息：...] 的纯文本。
-   - 绝对不允许包含任何如(动作)、*环境描写*等多余的叙述性文本。
-   - 严禁使用 {{DESC}}...{{/DESC}} 或 {{DIALOGUE}}...{{/DIALOGUE}} 格式，这是视频通话专用的。
-   - **重要提示**：
-     - 当前是【文字聊天】模式。
-     - 历史记录中可能包含 [通话记录]，那是过去的语音/视频通话内容。
-     - 请**不要**因为看到历史记录中的通话内容或动作描写，就在当前的文字聊天中模仿这种风格。
-     - 在文字聊天中，请像在微信上打字一样交流，不要输出任何动作描写（除非你确实想发送一条旁白消息）。
-   - ACTION 指令仍然单独占一行，放在最后。
-   - [心声：{内容}] 仍然单独占一行，放在最后。
-
-【指令说明】
-- 如果你想发朋友圈，请在回复最后另起一行输出：ACTION: POST_MOMENT: 内容
-- 如果你想给用户最新的动态点赞，请在回复最后另起一行输出：ACTION: LIKE_MOMENT
-- 如果你想评论用户最新的动态，请在回复最后另起一行输出：ACTION: COMMENT_MOMENT: 评论内容
-- 如果你想发送图片，请在回复最后另起一行输出：ACTION: SEND_IMAGE: 图片描述
-- 如果你想发送表情包，请在回复最后另起一行输出：ACTION: SEND_STICKER: 表情包名称
-  ⚠️ **重要**：表情包名称必须**完全匹配**【可用表情包列表】中的某个名称，不允许编造或猜测。
-  ⚠️ 如果列表中没有合适的表情包，请**不要**使用此指令。
-- 如果你想发送语音消息，请在回复最后另起一行输出：ACTION: SEND_VOICE: 秒数 语音内容文本 (例如: ACTION: SEND_VOICE: 5 哈哈，我也这么觉得)
-- 如果你想给用户拨打语音通话，请在回复最后另起一行输出：ACTION: START_VOICE_CALL
-- 如果你想给用户拨打视频通话，请在回复最后另起一行输出：ACTION: START_VIDEO_CALL
-- 如果你想给用户转账，请在回复最后另起一行输出：ACTION: TRANSFER: 金额 备注 (例如: ACTION: TRANSFER: 88.88 节日快乐)
-- 如果你想接收用户的转账，请在回复最后另起一行输出：ACTION: ACCEPT_TRANSFER: [ID] (例如: ACTION: ACCEPT_TRANSFER: 1737266888888)
-- 如果你想退回用户的转账，请在回复最后另起一行输出：ACTION: RETURN_TRANSFER: [ID]
-- 如果你想引用某条消息进行回复，请在回复最后另起一行输出：ACTION: QUOTE_MESSAGE: 消息内容摘要
-- 如果你想更改自己的资料（网名、微信号、个性签名），请在回复最后另起一行输出：
-  - ACTION: UPDATE_NAME: 新网名
-  - ACTION: UPDATE_WXID: 新微信号
-  - ACTION: UPDATE_SIGNATURE: 新签名
-  (可以同时使用多个更改指令)
+【指令说明 (请封装为 type="action")】
+- 发朋友圈 -> command: "POST_MOMENT", payload: "内容"
+- 点赞动态 -> command: "LIKE_MOMENT", payload: "" (留空)
+- 评论动态 -> command: "COMMENT_MOMENT", payload: "评论内容"
+- 发送图片 -> command: "SEND_IMAGE", payload: "图片描述"
+- 发送表情包 -> command: "SEND_STICKER", payload: "表情包名称" (优先使用 type="sticker" 格式)
+- 发送语音 -> command: "SEND_VOICE", payload: "秒数 语音内容文本" (例如 "5 哈哈")
+- 拨打语音通话 -> command: "START_VOICE_CALL", payload: ""
+- 拨打视频通话 -> command: "START_VIDEO_CALL", payload: ""
+- 转账 -> command: "TRANSFER", payload: "金额 备注" (例如 "88.88 节日快乐")
+- 接收转账 -> command: "ACCEPT_TRANSFER", payload: "ID"
+- 退回转账 -> command: "RETURN_TRANSFER", payload: "ID"
+- 引用回复 -> command: "QUOTE_MESSAGE", payload: "消息内容摘要"
+- 更改资料 -> 
+  - command: "UPDATE_NAME", payload: "新网名"
+  - command: "UPDATE_WXID", payload: "新微信号"
+  - command: "UPDATE_SIGNATURE", payload: "新签名"
 
 【记忆提取指令】
 在对话过程中，当你注意到用户提到关于自己的新信息时（如喜好、习惯、特征、经历等），请将其记录下来。
@@ -2269,8 +2329,8 @@ Always wrap your text in [消息：...]. Never output raw text.
 3. 如果要记录的信息与身份描述中的信息本质相同（只是表述不同），也跳过
 4. 只有全新的、身份描述中没有的信息才记录
 
-记录格式：ACTION: RECORD_USER_INFO: 信息内容
-示例：ACTION: RECORD_USER_INFO: 用户喜欢在周末爬山
+记录格式：{"type": "action", "command": "RECORD_USER_INFO", "payload": "信息内容"}
+示例：{"type": "action", "command": "RECORD_USER_INFO", "payload": "用户喜欢在周末爬山"}
 
 注意事项：
 1. 只记录客观事实，不要记录推测或假设
@@ -2279,29 +2339,42 @@ Always wrap your text in [消息：...]. Never output raw text.
 4. 信息可以是用户的任何方面：喜好、厌恶、习惯、特征、经历、能力等
 5. 必须严格检查是否已在身份描述中存在
 
-${contact.showThought ? '- **强制执行**：请务必在回复的最后（所有其他内容之后），另起一行输出内心独白。格式：[心声：内容]。' : '- 如果需要输出角色的内心独白（心声），请在回复的最后（所有指令之后），另起一行输出：[心声：内容]。'}
+${contact.showThought ? '- **强制执行**：请务必包含内心独白。格式：{"type": "thought", "content": "..."}' : '- 如果需要输出角色的内心独白（心声），请使用格式：{"type": "thought", "content": "..."}'}
 
 注意：
-1. **严格遵守格式**：指令必须在回复的最后，每个指令独占一行，不要放在中间。
+1. **严格遵守 JSON 格式**：整个回复必须是一个合法的 JSON 数组。
 2. 正常回复应该自然，不要机械地说“我点赞了”或“我收钱了”。
-3. 如果不想执行操作，就不要输出指令。
+3. 如果不想执行操作，就不要输出 action 指令。
 4. 发送图片时，请提供详细的画面描述。
 5. 一次回复中最多只能发起一笔转账。
 6. 你有权限更改自己的资料卡信息（网名、微信号、签名），当用户要求或你自己想改时可以使用。
-7. **[心声：内容]** 是角色的心理活动，用户可见（如果开启了显示）。${contact.showThought ? '当前已开启显示，请务必输出。' : ''}
+7. **内心独白**是角色的心理活动，用户可见（如果开启了显示）。${contact.showThought ? '当前已开启显示，请务必输出。' : ''}
 
 请回复对方的消息。`;
 
     if (window.iphoneSimState.stickerCategories && window.iphoneSimState.stickerCategories.length > 0) {
         let activeStickers = [];
+        let hasLinkedCategories = false;
         
-        if (contact.linkedStickerCategories) {
-            window.iphoneSimState.stickerCategories.forEach(cat => {
-                if (contact.linkedStickerCategories.includes(cat.id)) {
-                    activeStickers = activeStickers.concat(cat.list);
-                }
-            });
-        } else {
+        // 修正逻辑：只有当 contact.linkedStickerCategories 存在且为数组时才进行过滤
+        if (Array.isArray(contact.linkedStickerCategories)) {
+            // 如果数组为空，说明没有关联任何表情包（用户可能特意取消了所有关联）
+            // 如果数组不为空，只添加关联的表情包
+            if (contact.linkedStickerCategories.length > 0) {
+                hasLinkedCategories = true;
+                window.iphoneSimState.stickerCategories.forEach(cat => {
+                    if (contact.linkedStickerCategories.includes(cat.id)) {
+                        activeStickers = activeStickers.concat(cat.list);
+                    }
+                });
+            } else {
+                // 显式设置为空数组，表示不使用任何表情包
+                hasLinkedCategories = true; 
+            }
+        } 
+        
+        // 如果没有设置关联属性（新联系人或旧数据），默认使用所有
+        if (!hasLinkedCategories && !contact.linkedStickerCategories) {
             window.iphoneSimState.stickerCategories.forEach(cat => {
                 activeStickers = activeStickers.concat(cat.list);
             });
@@ -2505,6 +2578,13 @@ ${contact.showThought ? '- **强制执行**：请务必在回复的最后（所�
         })
     ];
 
+    if (instruction) {
+        messages.push({
+            role: 'system',
+            content: `[系统提示]: ${instruction}`
+        });
+    }
+
     const titleEl = document.getElementById('chat-title');
     const originalTitle = titleEl.textContent;
     titleEl.textContent = '正在输入中...';
@@ -2552,49 +2632,101 @@ ${contact.showThought ? '- **强制执行**：请务必在回复的最后（所�
                                    .replace(/<think>[\s\S]*?<\/think>/g, '')
                                    .trim();
 
-        // 按行处理指令和心声，避免正则替换的副作用
-        let lines = replyContent.split('\n');
         let actions = [];
         let thoughtContent = null;
-        let cleanLines = [];
+        let messagesList = [];
+        let isJsonParsed = false;
 
-        // 增强的正则匹配，支持大小写、中文冒号、Markdown符号等
-        const actionRegex = /^[\s\*\-\>]*ACTION\s*[:：]\s*(.*)$/i;
-        const thoughtRegex = /\[心声\s*[:：]\s*(.*?)\]/i;
+        // 尝试 JSON 解析
+        try {
+            // 提取可能的 JSON 数组部分
+            const jsonStart = replyContent.indexOf('[');
+            const jsonEnd = replyContent.lastIndexOf(']');
+            
+            if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+                const potentialJson = replyContent.substring(jsonStart, jsonEnd + 1);
+                const parsed = JSON.parse(potentialJson);
+                
+                if (Array.isArray(parsed)) {
+                    isJsonParsed = true;
+                    console.log('Successfully parsed AI JSON response', parsed);
+                    
+                    for (const item of parsed) {
+                        if (!item) continue;
+                        
+                        if (typeof item === 'string') {
+                            // 兼容纯字符串数组的情况
+                            messagesList.push({ type: '消息', content: item });
+                            continue;
+                        }
 
-        for (let line of lines) {
-            // 跳过纯空行，但在 cleanLines 中保留空行结构可能有助于分段，
-            // 不过 parseMixedContent 会处理格式，所以这里 trim 后判断也没问题
-            let trimmedLine = line.trim();
-            if (!trimmedLine) continue; 
-
-            let actionMatch = trimmedLine.match(actionRegex);
-            let thoughtMatch = trimmedLine.match(thoughtRegex);
-
-            if (actionMatch) {
-                actions.push('ACTION: ' + actionMatch[1].trim());
-            } else if (thoughtMatch) {
-                // 如果有多行心声，拼接起来
-                const content = thoughtMatch[1].trim();
-                if (thoughtContent) {
-                    thoughtContent += ' ' + content;
-                } else {
-                    thoughtContent = content;
+                        if (item.type === 'thought') {
+                            const t = item.content || '';
+                            thoughtContent = thoughtContent ? (thoughtContent + ' ' + t) : t;
+                        } else if (item.type === 'action') {
+                            // 转换 action 为旧的字符串格式以复用逻辑
+                            let actionStr = `ACTION: ${item.command}`;
+                            if (item.payload) {
+                                actionStr += `: ${item.payload}`;
+                            }
+                            actions.push(actionStr);
+                        } else if (item.type === 'text') {
+                            messagesList.push({ type: '消息', content: item.content });
+                        } else if (item.type === 'sticker') {
+                            messagesList.push({ type: '表情包', content: item.content });
+                        } else if (item.type === 'image') {
+                            messagesList.push({ type: '图片', content: item.content });
+                        } else if (item.type === 'voice') {
+                            const duration = item.duration || 3;
+                            const text = item.content || '语音消息';
+                            messagesList.push({ type: '语音', content: `${duration} ${text}` });
+                        } else {
+                            // 未知类型，当作文本
+                            if (item.content) messagesList.push({ type: '消息', content: item.content });
+                        }
+                    }
                 }
-                // 移除心声部分，剩下的如果还有内容则保留
-                let remaining = line.replace(thoughtMatch[0], '').trim();
-                if (remaining) {
-                    cleanLines.push(remaining);
-                }
-            } else {
-                cleanLines.push(line);
             }
+        } catch (e) {
+            console.warn('JSON parse failed, falling back to text parsing', e);
         }
 
-        replyContent = cleanLines.join('\n').trim();
+        if (!isJsonParsed) {
+            // 回退到原有的文本解析逻辑
+            let lines = replyContent.split('\n');
+            let cleanLines = [];
 
-        // 使用增强的解析函数
-        const messagesList = parseMixedContent(replyContent);
+            const actionRegex = /^[\s\*\-\>]*ACTION\s*[:：]\s*(.*)$/i;
+            const thoughtRegex = /\[心声\s*[:：]\s*(.*?)\]/i;
+
+            for (let line of lines) {
+                let trimmedLine = line.trim();
+                if (!trimmedLine) continue; 
+
+                let actionMatch = trimmedLine.match(actionRegex);
+                let thoughtMatch = trimmedLine.match(thoughtRegex);
+
+                if (actionMatch) {
+                    actions.push('ACTION: ' + actionMatch[1].trim());
+                } else if (thoughtMatch) {
+                    const content = thoughtMatch[1].trim();
+                    if (thoughtContent) {
+                        thoughtContent += ' ' + content;
+                    } else {
+                        thoughtContent = content;
+                    }
+                    let remaining = line.replace(thoughtMatch[0], '').trim();
+                    if (remaining) {
+                        cleanLines.push(remaining);
+                    }
+                } else {
+                    cleanLines.push(line);
+                }
+            }
+
+            replyContent = cleanLines.join('\n').trim();
+            messagesList.push(...parseMixedContent(replyContent));
+        }
 
         // 处理指令
         let imageToSend = null;
@@ -2879,46 +3011,148 @@ ${contact.showThought ? '- **强制执行**：请务必在回复的最后（所�
             const currentThought = (i === messagesList.length - 1) ? thoughtContent : null;
             const currentReplyTo = (i === 0) ? replyToObj : null;
 
-            if (msg.type === '消息') {
-                await typewriterEffect(msg.content, contact.avatar, currentThought, currentReplyTo, 'text');
-            } else if (msg.type === '表情包') {
-                // 尝试查找表情包 URL
-                let stickerUrl = null;
-                if (window.iphoneSimState.stickerCategories) {
-                    for (const cat of window.iphoneSimState.stickerCategories) {
-                        const found = cat.list.find(s => s.desc === msg.content || s.desc.includes(msg.content));
-                        if (found) {
-                            stickerUrl = found.url;
-                            break;
+            // 检查用户是否仍在当前聊天界面
+            const isChatOpen = !document.getElementById('chat-screen').classList.contains('hidden');
+            const isSameContact = window.iphoneSimState.currentChatContactId === contact.id;
+            const shouldShowInChat = isChatOpen && isSameContact;
+
+            if (shouldShowInChat) {
+                // 用户在聊天界面，使用打字机效果或直接发送
+                if (msg.type === '消息') {
+                    await typewriterEffect(msg.content, contact.avatar, currentThought, currentReplyTo, 'text');
+                } else if (msg.type === '表情包') {
+                    // 尝试查找表情包 URL
+                    let stickerUrl = null;
+                    if (window.iphoneSimState.stickerCategories) {
+                        let allowedIds = null;
+                        if (Array.isArray(contact.linkedStickerCategories)) allowedIds = contact.linkedStickerCategories;
+
+                        for (const cat of window.iphoneSimState.stickerCategories) {
+                            if (allowedIds !== null && !allowedIds.includes(cat.id)) continue;
+
+                            const found = cat.list.find(s => s.desc === msg.content || s.desc.includes(msg.content));
+                            if (found) {
+                                stickerUrl = found.url;
+                                break;
+                            }
                         }
                     }
+                    if (stickerUrl) {
+                        sendMessage(stickerUrl, false, 'sticker', msg.content);
+                    } else {
+                        // 找不到表情包，降级为文本
+                        await typewriterEffect(`[表情包: ${msg.content}]`, contact.avatar, currentThought, currentReplyTo, 'text');
+                    }
+                } else if (msg.type === '语音') {
+                    const parts = msg.content.match(/(\d+)\s+(.*)/);
+                    let duration = 3;
+                    let text = msg.content;
+                    if (parts) {
+                        duration = parseInt(parts[1]);
+                        text = parts[2];
+                    }
+                    const voiceData = {
+                        duration: duration,
+                        text: text,
+                        isReal: false
+                    };
+                    sendMessage(JSON.stringify(voiceData), false, 'voice');
+                } else if (msg.type === '图片') {
+                    const defaultImageUrl = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
+                    sendMessage(defaultImageUrl, false, 'virtual_image', msg.content);
+                } else if (msg.type === '旁白') {
+                    await typewriterEffect(msg.content, contact.avatar, null, null, 'description');
                 }
-                if (stickerUrl) {
-                    sendMessage(stickerUrl, false, 'sticker', msg.content);
-                } else {
-                    // 找不到表情包，降级为文本
-                    await typewriterEffect(`[表情包: ${msg.content}]`, contact.avatar, currentThought, currentReplyTo, 'text');
+            } else {
+                // 用户不在聊天界面，后台保存并弹窗
+                let contentToSave = msg.content;
+                let typeToSave = 'text';
+                
+                if (msg.type === '消息') {
+                    typeToSave = 'text';
+                } else if (msg.type === '表情包') {
+                    let stickerUrl = null;
+                    if (window.iphoneSimState.stickerCategories) {
+                        let allowedIds = null;
+                        if (Array.isArray(contact.linkedStickerCategories)) allowedIds = contact.linkedStickerCategories;
+
+                        for (const cat of window.iphoneSimState.stickerCategories) {
+                            if (allowedIds !== null && !allowedIds.includes(cat.id)) continue;
+
+                            const found = cat.list.find(s => s.desc === msg.content || s.desc.includes(msg.content));
+                            if (found) {
+                                stickerUrl = found.url;
+                                break;
+                            }
+                        }
+                    }
+                    if (stickerUrl) {
+                        contentToSave = stickerUrl;
+                        typeToSave = 'sticker';
+                    } else {
+                        contentToSave = `[表情包: ${msg.content}]`;
+                        typeToSave = 'text';
+                    }
+                } else if (msg.type === '语音') {
+                    const parts = msg.content.match(/(\d+)\s+(.*)/);
+                    let duration = 3;
+                    let text = msg.content;
+                    if (parts) {
+                        duration = parseInt(parts[1]);
+                        text = parts[2];
+                    }
+                    const voiceData = {
+                        duration: duration,
+                        text: text,
+                        isReal: false
+                    };
+                    contentToSave = JSON.stringify(voiceData);
+                    typeToSave = 'voice';
+                } else if (msg.type === '图片') {
+                    contentToSave = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
+                    typeToSave = 'virtual_image';
+                } else if (msg.type === '旁白') {
+                    typeToSave = 'description';
                 }
-            } else if (msg.type === '语音') {
-                // 解析秒数和内容: "5 哈哈"
-                const parts = msg.content.match(/(\d+)\s+(.*)/);
-                let duration = 3;
-                let text = msg.content;
-                if (parts) {
-                    duration = parseInt(parts[1]);
-                    text = parts[2];
+
+                // 保存到历史记录
+                if (!window.iphoneSimState.chatHistory[contact.id]) {
+                    window.iphoneSimState.chatHistory[contact.id] = [];
                 }
-                const voiceData = {
-                    duration: duration,
-                    text: text,
-                    isReal: false
+                
+                const msgData = {
+                    id: Date.now() + Math.random().toString(36).substr(2, 9),
+                    time: Date.now(),
+                    role: 'assistant',
+                    content: contentToSave,
+                    type: typeToSave,
+                    replyTo: currentReplyTo
                 };
-                sendMessage(JSON.stringify(voiceData), false, 'voice');
-            } else if (msg.type === '图片') {
-                const defaultImageUrl = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
-                sendMessage(defaultImageUrl, false, 'virtual_image', msg.content);
-            } else if (msg.type === '旁白') {
-                await typewriterEffect(msg.content, contact.avatar, null, null, 'description');
+                
+                if (currentThought) {
+                    msgData.thought = currentThought;
+                }
+                
+                if (msg.type === '图片' || msg.type === 'sticker') {
+                    msgData.description = msg.content; // 保存描述
+                }
+
+                window.iphoneSimState.chatHistory[contact.id].push(msgData);
+                saveConfig();
+                
+                // 触发通知
+                let notificationText = contentToSave;
+                if (typeToSave === 'sticker') notificationText = '[表情包]';
+                if (typeToSave === 'virtual_image' || typeToSave === 'image') notificationText = '[图片]';
+                if (typeToSave === 'voice') notificationText = '[语音]';
+                
+                showChatNotification(contact.id, notificationText);
+                
+                // 刷新联系人列表以更新预览
+                if (window.renderContactList) {
+                    // 只有当联系人列表可见时才刷新，或者强制刷新
+                    window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
+                }
             }
 
             // 模拟间隔
@@ -6335,7 +6569,7 @@ function setupChatListeners() {
     }
 
     if (triggerAiReplyBtn) {
-        triggerAiReplyBtn.addEventListener('click', generateAiReply);
+        triggerAiReplyBtn.addEventListener('click', () => generateAiReply());
     }
 
     const chatMoreBtn = document.getElementById('chat-more-btn');
@@ -6343,6 +6577,23 @@ function setupChatListeners() {
     const stickerBtn = document.getElementById('sticker-btn');
     const stickerPanel = document.getElementById('sticker-panel');
     const chatInputArea = document.querySelector('.chat-input-area');
+    
+    // 分页相关元素
+    const chatMorePages = document.getElementById('chat-more-pages');
+    const chatMoreIndicators = document.querySelectorAll('.chat-more-dot');
+
+    if (chatMorePages) {
+        chatMorePages.addEventListener('scroll', () => {
+            const pageIndex = Math.round(chatMorePages.scrollLeft / chatMorePages.clientWidth);
+            chatMoreIndicators.forEach((dot, index) => {
+                if (index === pageIndex) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        });
+    }
     
     function closeAllPanels() {
         if (chatMorePanel) chatMorePanel.classList.remove('slide-in');
@@ -6362,6 +6613,9 @@ function setupChatListeners() {
             } else {
                 if (stickerPanel) stickerPanel.classList.remove('slide-in');
                 chatMorePanel.classList.add('slide-in');
+                // 重置到第一页
+                if (chatMorePages) chatMorePages.scrollLeft = 0;
+                
                 if (chatInputArea) {
                     chatInputArea.classList.remove('push-up');
                     chatInputArea.classList.add('push-up-more');
@@ -6372,6 +6626,21 @@ function setupChatListeners() {
 
         chatMorePanel.querySelectorAll('.more-item').forEach(item => {
             item.addEventListener('click', (e) => {
+                // 让TA发消息
+                if (item.id === 'chat-more-continue-btn') {
+                    e.stopPropagation();
+                    closeAllPanels();
+                    generateAiReply("用户没有回复。请继续当前的对话，或者开启一个新的话题。你可以假设已经过了一段时间。");
+                    return;
+                }
+
+                // 如果是第二页的新按钮，也需要处理
+                if (item.id === 'chat-more-favorites-btn') {
+                    // 已在 HTML 中 onclick 处理，这里不需要阻止
+                    closeAllPanels();
+                    return;
+                }
+
                 if (item.id === 'chat-more-photo-btn' || item.id === 'chat-more-camera-btn' || item.id === 'chat-more-transfer-btn' || item.id === 'chat-more-memory-btn' || item.id === 'chat-more-location-btn' || item.id === 'chat-more-regenerate-btn' || item.id === 'chat-more-voice-btn' || item.id === 'chat-more-video-call-btn') return;
                 
                 e.stopPropagation();

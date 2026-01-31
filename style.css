@@ -75,6 +75,83 @@
     color: #34C759;
 }
 
+/* Chat Notification Banner (New Message Popup) */
+.chat-notification-banner {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 2000; /* Highest priority */
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transform: translateY(0);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.chat-notification-banner.hidden {
+    transform: translateY(-150%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-notification-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chat-notification-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.chat-notification-info {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.chat-notification-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-notification-message {
+    font-size: 13px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-notification-handle {
+    width: 36px;
+    height: 4px;
+    background-color: #e5e5ea;
+    border-radius: 2px;
+    align-self: center;
+    margin-top: 8px;
+    opacity: 0.8;
+}
+
 
 /* Thought Bubble */
 .thought-bubble {
@@ -1727,12 +1804,10 @@ textarea {
     height: 300px; /* 固定高度 */
     background-color: #f7f7f7;
     border-top: 1px solid #dcdcdc;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
     z-index: 90; /* 低于输入框 */
-    overflow-y: auto;
     transform: translateY(100%); /* 初始隐藏在底部 */
     transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.25s;
     visibility: hidden;
@@ -1747,7 +1822,55 @@ textarea {
 
 /* 覆盖 hidden 类，防止 display:none 破坏动画 */
 .chat-more-panel.hidden {
-    display: grid !important;
+    display: flex !important;
+}
+
+.chat-more-pages {
+    display: flex;
+    width: 100%;
+    flex: 1;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.chat-more-pages::-webkit-scrollbar {
+    display: none;
+}
+
+.chat-more-page {
+    min-width: 100%;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 80px); /* 固定两行高度 */
+    gap: 15px; /* 间距 */
+    scroll-snap-align: start;
+    align-content: start;
+}
+
+.chat-more-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    height: 20px;
+}
+
+.chat-more-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #d1d1d6;
+    transition: background-color 0.3s;
+}
+
+.chat-more-dot.active {
+    background-color: #8e8e93;
 }
 
 .more-item {

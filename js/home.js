@@ -25,6 +25,7 @@ let homeScreenData = [
     { index: 8, type: 'dom-element', elementId: 'polaroid-widget', size: '2x2' },
     
     // 其他 App (放在第4行: Index 12-15)
+    { index: 24, type: 'app', name: 'icity', iconClass: 'fas fa-book', color: '#333', appId: 'icity-app' },
     { index: 10, type: 'app', name: '微信', iconClass: 'fab fa-weixin', color: '#07C160', appId: 'wechat-app' },
     { index: 11, type: 'app', name: '世界书', iconClass: 'fas fa-globe', color: '#007AFF', appId: 'worldbook-app' },
     { index: 14, type: 'app', name: '设置', iconClass: 'fas fa-cog', color: '#8E8E93', appId: 'settings-app' },
@@ -73,6 +74,19 @@ function initGrid() {
 
     // 尝试读取存档
     loadLayout();
+
+    // 强制添加 icity 应用 (如果不存在)
+    if (!homeScreenData.some(item => item.appId === 'icity-app')) {
+        homeScreenData.push({ 
+            index: 24, 
+            type: 'app', 
+            name: 'icity', 
+            iconClass: 'fas fa-book', 
+            color: '#333', 
+            appId: 'icity-app',
+            _internalId: generateId()
+        });
+    }
     
     // 计算需要的总页数
     calculateTotalPages();
@@ -86,6 +100,42 @@ function initGrid() {
     
     // 初始化滚动监听
     initScrollListener();
+
+    // 检查布局更新
+    checkAndShowUpdateModal();
+}
+
+function checkAndShowUpdateModal() {
+    const currentVersion = '1.2'; // 布局版本号
+    const savedVersion = localStorage.getItem('layout_version');
+    
+    // 如果没有版本号或者版本号不匹配，显示弹窗
+    if (savedVersion !== currentVersion) {
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        
+        const content = document.createElement('div');
+        content.style.cssText = 'background: #fff; width: 85%; max-width: 320px; padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);';
+        
+        content.innerHTML = `
+            <div style="font-size: 40px; margin-bottom: 15px;">📱</div>
+            <h3 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 600;">系统布局更新</h3>
+            <p style="margin: 0 0 20px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                桌面布局已更新（iCity 移至第二页）。<br>
+                请点击下方按钮恢复默认布局以生效。
+            </p>
+            <button id="confirm-reset-layout" style="width: 100%; padding: 12px; background: #007AFF; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;">恢复默认布局并进入</button>
+        `;
+        
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+        
+        document.getElementById('confirm-reset-layout').onclick = () => {
+            localStorage.removeItem('myIOS_HomeScreen');
+            localStorage.setItem('layout_version', currentVersion);
+            location.reload();
+        };
+    }
 }
 
 function calculateTotalPages() {

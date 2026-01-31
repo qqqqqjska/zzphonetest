@@ -29,9 +29,22 @@
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="chat_tail_style.css">
 </head>
 <body>
     <div class="screen-container" id="screen-container">
+        <!-- 消息通知横幅 -->
+        <div id="chat-notification" class="chat-notification-banner hidden" onclick="window.handleNotificationClick()">
+            <div class="chat-notification-content">
+                <img id="chat-notification-avatar" src="" class="chat-notification-avatar">
+                <div class="chat-notification-info">
+                    <div id="chat-notification-title" class="chat-notification-title"></div>
+                    <div id="chat-notification-message" class="chat-notification-message"></div>
+                </div>
+            </div>
+            <div class="chat-notification-handle"></div>
+        </div>
+
         <!-- 总结通知横幅 -->
         <div id="summary-notification" class="notification-banner hidden">
             <i class="fas fa-spinner fa-spin"></i>
@@ -1062,39 +1075,61 @@
                 
                 <!-- 更多功能面板 -->
                 <div id="chat-more-panel" class="chat-more-panel hidden">
-                    <div class="more-item" id="chat-more-regenerate-btn">
-                        <div class="more-icon"><i class="fas fa-redo"></i></div>
-                        <div class="more-label">重回</div>
+                    <div class="chat-more-pages" id="chat-more-pages">
+                        <!-- 第一页 -->
+                        <div class="chat-more-page">
+                            <div class="more-item" id="chat-more-regenerate-btn">
+                                <div class="more-icon"><i class="fas fa-redo"></i></div>
+                                <div class="more-label">重回</div>
+                            </div>
+                            <div class="more-item" id="chat-more-photo-btn">
+                                <div class="more-icon"><i class="fas fa-image"></i></div>
+                                <div class="more-label">照片</div>
+                            </div>
+                            <div class="more-item" id="chat-more-camera-btn">
+                                <div class="more-icon"><i class="fas fa-camera"></i></div>
+                                <div class="more-label">拍摄</div>
+                            </div>
+                            <div class="more-item" id="chat-more-video-call-btn">
+                                <div class="more-icon"><i class="fas fa-video"></i></div>
+                                <div class="more-label">视频通话</div>
+                            </div>
+                            <div class="more-item" id="chat-more-location-btn">
+                                <div class="more-icon"><i class="fas fa-map-marker-alt"></i></div>
+                                <div class="more-label">位置</div>
+                            </div>
+                            <div class="more-item" id="chat-more-memory-btn">
+                                <div class="more-icon"><i class="fas fa-brain"></i></div>
+                                <div class="more-label">记忆</div>
+                            </div>
+                            <div class="more-item" id="chat-more-transfer-btn">
+                                <div class="more-icon"><i class="fas fa-exchange-alt"></i></div>
+                                <div class="more-label">转账</div>
+                            </div>
+                            <div class="more-item" id="chat-more-voice-btn">
+                                <div class="more-icon"><i class="fas fa-microphone"></i></div>
+                                <div class="more-label">语音输入</div>
+                            </div>
+                        </div>
+                        <!-- 第二页 -->
+                        <div class="chat-more-page">
+                            <div class="more-item" id="chat-more-continue-btn">
+                                <div class="more-icon"><i class="fas fa-comment-dots"></i></div>
+                                <div class="more-label">让TA发消息</div>
+                            </div>
+                            <div class="more-item" id="chat-more-favorites-btn" onclick="alert('收藏功能开发中...')">
+                                <div class="more-icon"><i class="fas fa-cube"></i></div>
+                                <div class="more-label">收藏</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="more-item" id="chat-more-photo-btn">
-                        <div class="more-icon"><i class="fas fa-image"></i></div>
-                        <div class="more-label">照片</div>
+                    
+                    <div class="chat-more-indicators" id="chat-more-indicators">
+                        <div class="chat-more-dot active"></div>
+                        <div class="chat-more-dot"></div>
                     </div>
+                    
                     <input type="file" id="chat-photo-input" accept="image/*" class="file-input-hidden">
-                    <div class="more-item" id="chat-more-camera-btn">
-                        <div class="more-icon"><i class="fas fa-camera"></i></div>
-                        <div class="more-label">拍摄</div>
-                    </div>
-                    <div class="more-item" id="chat-more-video-call-btn">
-                        <div class="more-icon"><i class="fas fa-video"></i></div>
-                        <div class="more-label">视频通话</div>
-                    </div>
-                    <div class="more-item" id="chat-more-location-btn">
-                        <div class="more-icon"><i class="fas fa-map-marker-alt"></i></div>
-                        <div class="more-label">位置</div>
-                    </div>
-                    <div class="more-item" id="chat-more-memory-btn">
-                        <div class="more-icon"><i class="fas fa-brain"></i></div>
-                        <div class="more-label">记忆</div>
-                    </div>
-                    <div class="more-item" id="chat-more-transfer-btn">
-                        <div class="more-icon"><i class="fas fa-exchange-alt"></i></div>
-                        <div class="more-label">转账</div>
-                    </div>
-                    <div class="more-item" id="chat-more-voice-btn">
-                        <div class="more-icon"><i class="fas fa-microphone"></i></div>
-                        <div class="more-label">语音输入</div>
-                    </div>
                 </div>
             </div>
 
@@ -2456,6 +2491,389 @@
         </div>
     </div>
 
+    <!-- icity App -->
+    <div id="icity-app" class="app-screen hidden" style="background-color: #f2f2f7;">
+        
+        <!-- Tab 1: Profile (Current Content) -->
+        <div id="icity-tab-content-profile" class="icity-tab-content" style="display: none; height: 100%;">
+            <div class="app-header" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 10; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; justify-content: space-between; padding-left: 10px; padding-right: 10px; padding-top: max(10px, env(safe-area-inset-top)); pointer-events: none;">
+                 <button id="close-icity-app" class="icon-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); pointer-events: auto;"><i class="fas fa-cog"></i></button>
+                 <div style="flex: 1;"></div>
+                 <button class="icon-btn" style="color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); pointer-events: auto;"><i class="fas fa-paper-plane"></i></button>
+            </div>
+
+            <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto; background-color: #fff; height: 100%;">
+                 <!-- Header BG -->
+                 <div id="icity-bg-trigger" style="height: 280px; background-color: #eee; background-size: cover; background-position: center; position: relative; cursor: pointer;">
+                 </div>
+                 
+                 <!-- Content -->
+                 <div style="background: #fff; position: relative; border-radius: 20px 20px 0 0; padding-bottom: 20px; min-height: 500px; margin-top: 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.05);">
+                     <div style="display: flex; flex-direction: column; align-items: center; transform: translateY(-100px); margin-bottom: -70px;">
+                         <!-- Avatar -->
+                         <div id="icity-avatar-trigger" style="width: 130px; height: 130px; background: #000; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); background-size: cover; background-position: center; cursor: pointer;"></div>
+                         
+                         <!-- Name etc -->
+                         <div style="margin-top: 10px; text-align: center;">
+                             <div style="font-size: 24px; font-weight: bold;">Kaneki</div>
+                             <div style="color: #999; font-size: 14px;">@heanova1</div>
+                             <div style="display: flex; gap: 10px; margin-top: 10px; justify-content: center;">
+                                 <span id="icity-titles-btn" style="background: #f0f0f0; color: #666; font-size: 12px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">+ 我的市民称号</span>
+                                 <span id="icity-badges-btn" style="background: #f0f0f0; color: #666; font-size: 12px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">
+                                    <span id="icity-equipped-badge-icon"></span>
+                                    <span id="icity-equipped-badge-name">+ 勋章</span>
+                                 </span>
+                             </div>
+                             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: center;">
+                             <button id="icity-edit-profile-btn" style="border: 1px solid #ddd; background: #fff; padding: 8px 15px; border-radius: 4px; display: flex; align-items: center; gap: 5px; color: #666;"><i class="fas fa-pen"></i> 修改资料</button>
+                             <button style="border: 1px solid #ddd; background: #fff; padding: 8px 15px; border-radius: 4px; display: flex; align-items: center; gap: 5px; color: #666;"><i class="fas fa-comment"></i> 私信</button>
+                             <button id="icity-settings-btn" style="border: 1px solid #ddd; background: #fff; padding: 8px; border-radius: 4px; color: #666;"><i class="fas fa-cog"></i></button>
+                         </div>
+                     </div>
+                 </div>
+                     
+                     <div style="display: flex; justify-content: center; gap: 20px; margin-top: -20px; border-top: 1px solid #f0f0f0; padding-top: 15px;">
+                         <div style="font-size: 14px; color: #999;"><span id="icity-followers-count" style="color: #007AFF; font-size: 16px; font-weight: bold;">0</span> 关注者</div>
+                         <div style="font-size: 14px; color: #999;"><span id="icity-friends-count" style="color: #007AFF; font-size: 16px; font-weight: bold;">0</span> 朋友</div>
+                         <div style="font-size: 14px; color: #999;"><span id="icity-diary-count" style="color: #007AFF; font-size: 16px; font-weight: bold;">0</span> 日记</div>
+                         <div style="font-size: 14px; color: #999;"><span id="icity-likes-count" style="color: #007AFF; font-size: 16px; font-weight: bold;">0</span> 被喜欢</div>
+                     </div>
+
+                     <div class="icity-menu-list" style="padding: 0 20px;">
+                        <div id="open-icity-calendar" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer;">
+                            <span style="font-size: 16px; font-weight: bold;">我的日历</span>
+                            <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                        </div>
+                     </div>
+
+                     <div class="icity-diary-list" style="padding: 15px; background: #fff; margin-top: 10px;">
+                     </div>
+                 </div>
+                 
+                 <!-- Inputs -->
+                 <input type="file" id="icity-bg-input" accept="image/*" class="file-input-hidden">
+                 <input type="file" id="icity-avatar-input" accept="image/*" class="file-input-hidden">
+            </div>
+        </div>
+
+        <!-- Tab 2: World (New) -->
+        <div id="icity-tab-content-world" class="icity-tab-content" style="display: block; height: 100%;">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #eee; justify-content: center; padding-top: max(10px, env(safe-area-inset-top));">
+                <div style="display: flex; gap: 20px; font-size: 16px;">
+                    <span id="icity-header-world" style="font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; cursor: pointer;">世界</span>
+                    <span id="icity-header-friends" style="color: #999; cursor: pointer;">朋友</span>
+                    <span style="color: #999;">@ 通知</span>
+                    <span style="color: #999;">♡ 喜欢</span>
+                </div>
+                <button id="icity-world-generate-btn" style="position: absolute; right: 15px; background: none; border: none; color: #007AFF; font-size: 16px;"><i class="fas fa-magic"></i></button>
+            </div>
+            
+            <div class="app-body" id="icity-world-list" style="padding: 0; padding-bottom: 60px; overflow-y: auto; background-color: #fff; flex: 1;">
+                <!-- World content will be generated here -->
+                <div style="text-align: center; padding: 50px; color: #999;">
+                    点击右上角生成动态
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Messages -->
+        <div id="icity-tab-content-messages" class="icity-tab-content" style="display: none; height: 100%; flex-direction: column;">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: center; position: relative;">
+                <div style="display: flex; background: #f0f0f0; border-radius: 8px; padding: 2px;">
+                    <div style="padding: 4px 15px; font-size: 14px; color: #666; cursor: pointer;">通讯录</div>
+                    <div style="padding: 4px 15px; font-size: 14px; font-weight: bold; background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;">私信</div>
+                </div>
+                <button style="position: absolute; right: 15px; background: none; border: none; font-size: 20px; color: #666;"><i class="far fa-plus-square"></i></button>
+            </div>
+            
+            <div class="app-body" id="icity-messages-list" style="padding: 0; padding-bottom: 60px; overflow-y: auto; background-color: #fff; flex: 1;">
+                <!-- Messages list will be generated here -->
+                <div class="empty-state" id="icity-messages-empty" style="text-align: center; padding: 50px; color: #999; display: none;">
+                    暂无私信
+                </div>
+            </div>
+        </div>
+
+        <div class="icity-tab-bar" style="position: absolute; bottom: 0; width: 100%; height: 50px; background: #fff; border-top: 1px solid #eee; display: flex; align-items: center; justify-content: space-around; padding-bottom: env(safe-area-inset-bottom); z-index: 20;">
+            <button class="icon-btn" style="color: #ccc;"><i class="fas fa-book"></i></button>
+            <button class="icon-btn" id="icity-nav-world" style="color: #000;"><i class="fas fa-globe"></i></button>
+            <div id="icity-nav-compose" style="width: 40px; height: 40px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #007AFF; cursor: pointer;"><i class="fas fa-pen-nib"></i></div>
+            <button class="icon-btn" id="icity-nav-messages" style="color: #ccc;"><i class="far fa-comment"></i></button>
+            <div id="icity-tab-me" style="width: 24px; height: 24px; background: #000; border-radius: 50%; border: 2px solid #007AFF; background-size: cover; background-position: center; cursor: pointer;"></div>
+        </div>
+    </div>
+
+    <!-- icity Compose Modal -->
+    <div id="icity-compose-modal" class="app-screen hidden" style="z-index: 200; background-color: #fff;">
+        <div style="padding: 47px 15px 10px; padding-top: max(47px, env(safe-area-inset-top)); display: flex; align-items: center; border-bottom: 1px solid #f0f0f0;">
+            <div id="icity-compose-avatar" style="width: 36px; height: 36px; background: #000; border-radius: 50%; margin-right: 10px; background-size: cover; background-position: center;"></div>
+            <input type="text" placeholder="标题 (可选)" style="flex: 1; border: none; font-size: 16px; outline: none; background: transparent; color: #000;">
+            <button id="close-icity-compose" style="background: none; border: none; font-size: 24px; color: #ccc; cursor: pointer;">&times;</button>
+        </div>
+        <textarea id="icity-compose-text" style="width: 100%; flex: 1; border: none; padding: 15px; font-size: 16px; resize: none; outline: none; background: transparent; color: #000;" placeholder="写点什么吧"></textarea>
+        
+        <!-- Footer -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-top: 1px solid #f0f0f0; padding-bottom: max(10px, env(safe-area-inset-bottom));">
+            <div style="display: flex; gap: 20px; color: #007AFF; font-size: 22px;">
+                <i class="fas fa-camera"></i>
+                <i class="fas fa-map-marker-alt"></i>
+                <i class="fas fa-mobile-alt"></i>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                 <div style="position: relative;">
+                     <div id="icity-visibility-menu" class="hidden" style="position: absolute; bottom: 45px; right: 0; background: #fff; box-shadow: 0 2px 15px rgba(0,0,0,0.15); border-radius: 8px; padding: 5px; width: 100px; display: flex; flex-direction: column; gap: 2px;">
+                         <div class="icity-vis-item" data-val="public" style="padding: 8px; font-size: 14px; border-radius: 4px; cursor: pointer; color: #666; display: flex; align-items: center; gap: 8px;"><i class="fas fa-globe"></i> 公开</div>
+                         <div class="icity-vis-item" data-val="friends" style="padding: 8px; font-size: 14px; border-radius: 4px; cursor: pointer; color: #666; display: flex; align-items: center; gap: 8px;"><i class="fas fa-user-friends"></i> 仅好友</div>
+                         <div class="icity-vis-item active" data-val="private" style="padding: 8px; font-size: 14px; border-radius: 4px; cursor: pointer; background-color: #007AFF; color: #fff; display: flex; align-items: center; gap: 8px;"><i class="fas fa-lock"></i> 私密</div>
+                     </div>
+                     <button id="icity-visibility-btn" style="background: none; border: none; color: #666; font-size: 14px; display: flex; align-items: center; gap: 5px; padding: 6px 10px; background: #f0f0f0; border-radius: 4px; cursor: pointer;">
+                         <i class="fas fa-lock"></i> <span>私密</span>
+                     </button>
+                 </div>
+                 <button id="icity-send-btn" style="background: #4CD964; color: #fff; border: none; padding: 6px 15px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer;">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity All Diaries Screen -->
+    <div id="icity-all-diaries-screen" class="app-screen hidden" style="background-color: #f2f2f7; z-index: 210;">
+        <div class="app-header" style="background: #fff; border-bottom: none;">
+            <button class="back-btn" id="close-icity-all-diaries"><i class="fas fa-chevron-left"></i></button>
+            <div style="flex: 1; text-align: center; font-weight: bold; font-size: 17px;" id="icity-all-diaries-title">
+                Kaneki · 日记
+            </div>
+            <div style="width: 60px;"></div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="icity-diary-tabs" style="display: flex; justify-content: space-around; border-bottom: 1px solid #f0f0f0; padding: 10px 0; font-size: 14px; background: #fff;">
+            <div class="icity-diary-tab active" data-tab="all" style="font-weight: bold; color: #fff; padding: 5px 15px; border-radius: 15px; background: #7C9BF8;">全部</div>
+            <div class="icity-diary-tab" data-tab="public" style="color: #999; padding: 5px 15px;">公开</div>
+            <div class="icity-diary-tab" data-tab="friends" style="color: #999; padding: 5px 15px;">仅好友</div>
+            <div class="icity-diary-tab" data-tab="private" style="color: #999; padding: 5px 15px;">私密</div>
+            <div class="icity-diary-tab" data-tab="archived" style="color: #999; padding: 5px 15px;">已封存</div>
+        </div>
+
+        <div class="app-body" style="padding: 0; padding-bottom: 20px; overflow-y: auto;">
+            <div id="icity-all-diaries-list" style="padding: 0;">
+                <!-- Full diary list here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Edit Profile Screen -->
+    <div id="icity-edit-profile-screen" class="app-screen hidden" style="background-color: #f2f2f7; z-index: 220;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #eee;">
+            <button class="back-btn" id="close-icity-edit-profile"><i class="fas fa-chevron-left"></i></button>
+            <h3 style="flex: 1; text-align: center;">编辑资料</h3>
+            <button class="wechat-icon-btn" id="save-icity-profile-btn" style="width: auto; font-size: 16px; color: #007AFF; font-weight: bold;">保存</button>
+        </div>
+        <div class="app-body" style="padding: 20px;">
+            <div class="ios-list-group">
+                <div class="list-item">
+                    <div class="list-content column">
+                        <label>昵称</label>
+                        <input type="text" id="icity-edit-nickname" placeholder="Kaneki" value="Kaneki" style="width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                </div>
+                <div class="list-item">
+                    <div class="list-content column">
+                        <label>ID</label>
+                        <input type="text" id="icity-edit-id" placeholder="@heanova1" value="@heanova1" style="width: 100%; margin-top: 5px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Calendar Screen -->
+    <div id="icity-calendar-screen" class="app-screen hidden" style="background-color: #fff; z-index: 250;">
+        <div class="app-header" style="background: #fff; border-bottom: none;">
+            <button class="back-btn" id="close-icity-calendar"><i class="fas fa-chevron-left"></i></button>
+            <div style="flex: 1; text-align: center; font-weight: bold; font-size: 17px;">
+                我的日历 · Calendar
+            </div>
+            <div style="width: 60px;"></div>
+        </div>
+        
+        <div class="app-body" style="padding: 0; overflow-y: auto;">
+            <!-- Year Selector -->
+            <div id="icity-calendar-years" style="display: flex; justify-content: center; gap: 20px; padding: 10px 0; font-size: 16px; color: #ccc; font-weight: bold; position: sticky; top: 0; background: #fff; z-index: 10;">
+                <!-- JS Generated -->
+            </div>
+
+            <div style="padding: 20px;">
+                <!-- Stats Card -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 16px; color: #666; margin-bottom: 5px;">记录 <span id="icity-calendar-days" style="color: #000; font-weight: bold; font-size: 20px;">0</span> 天</div>
+                        <div style="font-size: 16px; color: #666;">写下 <span id="icity-calendar-count" style="color: #000; font-weight: bold; font-size: 20px;">0</span> 篇日记</div>
+                    </div>
+                </div>
+
+                <!-- Heatmap -->
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <div style="display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: #999; padding-top: 2px; height: 120px;">
+                        <span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span>
+                        <span>7月</span><span>8月</span><span>9月</span><span>10月</span><span>11月</span><span>12月</span>
+                    </div>
+<div id="icity-calendar-heatmap" style="flex: 1; display: grid; grid-template-rows: repeat(12, 1fr); grid-template-columns: repeat(31, 1fr); gap: 2px;">
+                        <!-- Grid cells -->
+                    </div>
+                </div>
+
+                <!-- Monthly List -->
+                <div id="icity-calendar-months">
+                    <!-- JS generated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Settings Modal -->
+    <div id="icity-settings-modal" class="modal hidden" style="z-index: 230;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>设置</h3>
+                <button class="close-btn" id="close-icity-settings-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>关联联系人 (用于朋友页生成动态)</label>
+                    <div id="icity-link-contacts-container" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 5px;">
+                        <!-- Checkboxes generated by JS -->
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>关联世界书 (用于生成动态)</label>
+                    <select id="icity-link-wb" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background-color: #f9f9f9;">
+                        <option value="">-- 选择世界书 --</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label>联系人 iCity 设定</label>
+                    <div id="icity-contact-customization-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 10px; background: #f9f9f9;">
+                        <div style="text-align: center; color: #999; font-size: 12px;">请先勾选上方联系人</div>
+                    </div>
+                </div>
+
+                <button id="save-icity-settings-btn" class="ios-btn-block">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Badges Screen -->
+    <div id="icity-badges-screen" class="app-screen hidden" style="background-color: #fff; z-index: 220;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0;">
+            <button class="back-btn" id="close-icity-badges"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>我的勋章</h3>
+            <div style="width: 60px;"></div>
+        </div>
+        <div class="app-body" style="padding: 20px; overflow-y: auto;">
+            <div style="margin-bottom: 20px; font-size: 14px; color: #666;">
+                已获得: <span id="icity-badges-count" style="font-weight: bold; color: #000;">0</span> / <span id="icity-badges-total" style="font-weight: bold;">0</span>
+            </div>
+            <div id="icity-badges-list" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center;">
+                <!-- Badges will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Titles Screen -->
+    <div id="icity-titles-screen" class="app-screen hidden" style="background-color: #fff; z-index: 220;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0;">
+            <button class="back-btn" id="close-icity-titles"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>我的称号</h3>
+            <div style="width: 60px;"></div>
+        </div>
+        <div class="app-body" style="padding: 20px; overflow-y: auto;">
+            <div id="icity-titles-list" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start;">
+                <!-- Titles will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Detail Screen -->
+    <div id="icity-detail-screen" class="app-screen hidden" style="background-color: #fff; z-index: 230;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0;">
+            <button class="back-btn" id="close-icity-detail"><i class="fas fa-chevron-left"></i></button>
+            <div style="flex: 1; text-align: center; font-weight: bold; font-size: 17px;" id="icity-detail-title">
+                Kaneki · 日记
+            </div>
+            <div style="width: 60px;"></div>
+        </div>
+        <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto;">
+            <!-- Content Container -->
+            <div id="icity-detail-content" style="padding: 20px;">
+                <!-- User Info -->
+                <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                    <div id="icity-detail-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: #000; margin-right: 10px; background-size: cover; background-position: center;"></div>
+                    <div>
+                        <div id="icity-detail-name" style="font-weight: bold; font-size: 16px;">Kaneki</div>
+                        <div id="icity-detail-handle" style="font-size: 12px; color: #999;">@heanova1</div>
+                    </div>
+                </div>
+                
+                <!-- Text -->
+                <div id="icity-detail-text" style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap;"></div>
+                
+                <!-- Meta -->
+                <div style="display: flex; justify-content: space-between; color: #ccc; font-size: 12px; margin-bottom: 15px;">
+                    <span id="icity-detail-time">2025-08-23 02:24</span>
+                    <span id="icity-detail-visibility"><i class="fas fa-lock"></i> 私密</span>
+                </div>
+                
+                <!-- Action Bar -->
+                <div style="display: flex; justify-content: space-around; border-top: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; padding: 10px 0; color: #666; font-size: 14px;">
+                    <div style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><i class="far fa-heart"></i> 喜欢</div>
+                    <div style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><i class="far fa-comment-alt"></i> 小纸条</div>
+                    <div style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><i class="far fa-image"></i> 存为图片</div>
+                    <div style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><i class="fas fa-ellipsis-h"></i></div>
+                </div>
+                
+                <!-- Comments Section -->
+                <div style="margin-top: 15px;">
+                    <div style="font-size: 14px; color: #999; margin-bottom: 15px;" id="icity-detail-comments-count">0 条评论 <i class="fas fa-chevron-down"></i></div>
+                    <div id="icity-detail-comments-list">
+                        <!-- Comments will go here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Input Bar -->
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; background: #fff; border-top: 1px solid #f0f0f0; padding-bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="icity-comment-input" placeholder="我要评论" style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; font-size: 14px; outline: none;">
+            <button id="icity-comment-send-btn" style="background: #4CD964; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-size: 14px; cursor: pointer;"><i class="fas fa-paper-plane"></i> 发送</button>
+        </div>
+    </div>
+
+    <!-- iCity Message Detail Screen -->
+    <div id="icity-message-detail-screen" class="app-screen hidden" style="background-color: #fff; z-index: 240; display: flex; flex-direction: column;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0;">
+            <button class="back-btn" id="close-icity-message-detail"><i class="fas fa-chevron-left"></i></button>
+            <div style="flex: 1; text-align: center;">
+                <div style="font-weight: bold; font-size: 16px;" id="icity-message-detail-name">iCity 市政厅</div>
+                <div style="font-size: 10px; color: #999;" id="icity-message-detail-handle">@icity</div>
+            </div>
+            <button class="icon-btn" style="color: #ccc;"><i class="fas fa-ellipsis-h"></i></button>
+        </div>
+        
+        <div class="app-body" id="icity-message-detail-body" style="padding: 15px; padding-bottom: 60px; overflow-y: auto; flex: 1; display: flex; flex-direction: column;">
+            <!-- Messages Container -->
+            <div id="icity-message-detail-list">
+                <!-- Messages will be injected here -->
+            </div>
+        </div>
+        
+        <!-- Bottom Input Bar -->
+        <div style="background: #fff; padding: 10px 15px; border-top: 1px solid #f0f0f0; padding-bottom: max(10px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+            <input type="text" id="icity-message-input" style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; font-size: 14px; outline: none;">
+            <button id="icity-message-send-btn" style="background: #4CD964; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-size: 14px; cursor: pointer;"><i class="fas fa-paper-plane"></i> 发送</button>
+        </div>
+    </div>
+
     <!-- 查手机 - 浏览器 -->
     <div id="phone-browser" class="sub-screen hidden" style="z-index: 200; background-color: #fff; display: flex; flex-direction: column;">
         <!-- 顶部导航栏 -->
@@ -3051,6 +3469,7 @@
     <script src="js/worldbook.js"></script>
     <script src="js/meeting.js"></script>
     <script src="js/apps.js"></script>
+    <script src="js/icity.js"></script>
     <script src="js/home.js"></script>
     <script src="js/check_phone.js"></script>
     <script src="js/chat.js"></script>

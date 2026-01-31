@@ -57,8 +57,23 @@ function extractValidJson(content) {
     
     let extractedJson = '';
     
-    // 优先尝试提取对象格式
-    if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+    // 判断JSON类型：看大括号还是方括号在前面
+    let isObject = false;
+    let isArray = false;
+
+    if (firstBrace !== -1) {
+        if (firstBracket === -1 || firstBrace < firstBracket) {
+            isObject = true;
+        }
+    }
+    
+    // 如果没有判定为对象，且存在方括号，则判定为数组
+    if (!isObject && firstBracket !== -1) {
+        isArray = true;
+    }
+
+    // 提取对象格式
+    if (isObject && lastBrace !== -1 && firstBrace < lastBrace) {
         // 检查是否有嵌套的大括号，确保提取完整的JSON对象
         let braceCount = 0;
         let startPos = firstBrace;
@@ -82,8 +97,8 @@ function extractValidJson(content) {
             extractedJson = jsonStr.substring(firstBrace, lastBrace + 1);
         }
     }
-    // 如果没有找到对象，尝试数组格式
-    else if (firstBracket !== -1 && lastBracket !== -1 && firstBracket < lastBracket) {
+    // 提取数组格式
+    else if (isArray && lastBracket !== -1 && firstBracket < lastBracket) {
         // 检查是否有嵌套的方括号，确保提取完整的JSON数组
         let bracketCount = 0;
         let startPos = firstBracket;
@@ -1547,6 +1562,16 @@ async function callAiGeneration(contact, systemPrompt, type, btn, originalConten
         }
 
         console.log('开始处理解析结果，类型:', type);
+        
+        // 尝试自动解包 (Handle wrapped responses like { "chats": [...] } when we expected array)
+        if (type === 'moments' && !Array.isArray(result) && result.moments && Array.isArray(result.moments)) {
+            console.log('自动解包 moments 数组');
+            result = result.moments;
+        }
+        if (type === 'chats' && !Array.isArray(result) && result.chats && Array.isArray(result.chats)) {
+            console.log('自动解包 chats 数组');
+            result = result.chats;
+        }
         
         if (type === 'moments' && Array.isArray(result)) {
             console.log('处理moments类型，数组长度:', result.length);
