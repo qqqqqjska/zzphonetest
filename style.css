@@ -3321,6 +3321,15 @@ input:checked + .slider:before {
     box-shadow: none !important;
 }
 
+/* iCity Card Message Style */
+.message-content.icity-card-msg {
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+}
+
 .message-content.sticker-msg img {
     max-width: 150px; /* 适当调整表情包大小 */
     border-radius: 0; /* 表情包本身可能不需要圆角，或者保持原样 */
@@ -3981,7 +3990,15 @@ input.msg-select-checkbox {
 }
 
 /* --- iCity Mobile Layout Fixes --- */
-#icity-app {
+#icity-app,
+#icity-compose-modal,
+#icity-all-diaries-screen,
+#icity-edit-profile-screen,
+#icity-calendar-screen,
+#icity-badges-screen,
+#icity-titles-screen,
+#icity-detail-screen,
+#icity-message-detail-screen {
     height: 100vh;
     height: 100dvh; /* Use dynamic viewport height for mobile */
     width: 100vw;
@@ -5293,4 +5310,20 @@ html body .chat-message.user .voice-icon-box i { transform: rotate(-90deg); }
     top: 100px; /* 下移 */
     border: none; /* 去掉边框 */
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* Book Annotation Styles */
+.book-page-content .highlight {
+    background-color: rgba(255, 229, 59, 0.5); /* Yellow highlighter */
+    border-radius: 2px;
+    padding: 0 2px;
+}
+.book-page-content .contact-note {
+    font-size: 14px; /* Make it a bit more readable */
+    color: #576b95;  /* A softer, bluish-gray color, like a pen annotation */
+    display: block;  /* Ensure it takes its own line */
+    margin-bottom: 2px; /* Space between note and user text */
+    font-family: 'Kaiti', 'STKaiti', serif; /* Use a handwriting-style font */
+    padding-left: 10px; /* Indent slightly */
+    font-style: italic;
 }

@@ -115,6 +115,11 @@ function setupIcityListeners() {
         });
     }
 
+    const icityCommentSendBtn = document.getElementById('icity-comment-send-btn');
+    if (icityCommentSendBtn) {
+        icityCommentSendBtn.addEventListener('click', handleIcityCommentSend);
+    }
+
     // Badge Listeners
     const badgesBtn = document.getElementById('icity-badges-btn');
     const closeBadgesBtn = document.getElementById('close-icity-badges');
@@ -205,6 +210,7 @@ function setupIcityListeners() {
     });
     
     // World Tab Listeners
+    const navBooks = document.getElementById('icity-nav-books');
     const navWorld = document.getElementById('icity-nav-world');
     const navMessages = document.getElementById('icity-nav-messages');
     const tabMe = document.getElementById('icity-tab-me');
@@ -212,14 +218,80 @@ function setupIcityListeners() {
     const headerWorld = document.getElementById('icity-header-world');
     const headerFriends = document.getElementById('icity-header-friends');
 
+    // Books Logic
+    const addBookBtn = document.getElementById('icity-add-book-btn');
+    const closeAddBookBtn = document.getElementById('close-icity-add-book');
+    const saveBookBtn = document.getElementById('save-icity-book-btn');
+    const bookCoverInput = document.getElementById('icity-book-cover-input');
+    const bookCoverPreview = document.getElementById('icity-book-cover-preview');
+
+    if (addBookBtn) {
+        addBookBtn.addEventListener('click', () => {
+            document.getElementById('icity-add-book-modal').classList.remove('hidden');
+        });
+    }
+
+    if (closeAddBookBtn) {
+        closeAddBookBtn.addEventListener('click', () => {
+            document.getElementById('icity-add-book-modal').classList.add('hidden');
+        });
+    }
+
+    if (bookCoverInput) {
+        bookCoverInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                compressImage(file, 300, 0.7).then(base64 => {
+                    bookCoverPreview.style.backgroundImage = `url('${base64}')`;
+                    bookCoverPreview.dataset.base64 = base64;
+                    bookCoverPreview.innerHTML = ''; // Clear icon
+                });
+            }
+        });
+    }
+
+    if (saveBookBtn) {
+        saveBookBtn.addEventListener('click', () => {
+            const name = document.getElementById('icity-book-name').value.trim();
+            const cover = bookCoverPreview.dataset.base64;
+            
+            if (!name) {
+                alert('请输入书名');
+                return;
+            }
+            // Optional cover, default will be handled in render
+
+            if (!window.iphoneSimState.icityBooks) {
+                window.iphoneSimState.icityBooks = [];
+            }
+
+            window.iphoneSimState.icityBooks.push({
+                id: Date.now(),
+                name: name,
+                cover: cover || '' // Store empty string if no cover
+            });
+
+            saveConfig();
+            renderIcityBooks();
+            document.getElementById('icity-add-book-modal').classList.add('hidden');
+            
+            // Reset form
+            document.getElementById('icity-book-name').value = '';
+            bookCoverPreview.style.backgroundImage = '';
+            bookCoverPreview.innerHTML = '<i class="fas fa-camera"></i>';
+            delete bookCoverPreview.dataset.base64;
+        });
+    }
+
     const switchIcityTab = (tabName) => {
         // Hide all tabs
-        ['profile', 'world', 'messages'].forEach(t => {
+        ['profile', 'world', 'messages', 'books'].forEach(t => {
             const el = document.getElementById(`icity-tab-content-${t}`);
             if (el) el.style.display = 'none';
         });
 
         // Reset icons
+        if (navBooks) navBooks.style.color = '#ccc';
         if (navWorld) navWorld.style.color = '#ccc';
         if (navMessages) navMessages.style.color = '#ccc';
         if (tabMe) tabMe.style.border = '2px solid transparent';
@@ -233,10 +305,18 @@ function setupIcityListeners() {
         }
 
         // Highlight icon
+        if (tabName === 'books' && navBooks) navBooks.style.color = '#000';
         if (tabName === 'world' && navWorld) navWorld.style.color = '#000';
         if (tabName === 'messages' && navMessages) navMessages.style.color = '#000';
         if (tabName === 'profile' && tabMe) tabMe.style.border = '2px solid #000';
     };
+
+    if (navBooks) {
+        navBooks.addEventListener('click', () => {
+            switchIcityTab('books');
+            renderIcityBooks();
+        });
+    }
 
     if (navWorld) {
         navWorld.addEventListener('click', () => {
@@ -904,6 +984,16 @@ function saveIcitySettings() {
                     if (!contact.icityData) contact.icityData = {};
                     contact.icityData.handle = idInput.value.trim();
                 }
+                
+                // Save scheduled diary settings
+                const autoDiaryToggle = document.getElementById(`icity-auto-diary-toggle-${id}`);
+                const autoDiaryTime = document.getElementById(`icity-auto-diary-time-${id}`);
+                
+                if (autoDiaryToggle && autoDiaryTime) {
+                    if (!contact.icityData) contact.icityData = {};
+                    contact.icityData.autoDiaryEnabled = autoDiaryToggle.checked;
+                    contact.icityData.autoDiaryTime = autoDiaryTime.value;
+                }
             }
         });
     }
@@ -947,7 +1037,7 @@ function renderIcityContactCustomization() {
         
         item.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 5px; color: #333;">${contact.name}</div>
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
                 <div style="position: relative; width: 50px; height: 50px; flex-shrink: 0;">
                     <img src="${currentAvatar}" id="icity-custom-avatar-preview-${id}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid #ddd; cursor: pointer;">
                     <div style="position: absolute; bottom: 0; right: 0; background: #007AFF; color: #fff; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; pointer-events: none;"><i class="fas fa-camera"></i></div>
@@ -955,7 +1045,21 @@ function renderIcityContactCustomization() {
                 </div>
                 <div style="flex: 1;">
                     <input type="text" id="icity-custom-name-${id}" placeholder="iCity 昵称" value="${icityData.name || contact.name}" style="width: 100%; margin-bottom: 5px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
-                    <input type="text" id="icity-custom-id-${id}" placeholder="iCity ID (@开头)" value="${icityData.handle || '@user' + id.toString().slice(-4)}" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <input type="text" id="icity-custom-id-${id}" placeholder="iCity ID (@开头)" value="${icityData.handle || '@user' + id.toString().slice(-4)}" style="width: 100%; margin-bottom: 5px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    
+                    <div style="background: #f9f9f9; padding: 8px; border-radius: 6px; margin-top: 5px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 12px; color: #666;">定时写日记</span>
+                            <label class="toggle-switch" style="transform: scale(0.8);">
+                                <input type="checkbox" id="icity-auto-diary-toggle-${id}" ${icityData.autoDiaryEnabled ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span style="font-size: 12px; color: #999;">时间:</span>
+                            <input type="time" id="icity-auto-diary-time-${id}" value="${icityData.autoDiaryTime || '22:00'}" style="border: 1px solid #ddd; border-radius: 4px; font-size: 12px; padding: 2px;">
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -1030,7 +1134,7 @@ function handleIcitySend() {
             window.iphoneSimState.chatHistory[id].push({
                 role: 'system',
                 type: 'system_event',
-                content: `(用户发布了 iCity 动态: "${content}")`,
+                content: `(用户发布了 iCity 日记: "${content}")`,
                 time: Date.now()
             });
         });
@@ -1150,12 +1254,144 @@ function handleIcitySend() {
     document.getElementById('icity-compose-modal').classList.add('hidden');
     textInput.value = '';
 
-    // Generate Interactions if Public
+    // Generate Interactions
     if (visibility === 'public') {
         setTimeout(() => {
             generateIcityInteractions(newDiary);
         }, 3000);
+        setTimeout(() => {
+            generateContactComments(newDiary);
+        }, 5000);
+    } else if (visibility === 'friends') {
+        setTimeout(() => {
+            generateContactComments(newDiary);
+        }, 3000);
     }
+}
+
+async function generateContactComments(diary) {
+    const linkedIds = window.iphoneSimState.icityProfile.linkedContactIds || [];
+    if (linkedIds.length === 0 && window.iphoneSimState.icityProfile.linkedContactId) {
+        linkedIds.push(window.iphoneSimState.icityProfile.linkedContactId);
+    }
+    
+    if (linkedIds.length === 0) return;
+    
+    const contacts = window.iphoneSimState.contacts.filter(c => linkedIds.includes(c.id));
+    if (contacts.length === 0) return;
+
+    try {
+        const comments = await callAiForContactComments(diary, contacts);
+        if (comments && comments.length > 0) {
+            const targetDiary = window.iphoneSimState.icityDiaries.find(d => d.id === diary.id);
+            if (targetDiary) {
+                if (!targetDiary.commentsList) targetDiary.commentsList = [];
+                
+                comments.forEach(c => {
+                    targetDiary.commentsList.push({
+                        id: Date.now() + Math.random(),
+                        name: c.name, // Display name
+                        content: c.content,
+                        time: Date.now()
+                    });
+
+                    // 让联系人“记住”自己评论了什么
+                    // Find the contact object that corresponds to this comment
+                    const contact = contacts.find(ct => {
+                        const dName = (ct.icityData && ct.icityData.name) ? ct.icityData.name : ct.name;
+                        return dName === c.name;
+                    });
+
+                    if (contact) {
+                        if (!window.iphoneSimState.chatHistory) window.iphoneSimState.chatHistory = {};
+                        if (!window.iphoneSimState.chatHistory[contact.id]) window.iphoneSimState.chatHistory[contact.id] = [];
+                        
+                        window.iphoneSimState.chatHistory[contact.id].push({
+                            role: 'system',
+                            type: 'system_event',
+                            content: `(你在iCity评论了用户的日记: "${c.content}")`,
+                            time: Date.now()
+                        });
+                    }
+                });
+                
+                targetDiary.comments = (targetDiary.comments || 0) + comments.length;
+                saveConfig();
+                renderIcityDiaryList();
+                // If detail screen is open, refresh it
+                const detailScreen = document.getElementById('icity-detail-screen');
+                if (detailScreen && !detailScreen.classList.contains('hidden')) {
+                     // Simple check to see if we are viewing the same diary
+                     // In a real app we'd check ID, but openIcityDiaryDetail sets content directly.
+                     // We can just re-open it if the content matches or if we store current ID globally.
+                     // Ideally we should store currentDetailId. For now, let's just refresh if open.
+                     // Actually, openIcityDiaryDetail takes an ID.
+                     openIcityDiaryDetail(diary.id, 'diary'); 
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to generate contact comments", e);
+    }
+}
+
+async function callAiForContactComments(diary, contacts) {
+    const contextData = [];
+    
+    for (const contact of contacts) {
+        // Use custom iCity name if available
+        const displayName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+        
+        const history = window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id] ? window.iphoneSimState.chatHistory[contact.id].slice(-10) : [];
+        const chatContext = history.map(m => `${m.role === 'user' ? '用户' : '我'}: ${m.content}`).join('\n');
+        
+        contextData.push({
+            name: displayName,
+            originalName: contact.name,
+            persona: contact.persona || '无',
+            chat: chatContext
+        });
+    }
+
+    const contextStr = contextData.map(d => `
+【角色: ${d.name}】
+人设: ${d.persona}
+最近聊天:
+${d.chat}
+`).join('\n--------------------------------\n');
+
+    const prompt = `用户在朋友圈/iCity发布了一条动态：
+"${diary.content}"
+
+请让以下角色对这条动态进行评论。
+${contextStr}
+
+要求：
+1. 为每个角色生成一条评论。
+2. 评论内容要符合角色人设和最近的聊天上下文。
+3. 语气要像在社交媒体上互动，口语化。
+4. 严格返回 JSON 数组格式。
+
+格式示例：
+[
+    {
+        "name": "角色名",
+        "content": "评论内容"
+    }
+]`;
+
+    const messages = [{ role: 'user', content: prompt }];
+    const content = await safeCallAiApi(messages);
+    
+    try {
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+    } catch (e) {
+        console.error("Parse error", e);
+    }
+    return [];
 }
 
 async function generateIcityInteractions(diary) {
@@ -1692,6 +1928,194 @@ ${historyContext}
     }
 }
 
+function renderIcityBooks() {
+    const list = document.getElementById('icity-books-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const books = window.iphoneSimState.icityBooks || [];
+    
+    if (books.length === 0) {
+        list.innerHTML = '<div style="width: 100%; text-align: center; color: #999;">暂无书籍</div>';
+        return;
+    }
+    
+    // Ensure correct container style
+    list.style.display = 'flex';
+    list.style.gap = '20px'; // Add gap
+    list.style.padding = '0'; // Reset padding
+    list.style.alignItems = 'center';
+    list.style.overflowX = 'auto';
+    list.style.scrollSnapType = 'x mandatory';
+
+    // Add spacer for centering first item (subtracting gap)
+    const spacerLeft = document.createElement('div');
+    // Screen Center (50%) - Half Item (100px) - Gap (20px) = Start offset
+    // Note: Flex gap applies before the first item if there is a spacer?
+    // Flex gap applies BETWEEN items.
+    // [Spacer] <gap> [Item1]
+    // Spacer Width + Gap + ItemWidth/2 = 50%
+    // Spacer Width = 50% - 100px - 20px
+    spacerLeft.style.minWidth = 'calc(50% - 120px)'; 
+    spacerLeft.style.flexShrink = '0';
+    list.appendChild(spacerLeft);
+
+    books.forEach(book => {
+        const item = document.createElement('div');
+        item.className = 'icity-book-item';
+        item.style.cssText = `
+            flex-shrink: 0;
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            scroll-snap-align: center;
+            transition: transform 0.2s ease;
+            transform-origin: center center;
+        `;
+        
+        // Cover Style
+        let coverHtml = '';
+        if (book.cover) {
+            // Remove border-radius here, let container handle it
+            coverHtml = `<div style="width: 100%; height: 100%; border-radius: 2px 6px 6px 2px; background-image: url('${book.cover}'); background-size: cover; background-position: center; box-shadow: inset 3px 0 10px rgba(0,0,0,0.1);"></div>`;
+        } else {
+            // Default gray cover with title
+            // Remove border-radius here too
+            coverHtml = `
+                <div style="width: 100%; height: 100%; border-radius: 2px 6px 6px 2px; background-color: #8e8e93; display: flex; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; box-shadow: inset 3px 0 10px rgba(0,0,0,0.1);">
+                    <div style="color: #fff; font-size: 18px; font-weight: bold; text-align: center; line-height: 1.4; word-break: break-all; text-shadow: 0 1px 2px rgba(0,0,0,0.3); font-family: 'Times New Roman', serif;">
+                        ${book.name}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Structure
+        item.innerHTML = `
+            <div style="width: 100%; aspect-ratio: 3/4; position: relative; margin-bottom: 15px; transform: translateZ(0);">
+                
+                <!-- Independent Shadow Layer (Behind) -->
+                <div style="position: absolute; inset: 0; border-radius: 2px 6px 6px 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); pointer-events: none; z-index: 1;"></div>
+
+                <!-- Main Cover Container (Clipped Content) -->
+                <div class="book-cover-container" style="width: 100%; height: 100%; border-radius: 2px 6px 6px 2px; overflow: hidden; position: relative; z-index: 2; background-color: transparent; clip-path: inset(0 round 2px 6px 6px 2px);">
+                    ${coverHtml}
+                    <!-- Spine Highlight -->
+                    <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 15px; background: linear-gradient(to right, rgba(255,255,255,0.25), rgba(0,0,0,0)); pointer-events: none;"></div>
+                    <!-- Spine Shadow Line -->
+                    <div style="position: absolute; left: 6px; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.1); pointer-events: none;"></div>
+                    <!-- Inner Shadow for depth -->
+                    <div style="position: absolute; inset: 0; box-shadow: inset 0 0 2px rgba(0,0,0,0.1); pointer-events: none;"></div>
+                </div>
+
+                <!-- Shadow (Behind) -->
+                <div style="position: absolute; bottom: 2px; left: 5%; width: 90%; height: 10px; background: rgba(0,0,0,0.25); filter: blur(6px); z-index: 0; transform: translateY(4px);"></div>
+            </div>
+            
+            <!-- Label below book (only if cover exists, otherwise title is on cover) -->
+            ${book.cover ? `<div style="font-size: 14px; font-weight: 500; color: #333; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -5px; text-shadow: 0 1px 1px rgba(255,255,255,0.8);">${book.name}</div>` : ''}
+        `;
+        
+        // Long press/Right click for menu
+        let pressTimer;
+        let isLongPress = false;
+        const imgDiv = item.querySelector('div');
+        
+        const handleLongPress = () => {
+            isLongPress = true;
+            showIcityBookMenu(book.id);
+        };
+
+        imgDiv.addEventListener('touchstart', () => {
+            isLongPress = false;
+            pressTimer = setTimeout(handleLongPress, 500);
+        });
+        
+        imgDiv.addEventListener('touchend', () => clearTimeout(pressTimer));
+        imgDiv.addEventListener('touchmove', () => clearTimeout(pressTimer));
+        
+        imgDiv.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            handleLongPress();
+        });
+
+        imgDiv.onclick = (e) => {
+            if (isLongPress) return;
+            openIcityBook(book.id, imgDiv);
+        };
+
+        list.appendChild(item);
+    });
+
+    // Add spacer for centering last item
+    const spacerRight = document.createElement('div');
+    spacerRight.style.minWidth = 'calc(50% - 120px)';
+    spacerRight.style.flexShrink = '0';
+    list.appendChild(spacerRight);
+
+    // Scroll Logic for Scale Effect
+    const handleScroll = () => {
+        const center = list.scrollLeft + list.offsetWidth / 2;
+        const items = list.querySelectorAll('.icity-book-item');
+        
+        items.forEach(item => {
+            const itemCenter = item.offsetLeft + item.offsetWidth / 2;
+            const dist = Math.abs(center - itemCenter);
+            const maxDist = list.offsetWidth / 2; // Wider range
+            
+            let scale = 1;
+            let opacity = 1;
+            
+            if (dist < maxDist) {
+                const factor = 1 - (dist / maxDist); // 1 at center, 0 at maxDist
+                // Center (factor=1): Scale 1.15
+                // Edge (factor=0): Scale 0.9
+                scale = 0.9 + (factor * 0.25);
+                // Opacity: Keep it high to see other books
+                opacity = 0.7 + (factor * 0.3); // 0.7 to 1.0
+            } else {
+                scale = 0.9;
+                opacity = 0.7;
+            }
+            
+            item.style.transform = `scale(${scale})`;
+            item.style.opacity = opacity;
+            
+            // Adjust z-index and shadow for center focus
+            const shadowDiv = item.querySelector('div'); // The cover div
+            if (dist < 100) { // Near center
+                item.style.zIndex = 10;
+                if (shadowDiv) shadowDiv.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+            } else {
+                item.style.zIndex = 1;
+                if (shadowDiv) shadowDiv.style.boxShadow = '0 5px 15px rgba(0,0,0,0.1)';
+            }
+        });
+    };
+
+    // Remove old listener if any (to avoid duplicates if re-rendered)
+    if (list._scrollHandler) {
+        list.removeEventListener('scroll', list._scrollHandler);
+    }
+    list._scrollHandler = handleScroll;
+    list.addEventListener('scroll', handleScroll);
+    
+    // Initial call
+    setTimeout(handleScroll, 10);
+}
+
+function deleteIcityBook(id) {
+    if (confirm('确定删除这本书吗？')) {
+        window.iphoneSimState.icityBooks = window.iphoneSimState.icityBooks.filter(b => b.id !== id);
+        saveConfig();
+        renderIcityBooks();
+    }
+}
+
+window.deleteIcityBook = deleteIcityBook;
+
 function renderIcityDiaryList() {
     const listContainer = document.querySelector('.icity-diary-list');
     if (!listContainer) return;
@@ -1745,6 +2169,7 @@ function renderIcityDiaryList() {
                 <div style="position: relative;">
                     <i class="fas fa-ellipsis-h" style="cursor: pointer; padding: 5px;" onclick="event.stopPropagation(); toggleIcityMenu(this, ${diary.id})"></i>
                     <div id="icity-menu-${diary.id}" class="hidden" style="position: absolute; right: 0; bottom: 25px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px 0; min-width: 80px; z-index: 10;">
+                        <div onclick="event.stopPropagation(); window.handleIcityForward(${diary.id}, 'diary')" style="padding: 8px 15px; color: #333; font-size: 14px; cursor: pointer; text-align: center; border-bottom: 1px solid #f0f0f0;">转发</div>
                         <div onclick="event.stopPropagation(); deleteIcityDiary(${diary.id})" style="padding: 8px 15px; color: #FF3B30; font-size: 14px; cursor: pointer; text-align: center;">删除</div>
                     </div>
                 </div>
@@ -1891,8 +2316,9 @@ function renderIcityAllDiaries() {
                         <i class="far fa-comment"></i>
                         <span>${timeStr}</span>
                         <div style="position: relative;">
-                            <i class="fas fa-ellipsis-v" style="cursor: pointer; padding: 5px;" onclick="event.stopPropagation(); toggleIcityMenu(this, ${diary.id})"></i>
+                            <i class="fas fa-ellipsis-v" style="cursor: pointer; padding: 5px;" onclick="event.stopPropagation(); toggleIcityMenu(this, ${diary.id}, 'all')"></i>
                             <div id="icity-menu-all-${diary.id}" class="hidden" style="position: absolute; right: 0; bottom: 25px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px 0; min-width: 80px; z-index: 10;">
+                                <div onclick="event.stopPropagation(); window.handleIcityForward(${diary.id}, 'diary')" style="padding: 8px 15px; color: #333; font-size: 14px; cursor: pointer; text-align: center; border-bottom: 1px solid #f0f0f0;">转发</div>
                                 <div onclick="event.stopPropagation(); deleteIcityDiary(${diary.id})" style="padding: 8px 15px; color: #FF3B30; font-size: 14px; cursor: pointer; text-align: center;">删除</div>
                             </div>
                         </div>
@@ -1906,16 +2332,16 @@ function renderIcityAllDiaries() {
     });
 }
 
-function toggleIcityMenu(btn, id) {
-    // Determine which menu to toggle (main list or all list)
-    // Actually we can just try to toggle both or check context. 
-    // Simplified: toggle based on ID.
-    
+function toggleIcityMenu(btn, id, type = 'main') {
     // Close all first
     document.querySelectorAll('[id^="icity-menu-"]').forEach(el => el.classList.add('hidden'));
     
-    let menu = document.getElementById(`icity-menu-${id}`);
-    if (!menu) menu = document.getElementById(`icity-menu-all-${id}`);
+    let menuId = `icity-menu-${id}`;
+    if (type === 'all') {
+        menuId = `icity-menu-all-${id}`;
+    }
+    
+    const menu = document.getElementById(menuId);
     
     if (menu) {
         menu.classList.toggle('hidden');
@@ -1972,6 +2398,9 @@ function handleSaveIcityProfile() {
 }
 
 function openIcityDiaryDetail(id, source = 'diary') {
+    window.currentOpenIcityDiaryId = id;
+    window.currentOpenIcitySource = source;
+    
     let post = null;
     let userAvatar = '';
     let userName = '';
@@ -2027,7 +2456,7 @@ function openIcityDiaryDetail(id, source = 'diary') {
         if (!userName) userName = post.name;
         if (!userHandle) userHandle = post.handle || '@user';
         
-        visibility = 'friends';
+        visibility = post.visibility || 'friends';
     }
 
     if (!post) return;
@@ -2101,6 +2530,16 @@ function openIcityDiaryDetail(id, source = 'diary') {
         commentItem.style.marginBottom = '15px';
         commentItem.style.borderBottom = '1px dashed #f0f0f0';
         commentItem.style.paddingBottom = '10px';
+        commentItem.style.cursor = 'pointer';
+
+        commentItem.onclick = () => {
+            window.icityReplyingTo = comment;
+            const input = document.getElementById('icity-comment-input');
+            if (input) {
+                input.placeholder = `回复 ${comment.name}:`;
+                input.focus();
+            }
+        };
 
         let timeStr = '刚刚';
         const diff = Date.now() - comment.time;
@@ -2108,9 +2547,37 @@ function openIcityDiaryDetail(id, source = 'diary') {
         else if (diff < 3600000) timeStr = Math.floor(diff/60000) + '分钟前';
         else timeStr = new Date(comment.time).toLocaleString();
 
+        // Resolve Avatar
+        let avatarUrl = '';
+        const userNickname = (window.iphoneSimState.icityProfile && window.iphoneSimState.icityProfile.nickname) ? window.iphoneSimState.icityProfile.nickname : 'Kaneki';
+        
+        if (comment.name === userNickname) {
+            avatarUrl = (window.iphoneSimState.icityProfile && window.iphoneSimState.icityProfile.avatar) ? window.iphoneSimState.icityProfile.avatar : '';
+        } else {
+            // Check contacts first (higher priority for linked contacts or friends)
+            const contact = window.iphoneSimState.contacts.find(c => {
+                const cName = (c.icityData && c.icityData.name) ? c.icityData.name : c.name;
+                return cName === comment.name || c.name === comment.name;
+            });
+            
+            if (contact) {
+                avatarUrl = (contact.icityData && contact.icityData.avatar) ? contact.icityData.avatar : contact.avatar;
+            }
+        }
+
+        let avatarStyle = '';
+        let avatarContent = '';
+        
+        if (avatarUrl) {
+            avatarStyle = `background-image: url('${avatarUrl}'); background-size: cover; background-position: center;`;
+        } else {
+             avatarStyle = `background: #ccc;`;
+             avatarContent = `<i class="fas fa-user"></i>`;
+        }
+
         commentItem.innerHTML = `
-            <div style="width: 30px; height: 30px; border-radius: 50%; background: #ccc; margin-right: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px;">
-                <i class="fas fa-user"></i>
+            <div style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; ${avatarStyle}">
+                ${avatarContent}
             </div>
             <div style="flex: 1;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
@@ -2244,7 +2711,12 @@ function renderIcityWorld() {
                 <i class="far fa-heart"></i>
                 <i class="far fa-comment"></i>
                 <div style="display: flex; align-items: center; gap: 5px;"><i class="far fa-clock"></i> ${timeStr}</div>
-                <i class="fas fa-ellipsis-v"></i>
+                <div style="position: relative;">
+                    <i class="fas fa-ellipsis-v" style="cursor: pointer; padding: 5px;" onclick="event.stopPropagation(); toggleIcityFeedMenu(this, ${post.id})"></i>
+                    <div id="icity-feed-menu-${post.id}" class="hidden" style="position: absolute; right: 0; bottom: 25px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px 0; min-width: 80px; z-index: 10;">
+                        <div onclick="event.stopPropagation(); window.handleIcityForward(${post.id}, 'world')" style="padding: 8px 15px; color: #333; font-size: 14px; cursor: pointer; text-align: center;">转发</div>
+                    </div>
+                </div>
             </div>
         `;
         list.appendChild(item);
@@ -2542,6 +3014,13 @@ function renderIcityFriends() {
             `;
         }
 
+        let visIconHtml = '';
+        if (post.visibility === 'friends') {
+            visIconHtml = '<i class="fas fa-user-friends" style="margin-right: 5px;"></i>';
+        } else {
+            visIconHtml = '<i class="fas fa-globe" style="margin-right: 5px;"></i>';
+        }
+
         item.innerHTML = `
             ${checkboxHtml}
             <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">
@@ -2554,13 +3033,21 @@ function renderIcityFriends() {
                 </div>
             </div>
             <div style="font-size: 15px; color: #333; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap;">${post.content}</div>
-            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 20px; color: #ccc; font-size: 13px;">
-                <i class="far fa-heart"></i>
-                <i class="far fa-comment"></i>
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 15px; color: #ccc; font-size: 13px;">
+                <div style="display: flex; align-items: center;">${visIconHtml}</div>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <i class="far fa-heart"></i>
+                    <span>${post.likes || 0}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <i class="far fa-comment"></i>
+                    <span>${(post.commentsList && post.commentsList.length) || post.comments || 0}</span>
+                </div>
                 <div style="display: flex; align-items: center; gap: 5px;"><i class="far fa-clock"></i> ${timeStr}</div>
                 <div style="position: relative;">
                     <i class="fas fa-ellipsis-v" style="cursor: pointer; padding: 5px;" onclick="event.stopPropagation(); toggleIcityFeedMenu(this, ${post.id})"></i>
                     <div id="icity-feed-menu-${post.id}" class="hidden" style="position: absolute; right: 0; bottom: 25px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 4px; padding: 5px 0; min-width: 100px; z-index: 10;">
+                        <div onclick="event.stopPropagation(); window.handleIcityForward(${post.id}, 'friends')" style="padding: 8px 15px; color: #333; font-size: 14px; cursor: pointer; text-align: left; border-bottom: 1px solid #f0f0f0;">转发</div>
                         <div onclick="event.stopPropagation(); enterIcityFeedSelectionMode(${post.id})" style="padding: 8px 15px; color: #333; font-size: 14px; cursor: pointer; text-align: left;">多选</div>
                         <div onclick="event.stopPropagation(); deleteIcityFeedItem(${post.id})" style="padding: 8px 15px; color: #FF3B30; font-size: 14px; cursor: pointer; text-align: left; border-top: 1px solid #f0f0f0;">删除</div>
                     </div>
@@ -2741,26 +3228,33 @@ ${d.memory}
 ${d.wb}
 `).join('\n--------------------------------\n');
 
-    const prompt = `请基于以下角色的详细上下文，为他们生成一些 iCity 动态（类似日记、感悟、emo时刻）。
+    const prompt = `请基于以下角色的详细上下文，为他们生成一些 iCity 动态。
     
 ${contextStr}
 
 要求：
 1. 为每个角色生成 1 条内容。
-2. **风格要求**：不要写成普通的社交动态。要是日记、心理活动、感悟、或者emo时刻。可以是短句，也可以是长文。要体现角色的内心世界。
-3. **结合上下文**：必须深度结合该角色的【人设】、【最近聊天】、【记忆】和【世界观背景】。
-   - 如果最近和用户聊了某事，可以在日记中体现对那件事的看法。
-   - 如果有特定的世界观（如末世、古代等），日记内容要符合该世界观。
-   - 如果有记忆，可以呼应记忆中的事件。
-4. 严格返回 JSON 数组格式。
+2. **风格要求**：日记、感悟、emo时刻。体现内心世界。
+3. **结合上下文**：必须结合角色人设、聊天记录和记忆。
+4. **可见性设置**：请为每条动态决定是 "public" (公开) 还是 "friends" (仅好友)。
+   - 如果内容比较私密、emo、或者是对特定人的悄悄话，设为 "friends"。
+   - 如果是分享生活、风景、或者比较大众的话题，设为 "public"。
+5. **互动生成**：
+   - 如果是 "public"：请生成较多的点赞数(likes)和一些**陌生人/路人**的评论(comments_list)。评论内容要像真实的网友互动。
+   - 如果是 "friends"：点赞数较少，评论列表为空(或仅限互关好友，暂时留空即可)。
+6. 严格返回 JSON 数组格式。
 
 格式示例：
 [
     {
         "name": "角色姓名",
-        "content": "日记正文内容...",
-        "likes": 5,
-        "comments": 0
+        "content": "日记内容...",
+        "visibility": "public",  // 或 "friends"
+        "likes": 128,
+        "comments_list": [
+            { "name": "路人A", "content": "好美！" },
+            { "name": "momo", "content": "求链接" }
+        ]
     }
 ]`;
 
@@ -2798,8 +3292,10 @@ ${contextStr}
                     avatar: avatar,
                     content: item.content,
                     time: Date.now(),
+                    visibility: item.visibility || 'public',
                     likes: item.likes || 0,
-                    comments: item.comments || 0
+                    comments: (item.comments_list && item.comments_list.length) || item.comments || 0,
+                    commentsList: item.comments_list || []
                 };
             });
         }
@@ -2812,6 +3308,95 @@ ${contextStr}
 
 window.renderIcityFriends = renderIcityFriends;
 window.handleGenerateIcityFriends = handleGenerateIcityFriends;
+
+// Scheduled Diary Generation
+window.generateScheduledContactDiary = async function(contact) {
+    console.log('Generating scheduled diary for:', contact.name);
+    
+    // Show hidden notification (optional, maybe not needed for background task)
+    // showNotification(`正在生成 ${contact.name} 的今日日记...`);
+
+    // Prepare Context
+    // Use custom iCity name if available
+    const displayName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+
+    // Chat History (Today's chat if possible, or recent)
+    const history = window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id] ? window.iphoneSimState.chatHistory[contact.id].slice(-20) : [];
+    const chatContext = history.map(m => `${m.role === 'user' ? '用户' : '我'}: ${m.content}`).join('\n');
+    
+    // Memories
+    const memories = window.iphoneSimState.memories ? window.iphoneSimState.memories.filter(m => m.contactId === contact.id).slice(-5) : [];
+    const memoryContext = memories.map(m => m.content).join('\n');
+    
+    // Worldbook
+    let wbContext = '';
+    if (contact.linkedWbCategories && contact.linkedWbCategories.length > 0) {
+            const entries = window.iphoneSimState.worldbook ? window.iphoneSimState.worldbook.filter(e => contact.linkedWbCategories.includes(e.categoryId) && e.enabled) : [];
+            const contactWb = entries.map(e => e.content).join('\n').slice(0, 500);
+            if (contactWb) wbContext += '\n' + contactWb;
+    }
+
+    const prompt = `你现在扮演 ${contact.name} (iCity昵称: ${displayName})。
+人设: ${contact.persona || '无'}
+世界观背景: ${wbContext}
+重要记忆: ${memoryContext}
+最近聊天:
+${chatContext}
+
+【任务】
+请写一篇较长的日记，总结你今天的一天。
+时间是晚上（或者你设定的时间），你正在回顾今天发生的事情、你的心情、或者你的感悟。
+
+【要求】
+1. **篇幅较长**：内容要丰富，字数在 100-300 字之间。
+2. **深度结合上下文**：
+   - 如果今天和用户（"我"）聊过天，请在日记中提到今天聊的话题，或者对用户的看法。
+   - 如果有特定世界观，内容要符合该世界观下的生活状态。
+   - 如果没有特别的事情，可以写你的日常生活、心理活动、或者对未来的期许。
+3. **风格**：完全沉浸在角色中，使用角色的口吻。可以是感性的、碎碎念的、或者严肃的，取决于人设。
+4. **格式**：只返回日记正文内容，不要包含任何解释性文字或JSON格式。直接输出纯文本。
+
+请开始写日记：`;
+
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const content = await safeCallAiApi(messages);
+        
+        if (content) {
+            const newPost = {
+                id: Date.now(),
+                contactId: contact.id,
+                name: displayName,
+                handle: (contact.icityData && contact.icityData.handle) ? contact.icityData.handle : `@User_${contact.id.toString().substring(0, 4)}`,
+                avatar: (contact.icityData && contact.icityData.avatar) ? contact.icityData.avatar : contact.avatar,
+                content: content.trim(),
+                time: Date.now(),
+                likes: Math.floor(Math.random() * 10),
+                comments: 0
+            };
+
+            // Add to Friends Feed
+            if (!window.iphoneSimState.icityFriendsPosts) window.iphoneSimState.icityFriendsPosts = [];
+            window.iphoneSimState.icityFriendsPosts.unshift(newPost);
+            
+            saveConfig();
+            
+            // If the user is currently viewing the friends tab, refresh it
+            const friendsTab = document.getElementById('icity-tab-content-world');
+            const headerFriends = document.getElementById('icity-header-friends');
+            if (friendsTab && friendsTab.style.display !== 'none' && headerFriends && headerFriends.dataset.active === 'true') {
+                renderIcityFriends();
+            }
+            
+            // Optional: Notification
+            if (window.showChatNotification) {
+                window.showChatNotification(contact.id, `[iCity] ${displayName} 发布了今日日记`);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to generate scheduled diary:', e);
+    }
+};
 
 // Calendar Functions
 function renderIcityCalendar(year = 2026) {
@@ -3032,6 +3617,957 @@ function renderIcityMonthlyList(year, diaries) {
 function getDiariesCountInMonth(diaries, month) {
     return new Set(diaries.filter(d => new Date(d.time).getMonth() === month).map(d => new Date(d.time).getDate())).size;
 }
+
+function showIcityBookMenu(bookId) {
+    // Remove existing if any
+    const existing = document.getElementById('icity-book-action-sheet');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'icity-book-action-sheet';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.4); z-index: 1000;
+        display: flex; flex-direction: column; justify-content: flex-end;
+    `;
+    
+    overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    const sheet = document.createElement('div');
+    sheet.style.cssText = `
+        background: #f2f2f7; border-radius: 12px 12px 0 0; padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom));
+        animation: slideUp 0.3s ease;
+    `;
+    
+    // Options
+    const options = [
+        { text: '更改书名', color: '#007AFF', action: () => renameIcityBook(bookId) },
+        { text: '更改封面', color: '#007AFF', action: () => changeIcityBookCover(bookId) },
+        { text: '删除', color: '#FF3B30', action: () => deleteIcityBook(bookId) }
+    ];
+
+    const group = document.createElement('div');
+    group.style.cssText = 'background: #fff; border-radius: 12px; overflow: hidden; margin-bottom: 10px;';
+
+    options.forEach((opt, index) => {
+        const btn = document.createElement('div');
+        btn.textContent = opt.text;
+        btn.style.cssText = `
+            padding: 15px; text-align: center; font-size: 16px; color: ${opt.color};
+            background: #fff; cursor: pointer;
+            ${index < options.length - 1 ? 'border-bottom: 1px solid #eee;' : ''}
+        `;
+        btn.onclick = () => {
+            overlay.remove();
+            opt.action();
+        };
+        group.appendChild(btn);
+    });
+
+    const cancelBtn = document.createElement('div');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = `
+        padding: 15px; text-align: center; font-size: 16px; color: #007AFF;
+        background: #fff; border-radius: 12px; cursor: pointer; font-weight: bold;
+    `;
+    cancelBtn.onclick = () => overlay.remove();
+
+    sheet.appendChild(group);
+    sheet.appendChild(cancelBtn);
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+    
+    // Add CSS animation if not exists
+    if (!document.getElementById('slideUp-style')) {
+        const style = document.createElement('style');
+        style.id = 'slideUp-style';
+        style.innerHTML = '@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }';
+        document.head.appendChild(style);
+    }
+}
+
+function renameIcityBook(id) {
+    const book = window.iphoneSimState.icityBooks.find(b => b.id === id);
+    if (!book) return;
+    
+    const newName = prompt('请输入新的书名:', book.name);
+    if (newName && newName.trim()) {
+        book.name = newName.trim();
+        saveConfig();
+        renderIcityBooks();
+    }
+}
+
+function changeIcityBookCover(id) {
+    // Create hidden input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            compressImage(file, 300, 0.7).then(base64 => {
+                const book = window.iphoneSimState.icityBooks.find(b => b.id === id);
+                if (book) {
+                    book.cover = base64;
+                    saveConfig();
+                    renderIcityBooks();
+                }
+            });
+        }
+    };
+    input.click();
+}
+
+window.showIcityBookMenu = showIcityBookMenu;
+window.renameIcityBook = renameIcityBook;
+window.changeIcityBookCover = changeIcityBookCover;
+
+// Book Reader Logic
+function injectBookStyles() {
+    if (document.getElementById('icity-book-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'icity-book-styles';
+    style.innerHTML = `
+        .book-reader-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #e0e0e0; z-index: 2000;
+            display: flex; flex-direction: column;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .book-reader-screen.visible {
+            opacity: 1; pointer-events: auto;
+        }
+        .book-reader-header {
+            padding: 40px 20px 10px; display: flex; justify-content: space-between;
+            align-items: center; background: transparent; z-index: 10;
+        }
+        .book-stage {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            perspective: 1500px; overflow: hidden; position: relative;
+        }
+        .book-3d {
+            width: 90vw; max-width: 800px;
+            aspect-ratio: 3/2; /* Spread ratio */
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+        }
+        .book-3d.centered-cover {
+            transform: translateX(-25%);
+        }
+        .book-page {
+            position: absolute; top: 0; left: 50%;
+            width: 50%; height: 100%;
+            transform-origin: left center;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1);
+            display: flex; flex-direction: column;
+            backface-visibility: visible;
+        }
+        .book-page.flipped {
+            transform: rotateY(-180deg);
+        }
+        .page-side {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            backface-visibility: hidden;
+            background: #fff;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+            border-radius: 2px 6px 6px 2px;
+        }
+        .page-front {
+            z-index: 2;
+        }
+        .page-back {
+            transform: rotateY(180deg);
+            z-index: 1;
+            border-radius: 6px 2px 2px 6px; /* Mirror radius */
+            box-shadow: inset -5px 0 10px rgba(0,0,0,0.05); /* Mirror shadow */
+        }
+        .book-page-content {
+            flex: 1; padding: 30px; font-size: 16px; line-height: 1.8;
+            color: #333; overflow-y: auto; white-space: pre-wrap; font-family: 'Songti SC', serif;
+            outline: none;
+        }
+        .book-page-footer {
+            height: 30px; display: flex; justify-content: center; align-items: center;
+            font-size: 12px; color: #999;
+        }
+        .book-cover-page {
+            background-size: cover; background-position: center;
+        }
+        .book-controls {
+            position: absolute; bottom: 20px; width: 100%;
+            display: flex; justify-content: center; gap: 20px; z-index: 20;
+        }
+        .book-control-btn {
+            background: rgba(0,0,0,0.5); color: #fff; border: none;
+            padding: 10px 20px; border-radius: 20px; cursor: pointer;
+        }
+        .book-fly-anim {
+            position: fixed; z-index: 3000;
+            transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            transform-origin: center center;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function openIcityBook(id, startEl) {
+    injectBookStyles();
+    
+    const book = window.iphoneSimState.icityBooks.find(b => b.id === id);
+    if (!book) return;
+    
+    if (!book.pages || !Array.isArray(book.pages) || book.pages.length === 0) {
+        book.pages = [{ content: '' }];
+    }
+
+    let reader = document.getElementById('icity-book-reader');
+    if (!reader) {
+        reader = document.createElement('div');
+        reader.id = 'icity-book-reader';
+        reader.className = 'book-reader-screen';
+        reader.innerHTML = `
+            <div class="book-reader-header">
+                <button class="back-btn" onclick="closeIcityBook()"><i class="fas fa-chevron-left"></i> 关闭</button>
+                <div style="font-weight: bold;" id="book-reader-title"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="icon-btn" onclick="openIcityBookSettings()"><i class="fas fa-cog"></i></button>
+                    <button class="icon-btn" onclick="addIcityBookPage()"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+            <div class="book-stage">
+                <div class="book-3d" id="book-3d-container"></div>
+            </div>
+            <div class="book-controls">
+                <button class="book-control-btn" onclick="prevIcityBookSheet()"><i class="fas fa-arrow-left"></i></button>
+                <button class="book-control-btn" onclick="nextIcityBookSheet()"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        `;
+        document.body.appendChild(reader);
+    } else {
+        // Ensure settings button exists if reader already exists (hot patch)
+        const header = reader.querySelector('.book-reader-header');
+        if (header && !header.querySelector('.fa-cog')) {
+            const rightDiv = document.createElement('div');
+            rightDiv.style.cssText = 'display: flex; gap: 10px;';
+            
+            // Move existing plus button
+            const plusBtn = header.querySelector('.icon-btn');
+            if (plusBtn) {
+                // Create settings button
+                const settingsBtn = document.createElement('button');
+                settingsBtn.className = 'icon-btn';
+                settingsBtn.onclick = () => openIcityBookSettings();
+                settingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
+                
+                rightDiv.appendChild(settingsBtn);
+                rightDiv.appendChild(plusBtn.cloneNode(true)); // Clone to avoid reference issues
+                
+                // Re-attach listener to new plus button
+                rightDiv.lastChild.onclick = () => addIcityBookPage();
+                
+                // Replace old plus button with container
+                header.replaceChild(rightDiv, plusBtn);
+            }
+        }
+    }
+    
+    document.getElementById('book-reader-title').textContent = book.name;
+    window.currentReadingBook = book;
+    
+    renderBookPages(book);
+    
+    // Initial state: Sheet 0 (Cover) is visible on right. All sheets are stacked on right.
+    window.currentSheetIndex = 0; 
+    
+    // Center the cover initially
+    document.getElementById('book-3d-container').classList.add('centered-cover');
+    
+    if (startEl) {
+        const rect = startEl.getBoundingClientRect();
+        const clone = startEl.cloneNode(true);
+        clone.classList.add('book-fly-anim');
+        clone.style.top = rect.top + 'px';
+        clone.style.left = rect.left + 'px';
+        clone.style.width = rect.width + 'px';
+        clone.style.height = rect.height + 'px';
+        clone.style.margin = '0';
+        document.body.appendChild(clone);
+        
+        requestAnimationFrame(() => {
+            reader.classList.add('visible');
+            clone.style.top = '20%'; 
+            clone.style.left = '50%';
+            clone.style.transform = 'translate(-50%, 0)';
+            clone.style.width = '40vw'; // Half of book width
+            clone.style.height = 'auto'; 
+            clone.style.opacity = '0';
+            
+            setTimeout(() => {
+                clone.remove();
+            }, 500);
+        });
+    } else {
+        reader.classList.add('visible');
+    }
+}
+
+function renderBookPages(book) {
+    const container = document.getElementById('book-3d-container');
+    container.innerHTML = '';
+    
+    // Sheet 0: Front = Cover, Back = Inner Cover (Page 0?? Let's say Inner is blank/dedication)
+    // Actually mapping:
+    // Sheet 0: Front=Cover, Back=Empty/TitlePage
+    // Sheet 1: Front=Page 1, Back=Page 2
+    // Sheet 2: Front=Page 3, Back=Page 4
+    
+    const sheets = [];
+    
+    // Cover Sheet
+    const coverSheet = document.createElement('div');
+    coverSheet.className = 'book-page';
+    coverSheet.style.zIndex = 100;
+    
+    const coverFront = document.createElement('div');
+    coverFront.className = 'page-side page-front book-cover-page';
+    if (book.cover) {
+        coverFront.style.backgroundImage = `url('${book.cover}')`;
+    } else {
+        coverFront.style.backgroundColor = '#8e8e93';
+        coverFront.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:bold; font-family:'Times New Roman'; padding:20px; text-align:center;">${book.name}</div>`;
+    }
+    
+    const coverBack = document.createElement('div');
+    coverBack.className = 'page-side page-back';
+    coverBack.style.background = '#f5f5f5'; // Inner cover
+    
+    coverSheet.appendChild(coverFront);
+    coverSheet.appendChild(coverBack);
+    container.appendChild(coverSheet);
+    sheets.push(coverSheet);
+    
+    // Content Sheets
+    // Iterate pages by 2
+    const totalPages = book.pages.length;
+    const totalSheets = Math.ceil(totalPages / 2);
+    
+    for (let i = 0; i < totalSheets; i++) {
+        const pageIdx1 = i * 2;
+        const pageIdx2 = i * 2 + 1;
+        
+        const sheetDiv = document.createElement('div');
+        sheetDiv.className = 'book-page';
+        sheetDiv.style.zIndex = 99 - i;
+        
+        // Front (Right side when open) -> Page 1, 3, 5...
+        const frontDiv = document.createElement('div');
+        frontDiv.className = 'page-side page-front';
+        frontDiv.innerHTML = `
+            <div class="book-page-content" contenteditable="true" oninput="updateBookPageContent(${pageIdx1}, this)">${book.pages[pageIdx1].content}</div>
+            <div class="book-page-footer">${pageIdx1 + 1}</div>
+        `;
+        // Stop prop
+        frontDiv.querySelector('.book-page-content').addEventListener('click', e => e.stopPropagation());
+        frontDiv.onclick = () => nextIcityBookSheet();
+        
+        // Back (Left side when turned) -> Page 2, 4, 6...
+        const backDiv = document.createElement('div');
+        backDiv.className = 'page-side page-back';
+        
+        if (pageIdx2 < totalPages) {
+            backDiv.innerHTML = `
+                <div class="book-page-content" contenteditable="true" oninput="updateBookPageContent(${pageIdx2}, this)">${book.pages[pageIdx2].content}</div>
+                <div class="book-page-footer">${pageIdx2 + 1}</div>
+            `;
+            backDiv.querySelector('.book-page-content').addEventListener('click', e => e.stopPropagation());
+        } else {
+            // Empty back page
+            backDiv.innerHTML = '<div class="book-page-content"></div>';
+        }
+        backDiv.onclick = () => prevIcityBookSheet();
+        
+        sheetDiv.appendChild(frontDiv);
+        sheetDiv.appendChild(backDiv);
+        container.appendChild(sheetDiv);
+        sheets.push(sheetDiv);
+    }
+    
+    window.bookSheets = sheets;
+    updateBookZIndexes();
+}
+
+function updateBookZIndexes() {
+    if (!window.bookSheets) return;
+    window.bookSheets.forEach((sheet, index) => {
+        if (sheet.classList.contains('flipped')) {
+            sheet.style.zIndex = 100 + index; // Left stack: Higher index on top
+        } else {
+            sheet.style.zIndex = 1000 - index; // Right stack: Lower index on top
+        }
+    });
+}
+
+function updateBookPageContent(index, el) {
+    if (window.currentReadingBook && window.currentReadingBook.pages[index]) {
+        // Save as HTML to preserve annotations
+        window.currentReadingBook.pages[index].content = el.innerHTML;
+        // Do not save on every input, will be saved on close
+        // saveConfig(); 
+    }
+}
+
+function nextIcityBookSheet() {
+    if (window.currentSheetIndex < window.bookSheets.length) {
+        // If flipping cover (0), move book to center
+        if (window.currentSheetIndex === 0) {
+            document.getElementById('book-3d-container').classList.remove('centered-cover');
+        }
+        window.bookSheets[window.currentSheetIndex].classList.add('flipped');
+        window.currentSheetIndex++;
+        updateBookZIndexes();
+    }
+}
+
+function prevIcityBookSheet() {
+    if (window.currentSheetIndex > 0) {
+        window.currentSheetIndex--;
+        window.bookSheets[window.currentSheetIndex].classList.remove('flipped');
+        
+        // If flipping back to cover (0), center cover
+        if (window.currentSheetIndex === 0) {
+            document.getElementById('book-3d-container').classList.add('centered-cover');
+        }
+        updateBookZIndexes();
+    }
+}
+
+function addIcityBookPage() {
+    if (window.currentReadingBook) {
+        window.currentReadingBook.pages.push({ content: '' });
+        saveConfig();
+        renderBookPages(window.currentReadingBook);
+        
+        // Restore flip state
+        window.bookSheets.forEach((sheet, idx) => {
+            if (idx < window.currentSheetIndex) {
+                sheet.classList.add('flipped');
+            }
+        });
+        
+        // If we added a page that started a new sheet, we might want to flip to it?
+        // Logic: if pages length changed from even to odd, new sheet created.
+        // Simplest: just stay where we are, user can flip.
+    }
+}
+
+function closeIcityBook() {
+    const reader = document.getElementById('icity-book-reader');
+    if (reader) {
+        reader.classList.remove('visible');
+    }
+    
+    // Trigger AI annotation process after closing
+    if (window.currentReadingBook) {
+        // Save final content before annotating
+        saveConfig(); 
+        startBookAnnotation(window.currentReadingBook);
+        window.currentReadingBook = null;
+    }
+}
+
+async function startBookAnnotation(book) {
+    const linkedContactIds = book.linkedContactIds || [];
+    if (linkedContactIds.length === 0) return;
+
+    const contacts = window.iphoneSimState.contacts.filter(c => linkedContactIds.includes(c.id));
+    if (contacts.length === 0) return;
+    
+    const notification = document.getElementById('summary-notification');
+    const notificationText = document.getElementById('summary-notification-text');
+    if (notification && notificationText) {
+        notificationText.textContent = 'AI 正在批注中...';
+        notification.classList.remove('hidden');
+    }
+
+    try {
+        for (const contact of contacts) {
+            for (let i = 0; i < book.pages.length; i++) {
+                const page = book.pages[i];
+                // Ensure content is not empty and is not just placeholder HTML
+                if (page.content && page.content.trim() !== '' && page.content.trim() !== '<br>') {
+                    const annotatedHtml = await callAiForBookAnnotation(page.content, contact);
+                    if (annotatedHtml) {
+                        book.pages[i].content = annotatedHtml;
+                    }
+                }
+            }
+        }
+        
+        saveConfig();
+        
+        if (notification && notificationText) {
+            notificationText.textContent = '批注完成!';
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 2000);
+        }
+
+    } catch(e) {
+        console.error("Book annotation failed:", e);
+        if (notification) {
+            notification.classList.add('hidden');
+        }
+    }
+}
+
+async function callAiForBookAnnotation(pageHTML, contact) {
+    const contactName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+    const userName = (window.iphoneSimState.userPersonas && window.iphoneSimState.userPersonas[contact.activePersonaId])
+        ? window.iphoneSimState.userPersonas[contact.activePersonaId].name
+        : '我';
+
+    const history = (window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id])
+        ? window.iphoneSimState.chatHistory[contact.id].slice(-10).map(m => `${m.role === 'user' ? userName : contactName}: ${m.content}`).join('\n')
+        : '无';
+
+    const userPersonaPrompt = (window.iphoneSimState.userPersonas && window.iphoneSimState.userPersonas[contact.activePersonaId])
+        ? window.iphoneSimState.userPersonas[contact.activePersonaId].aiPrompt
+        : '普通人';
+
+    const prompt = `
+你正在扮演 ${contactName}。你的详细人设是：
+<contact_persona>
+${contact.persona || '一个普通朋友'}
+</contact_persona>
+
+你正在和你的朋友 ${userName} 一起制作一本数字手账。TA的人设是：
+<user_persona>
+${userPersonaPrompt}
+</user_persona>
+
+最近你们的聊天记录摘要如下：
+<chat_history>
+${history}
+</chat_history>
+
+现在，${userName} 写了一页手账，内容如下 (HTML格式):
+<page_content>
+${pageHTML}
+</page_content>
+
+【你的任务】
+以 ${contactName} 的身份，阅读上面的内容并进行“批注”。这不是批改作文，而是像朋友间的互动，可以吐槽、划重点、或者写点俏皮话，就像在共同完成一个手账。
+
+【批注规则】
+你必须返回完整的HTML代码，并在其中嵌入你的批注。你可以使用以下HTML标签：
+
+1.  **添加评论**: 在你想要评论的那一行文字的 **正上方**，插入一个包含你评论的div。**你的评论必须是独立的、没有背景的、单独成行的文字**。
+    格式: \`<div class="contact-note">你的吐槽或评论</div>\`
+    示例:
+    原始HTML:
+    \`\`\`html
+    <div>这是用户写的第一行。</div>
+    <div>这是用户写的第二行。</div>
+    \`\`\`
+    如果你想评论第二行，应修改为:
+    \`\`\`html
+    <div>这是用户写的第一行。</div>
+    <div class="contact-note">哈哈，这行写得真有意思。</div>
+    <div>这是用户写的第二行。</div>
+    \`\`\`
+
+2.  **划重点 (荧光笔)**: 将你感兴趣的文字用 \`<span class="highlight">\` 包裹。
+    示例: \`<div>这是... <span class="highlight">你觉得重要的部分</span> ...</div>\`
+
+3.  **划掉文字**: 如果你想开玩笑地划掉某些内容，使用 \`<del>\` 标签。
+    示例: \`<div>我今天吃了 <del>五个</del> 一个苹果。</div>\`
+
+4.  **改变样式**: 你可以小范围地使用 \`<strong>\` (加粗), \`<em>\` (斜体), 或 \`<span style="color: red;">\` (改颜色)。
+
+【输出要求】
+-   **必须** 返回修改后的 **完整HTML** 内容，包括所有原始文本和你的批注标签。
+-   **不要** 删除或修改用户的原文，只通过添加标签来装饰它。
+-   你的批注要自然、有趣、符合你的人设和聊天上下文。
+-   如果内容没什么可批注的，可以不加任何标签，直接返回原始HTML。
+-   **不要** 在最终输出中包含任何解释、代码块标记(\`\`\`)或除了HTML内容之外的任何东西。
+
+请现在开始你的批注，并返回修改后的完整HTML：
+`;
+
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const response = await safeCallAiApi(messages);
+        // Clean the response to ensure it's valid HTML
+        const cleanResponse = response.replace(/^```html\s*|```\s*$/g, '').trim();
+        return cleanResponse;
+    } catch (e) {
+        console.error('AI call for book annotation failed', e);
+        return null;
+    }
+}
+
+window.openIcityBook = openIcityBook;
+window.closeIcityBook = closeIcityBook;
+window.addIcityBookPage = addIcityBookPage;
+window.nextIcityBookPage = nextIcityBookPage;
+window.prevIcityBookPage = prevIcityBookPage;
+window.updateBookPageContent = updateBookPageContent;
+
+function openIcityBookSettings() {
+    if (!window.currentReadingBook) return;
+    
+    // Create modal if not exists
+    let modal = document.getElementById('icity-book-contact-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'icity-book-contact-modal';
+        modal.className = 'modal hidden';
+        modal.style.zIndex = 3000; // Above book reader (2000)
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>关联联系人</h3>
+                    <button class="close-btn" onclick="closeIcityBookSettings()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="icity-book-contact-list" class="ios-list-group" style="margin: 0; max-height: 300px; overflow-y: auto; background: transparent;">
+                        <!-- Contacts -->
+                    </div>
+                    <div style="padding: 15px;">
+                        <button onclick="saveIcityBookSettings()" class="ios-btn-block">保存</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Render list
+    const list = document.getElementById('icity-book-contact-list');
+    list.innerHTML = '';
+    const contacts = window.iphoneSimState.contacts || [];
+    const linkedIds = window.currentReadingBook.linkedContactIds || [];
+    
+    if (contacts.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无联系人</div>';
+    } else {
+        contacts.forEach(c => {
+            const item = document.createElement('div');
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.padding = '10px 15px';
+            item.style.borderBottom = '1px solid #f0f0f0';
+            item.style.cursor = 'pointer';
+            
+            const isChecked = linkedIds.includes(c.id);
+            
+            // Find appropriate avatar
+            let avatar = c.avatar;
+            if (c.icityData && c.icityData.avatar) avatar = c.icityData.avatar;
+            
+            item.innerHTML = `
+                <input type="checkbox" class="book-contact-checkbox" value="${c.id}" ${isChecked ? 'checked' : ''} style="margin-right: 15px; transform: scale(1.2);">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: #ccc; margin-right: 10px; background-image: url('${avatar}'); background-size: cover; background-position: center;"></div>
+                <div style="font-weight: bold; color: #333;">${c.remark || c.name}</div>
+            `;
+             item.onclick = (e) => {
+                if (e.target.type !== 'checkbox') {
+                    const cb = item.querySelector('input[type="checkbox"]');
+                    cb.checked = !cb.checked;
+                }
+            };
+            list.appendChild(item);
+        });
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeIcityBookSettings() {
+    const modal = document.getElementById('icity-book-contact-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function saveIcityBookSettings() {
+    if (!window.currentReadingBook) return;
+    
+    const checkboxes = document.querySelectorAll('.book-contact-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => Number(cb.value));
+    
+    window.currentReadingBook.linkedContactIds = selectedIds;
+    saveConfig();
+    
+    closeIcityBookSettings();
+    alert('已关联');
+}
+
+window.openIcityBookSettings = openIcityBookSettings;
+window.closeIcityBookSettings = closeIcityBookSettings;
+window.saveIcityBookSettings = saveIcityBookSettings;
+
+async function handleIcityCommentSend() {
+    const input = document.getElementById('icity-comment-input');
+    let content = input.value.trim();
+    if (!content) return;
+    
+    // Find the post
+    let post = null;
+    
+    if (window.currentOpenIcitySource === 'diary') {
+        post = window.iphoneSimState.icityDiaries.find(d => d.id === window.currentOpenIcityDiaryId);
+    } else if (window.currentOpenIcitySource === 'world') {
+        post = window.iphoneSimState.icityWorldPosts.find(p => p.id === window.currentOpenIcityDiaryId);
+    } else if (window.currentOpenIcitySource === 'friends') {
+        post = window.iphoneSimState.icityFriendsPosts.find(p => p.id === window.currentOpenIcityDiaryId);
+    }
+    
+    if (!post) return;
+    
+    // Check if replying to someone
+    if (window.icityReplyingTo) {
+        content = `回复 ${window.icityReplyingTo.name}：${content}`;
+        // Clear reply state
+        window.icityReplyingTo = null;
+        input.placeholder = '我要评论';
+    }
+    
+    // Add user comment
+    if (!post.commentsList) post.commentsList = [];
+    
+    const userComment = {
+        id: Date.now(),
+        name: window.iphoneSimState.icityProfile.nickname || 'Kaneki',
+        content: content,
+        time: Date.now()
+    };
+    
+    post.commentsList.push(userComment);
+    post.comments = (post.comments || 0) + 1;
+    
+    input.value = '';
+    saveConfig();
+    
+    // Refresh view
+    openIcityDiaryDetail(window.currentOpenIcityDiaryId, window.currentOpenIcitySource);
+    
+    // Generate AI Reply
+    // If user commented on someone else's post, trigger reply
+    if (window.currentOpenIcitySource !== 'diary') {
+        await generateIcityCommentReply(post, content);
+    }
+}
+
+async function generateIcityCommentReply(post, userContent) {
+    // Determine persona
+    let persona = "一个路人网友";
+    let name = post.name;
+    
+    if (window.currentOpenIcitySource === 'friends') {
+        // Find contact
+        let contact = null;
+        if (post.contactId) {
+            contact = window.iphoneSimState.contacts.find(c => c.id === post.contactId);
+        } else {
+            contact = window.iphoneSimState.contacts.find(c => c.name === post.name);
+        }
+        
+        if (contact) {
+            persona = contact.persona || "你的朋友";
+        }
+    } else {
+        // World post - fake persona
+        persona = "网络用户，性格随机";
+    }
+    
+    const prompt = `你扮演 ${name} (人设: ${persona})。
+你在社交平台发布了动态："${post.content}"
+用户评论说："${userContent}"
+
+请回复用户的评论。
+要求：
+1. 简短、口语化。
+2. 符合人设。
+3. 只返回回复内容，不要包含其他文字。`;
+
+    try {
+        const messages = [{ role: 'user', content: prompt }];
+        const reply = await safeCallAiApi(messages);
+        
+        if (reply) {
+            const aiComment = {
+                id: Date.now() + 1,
+                name: name, // Author replies
+                content: `回复我：${reply}`, // Prefix as requested
+                time: Date.now()
+            };
+            
+            post.commentsList.push(aiComment);
+            post.comments = (post.comments || 0) + 1;
+            saveConfig();
+            
+            // Refresh if still on same page
+            if (window.currentOpenIcityDiaryId === post.id) {
+                openIcityDiaryDetail(post.id, window.currentOpenIcitySource);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to generate comment reply", e);
+    }
+}
+
+// Forwarding Logic
+window.currentForwardDiaryId = null;
+window.currentForwardSource = 'diary';
+
+function handleIcityForward(diaryId, source = 'diary') {
+    // Hide menus first
+    document.querySelectorAll('[id^="icity-menu-"]').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[id^="icity-feed-menu-"]').forEach(el => el.classList.add('hidden'));
+    
+    window.currentForwardDiaryId = diaryId;
+    window.currentForwardSource = source;
+    openContactPicker();
+}
+
+function openContactPicker() {
+    const modal = document.getElementById('contact-picker-modal');
+    if (!modal) return;
+    
+    renderContactPickerList();
+    modal.classList.remove('hidden');
+    
+    const closeBtn = document.getElementById('close-contact-picker');
+    if (closeBtn) closeBtn.onclick = () => modal.classList.add('hidden');
+    
+    const sendBtn = document.getElementById('contact-picker-send-btn');
+    if (sendBtn) sendBtn.onclick = handleContactPickerSend;
+}
+
+function renderContactPickerList() {
+    const list = document.getElementById('contact-picker-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const contacts = window.iphoneSimState.contacts || [];
+    
+    if (contacts.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">暂无联系人</div>';
+        return;
+    }
+    
+    contacts.forEach(c => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.padding = '10px 15px';
+        item.style.borderBottom = '1px solid #f0f0f0';
+        item.style.cursor = 'pointer';
+        
+        item.innerHTML = `
+            <input type="checkbox" class="contact-picker-checkbox" value="${c.id}" style="margin-right: 15px; transform: scale(1.2);">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #ccc; margin-right: 10px; background-image: url('${c.avatar}'); background-size: cover; background-position: center;"></div>
+            <div style="font-weight: bold; color: #333;">${c.remark || c.name}</div>
+        `;
+        
+        // Toggle checkbox on row click
+        item.onclick = (e) => {
+            if (e.target.type !== 'checkbox') {
+                const cb = item.querySelector('input[type="checkbox"]');
+                cb.checked = !cb.checked;
+            }
+        };
+        
+        list.appendChild(item);
+    });
+}
+
+function handleContactPickerSend() {
+    const checkboxes = document.querySelectorAll('.contact-picker-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => Number(cb.value));
+    
+    if (selectedIds.length === 0) {
+        alert('请选择联系人');
+        return;
+    }
+    
+    if (!window.currentForwardDiaryId) return;
+    
+    let post = null;
+    let authorName = '';
+    let authorAvatar = '';
+
+    if (window.currentForwardSource === 'diary') {
+        post = window.iphoneSimState.icityDiaries.find(d => d.id === window.currentForwardDiaryId);
+        authorName = window.iphoneSimState.icityProfile.nickname || 'Kaneki';
+        authorAvatar = window.iphoneSimState.icityProfile.avatar || '';
+    } else if (window.currentForwardSource === 'world') {
+        post = window.iphoneSimState.icityWorldPosts.find(p => p.id === window.currentForwardDiaryId);
+        if (post) {
+            authorName = post.name;
+            authorAvatar = post.avatar;
+        }
+    } else if (window.currentForwardSource === 'friends') {
+        post = window.iphoneSimState.icityFriendsPosts.find(p => p.id === window.currentForwardDiaryId);
+        if (post) {
+            authorName = post.name;
+            authorAvatar = post.avatar;
+            // Try to resolve contact info if available
+            if (post.contactId) {
+                const contact = window.iphoneSimState.contacts.find(c => c.id === post.contactId);
+                if (contact) {
+                    if (contact.icityData && contact.icityData.name) authorName = contact.icityData.name;
+                    if (contact.icityData && contact.icityData.avatar) authorAvatar = contact.icityData.avatar;
+                    else if (!authorAvatar) authorAvatar = contact.avatar;
+                }
+            }
+        }
+    }
+
+    if (!post) return;
+    
+    const cardData = {
+        diaryId: post.id,
+        content: post.content,
+        authorName: authorName,
+        authorAvatar: authorAvatar,
+        time: post.time,
+        source: window.currentForwardSource // Add source to help identify author context
+    };
+    
+    selectedIds.forEach(contactId => {
+        if (!window.iphoneSimState.chatHistory[contactId]) {
+            window.iphoneSimState.chatHistory[contactId] = [];
+        }
+        
+        window.iphoneSimState.chatHistory[contactId].push({
+            id: Date.now() + Math.random().toString(36).substr(2, 9),
+            role: 'user', // Sent by me
+            type: 'icity_card',
+            content: JSON.stringify(cardData),
+            time: Date.now()
+        });
+    });
+    
+    saveConfig();
+    
+    document.getElementById('contact-picker-modal').classList.add('hidden');
+    alert('已转发');
+    
+    // Refresh chat if open
+    if (window.iphoneSimState.currentChatContactId && selectedIds.includes(window.iphoneSimState.currentChatContactId)) {
+        if (window.renderChatHistory) window.renderChatHistory(window.iphoneSimState.currentChatContactId);
+    }
+}
+
+// Export functions
+window.handleIcityForward = handleIcityForward;
 
 // Calendar Functions
 function renderIcityCalendar(year = 2026) {

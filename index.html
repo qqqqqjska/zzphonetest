@@ -2494,6 +2494,17 @@
     <!-- icity App -->
     <div id="icity-app" class="app-screen hidden" style="background-color: #f2f2f7;">
         
+        <!-- Tab 0: Books (New) -->
+        <div id="icity-tab-content-books" class="icity-tab-content" style="display: none; height: 100%; flex-direction: column;">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: center; position: relative; padding-top: max(10px, env(safe-area-inset-top));">
+                <div style="font-weight: bold; font-size: 17px;">书架</div>
+                <button id="icity-add-book-btn" style="position: absolute; right: 15px; background: none; border: none; font-size: 20px; color: #333;"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="app-body" id="icity-books-list" style="padding: 0; padding-bottom: 60px; overflow-x: auto; overflow-y: hidden; background-color: #fff; flex: 1; display: flex; align-items: center; scroll-snap-type: x mandatory; position: relative;">
+                <!-- Books generated here -->
+            </div>
+        </div>
+
         <!-- Tab 1: Profile (Current Content) -->
         <div id="icity-tab-content-profile" class="icity-tab-content" style="display: none; height: 100%;">
             <div class="app-header" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 10; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border: none; justify-content: space-between; padding-left: 10px; padding-right: 10px; padding-top: max(10px, env(safe-area-inset-top)); pointer-events: none;">
@@ -2595,7 +2606,7 @@
         </div>
 
         <div class="icity-tab-bar">
-            <button class="icon-btn" style="color: #ccc;"><i class="fas fa-book"></i></button>
+            <button class="icon-btn" id="icity-nav-books" style="color: #ccc;"><i class="fas fa-book"></i></button>
             <button class="icon-btn" id="icity-nav-world" style="color: #000;"><i class="fas fa-globe"></i></button>
             <div id="icity-nav-compose" style="width: 40px; height: 40px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: #007AFF; cursor: pointer;"><i class="fas fa-pen-nib"></i></div>
             <button class="icon-btn" id="icity-nav-messages" style="color: #ccc;"><i class="far fa-comment"></i></button>
@@ -2759,6 +2770,31 @@
                 </div>
 
                 <button id="save-icity-settings-btn" class="ios-btn-block">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iCity Add Book Modal -->
+    <div id="icity-add-book-modal" class="modal hidden" style="z-index: 250;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加书籍</h3>
+                <button class="close-btn" id="close-icity-add-book">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>书名</label>
+                    <input type="text" id="icity-book-name" placeholder="输入书名">
+                </div>
+                <div class="setting-group">
+                    <label>封面</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div id="icity-book-cover-preview" style="width: 60px; height: 80px; background: #eee; border-radius: 4px; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: #999; font-size: 20px;"><i class="fas fa-camera"></i></div>
+                        <input type="file" id="icity-book-cover-input" accept="image/*" class="file-input-hidden">
+                        <label for="icity-book-cover-input" class="ios-btn" style="margin: 0;">选择图片</label>
+                    </div>
+                </div>
+                <button id="save-icity-book-btn" class="ios-btn-block">确定</button>
             </div>
         </div>
     </div>
@@ -3490,6 +3526,24 @@
                             <textarea id="edit-chat-msg-content" placeholder="输入新的消息内容..." style="height: 150px;"></textarea>
                         </div>
                         <button id="save-edit-chat-msg-btn" class="ios-btn-block">保存修改</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 联系人选择弹窗 (通用) -->
+            <div id="contact-picker-modal" class="modal hidden" style="z-index: 300;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>选择联系人</h3>
+                        <button class="close-btn" id="close-contact-picker">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding: 0;">
+                        <div id="contact-picker-list" class="ios-list-group" style="margin: 0; max-height: 300px; overflow-y: auto; background: transparent;">
+                            <!-- Contacts will be generated here -->
+                        </div>
+                        <div style="padding: 15px;">
+                            <button id="contact-picker-send-btn" class="ios-btn-block">发送</button>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1408,7 +1408,7 @@ function renderChatHistory(contactId, preserveScroll = false) {
     if (needSave) saveConfig();
 
     messagesRendered.forEach(msg => {
-        if (msg.type === 'system_event' || (typeof msg.content === 'string' && msg.content.startsWith('(用户发布了 iCity 动态:'))) {
+        if (msg.type === 'system_event' || (typeof msg.content === 'string' && msg.content.startsWith('(用户发布了 iCity 日记:'))) {
             return;
         }
         appendMessageToUI(msg.content, msg.role === 'user', msg.type || 'text', msg.description, msg.replyTo, msg.id, msg.time, true);
@@ -1746,6 +1746,26 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                 <div style="border-top: 1px solid #f0f0f0; padding-top: 8px; font-size: 12px; color: #666; display: flex; align-items: center;">
                     <i class="fas fa-heart" style="color: #FF3B30; margin-right: 5px;"></i> 
                     <span>闲鱼收藏礼物</span>
+                </div>
+            </div>
+        `;
+    } else if (type === 'icity_card') {
+        extraClass = 'icity-card-msg';
+        let cardData = typeof text === 'string' ? JSON.parse(text) : text;
+        
+        let displayContent = cardData.content;
+        if (displayContent && displayContent.length > 30) {
+            displayContent = displayContent.substring(0, 30) + '...';
+        }
+        
+        contentHtml = `
+            <div class="icity-share-card" style="background: #fff; border-radius: 8px; width: 220px; height: 110px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; margin-top: -40px;" onclick="document.getElementById('icity-app').classList.remove('hidden'); window.openIcityDiaryDetail(${cardData.diaryId});">
+                <div style="padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="font-size: 14px; font-weight: bold; color: #333; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cardData.authorName}</div>
+                    <div style="font-size: 12px; color: #666; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayContent}</div>
+                </div>
+                <div style="padding: 4px 10px; font-size: 10px; color: #999; display: flex; align-items: center; border-top: 1px solid #f5f5f5; height: 24px; padding-top: 6px;">
+                    <i class="fas fa-globe" style="margin-right: 4px;"></i> <span style="position: relative; top: 0px;">iCity 日记</span>
                 </div>
             </div>
         `;
@@ -2116,6 +2136,153 @@ function scrollToBottom() {
     container.scrollTop = container.scrollHeight;
 }
 
+// New Robust Parser for AI Responses
+function parseMixedAiResponse(content) {
+    const results = [];
+    
+    // Helper to process valid item
+    const processItem = (item) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+            results.push({ type: '消息', content: item });
+            return;
+        }
+        
+        // Normalize types
+        let type = '消息';
+        let content = item.content || '';
+        
+        if (item.type === 'text') type = '消息';
+        else if (item.type === 'sticker') type = '表情包';
+        else if (item.type === 'image') type = '图片';
+        else if (item.type === 'voice') {
+            type = '语音';
+            content = `${item.duration || 3} ${item.content || '语音消息'}`;
+        } else if (item.type === 'thought') {
+            type = 'thought'; // Special handling
+        } else if (item.type === 'action') {
+            type = 'action';
+            content = item; // Keep full object
+        } else {
+            // Unknown type fallback
+            type = '消息';
+        }
+
+        results.push({ type, content });
+    };
+
+    // Helper to try parsing JSON with loose rules
+    const fixJson = (str) => {
+        // Fix trailing commas: replace ,] with ] and ,} with }
+        return str.replace(/,\s*([\]}])/g, '$1');
+    };
+
+    const tryParse = (str) => {
+        if (!str) return null;
+        try {
+            return JSON.parse(str);
+        } catch (e) {
+            try {
+                return JSON.parse(fixJson(str));
+            } catch (e2) {
+                return null;
+            }
+        }
+    };
+
+    // Strategy 1: Attempt to parse the whole content (or markdown block)
+    let cleanContent = content.trim();
+    // Remove markdown code blocks if present
+    if (cleanContent.includes('```')) {
+        // Try to extract content inside ```json ... ``` or just ``` ... ```
+        const match = cleanContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (match) {
+            cleanContent = match[1].trim();
+        }
+    }
+
+    let parsed = tryParse(cleanContent);
+    if (parsed && Array.isArray(parsed)) {
+        parsed.forEach(processItem);
+        return results;
+    }
+
+    // Strategy 2: Forced Regex Extraction
+    // Look for the outermost square brackets [ ... ] that might contain the array
+    // This handles cases where there is extra text before or after, or the JSON is messy
+    const jsonArrayRegex = /\[\s*\{[\s\S]*\}\s*\]/g;
+    let match;
+    let foundJson = false;
+    
+    // We iterate in case there are multiple JSON blocks (though usually one)
+    while ((match = jsonArrayRegex.exec(content)) !== null) {
+        const potentialJson = match[0];
+        parsed = tryParse(potentialJson);
+        if (parsed && Array.isArray(parsed)) {
+            parsed.forEach(processItem);
+            foundJson = true;
+        }
+    }
+
+    if (foundJson) return results;
+
+    // Strategy 3: Line-by-line fallback (for streaming-like or broken multi-line structures)
+    const lines = content.split('\n');
+    let buffer = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        if (!line) continue;
+
+        // Try parsing current line
+        parsed = tryParse(line);
+        
+        if (!parsed) {
+            if (buffer) {
+                let combined = buffer + line;
+                parsed = tryParse(combined);
+                if (parsed) {
+                    buffer = ''; 
+                } else {
+                    buffer += line; 
+                    continue; 
+                }
+            } else {
+                // Start buffering if it looks like start of JSON
+                if (line.startsWith('{') || line.startsWith('[')) {
+                    buffer = line;
+                    continue;
+                }
+                // Otherwise treat as plain text
+                results.push({ type: '消息', content: line });
+                continue;
+            }
+        }
+
+        if (parsed) {
+            if (Array.isArray(parsed)) {
+                parsed.forEach(processItem);
+            } else {
+                processItem(parsed);
+            }
+        }
+    }
+
+    // Process remaining buffer
+    if (buffer) {
+        parsed = tryParse(buffer);
+        if (parsed) {
+            if (Array.isArray(parsed)) parsed.forEach(processItem);
+            else processItem(parsed);
+        } else {
+            results.push({ type: '消息', content: buffer });
+        }
+    }
+
+    return results;
+}
+
+// Fallback legacy parser
 function parseMixedContent(content) {
     const results = [];
     // 预处理：统一符号
@@ -2204,6 +2371,30 @@ async function generateAiReply(instruction = null) {
         }
     }
 
+    let icityContext = '';
+    if (window.iphoneSimState.icityDiaries && window.iphoneSimState.icityDiaries.length > 0) {
+        // Check visibility permissions
+        const isLinked = window.iphoneSimState.icityProfile && 
+                         window.iphoneSimState.icityProfile.linkedContactIds && 
+                         window.iphoneSimState.icityProfile.linkedContactIds.includes(contact.id);
+        
+        const recentDiaries = window.iphoneSimState.icityDiaries.filter(d => {
+            if (d.visibility === 'private') return false;
+            // Friends-only posts are visible to linked contacts
+            if (d.visibility === 'friends' && !isLinked) return false; 
+            return true;
+        }).slice(0, 3); // Get last 3
+
+        if (recentDiaries.length > 0) {
+            icityContext += '\n【用户最近的 iCity 日记】\n';
+            recentDiaries.forEach(d => {
+                const date = new Date(d.time);
+                const timeStr = `${date.getMonth() + 1}月${date.getDate()}日`;
+                icityContext += `[${timeStr}] ${d.content}\n`;
+            });
+        }
+    }
+
     let memoryContext = '';
     if (contact.memorySendLimit && contact.memorySendLimit > 0) {
         const contactMemories = window.iphoneSimState.memories.filter(m => m.contactId === contact.id);
@@ -2256,6 +2447,7 @@ async function generateAiReply(instruction = null) {
 聊天风格：${contact.style || '正常'}
 ${userPromptInfo}
 ${momentContext}
+${icityContext}
 ${memoryContext}
 ${meetingContext}
 ${timeContext}
@@ -2564,6 +2756,18 @@ ${contact.showThought ? '- **强制执行**：请务必包含内心独白。格�
                     giftData = { title: '礼物', price: '0' };
                 }
                 return { role: h.role, content: `[送出礼物：${giftData.title}，价值：${giftData.price}元] (这是我在闲鱼上看到你收藏的商品，特意买来送给你的)` };
+            } else if (h.type === 'icity_card') {
+                let cardData = {};
+                try {
+                    cardData = typeof content === 'string' ? JSON.parse(content) : content;
+                } catch(e) {}
+                
+                let authorInfo = `作者: ${cardData.authorName || '未知'}`;
+                if (cardData.source === 'diary') {
+                    authorInfo = `作者: 我(用户)`;
+                }
+                
+                return { role: h.role, content: `[分享了 iCity 日记 (${authorInfo}): "${cardData.content || '内容'}"]` };
             } else {
                 if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
                      try {
@@ -2635,98 +2839,74 @@ ${contact.showThought ? '- **强制执行**：请务必包含内心独白。格�
         let actions = [];
         let thoughtContent = null;
         let messagesList = [];
-        let isJsonParsed = false;
+        
+        // 使用新的混合解析器
+        const parsedItems = parseMixedAiResponse(replyContent);
+        
+        // 处理解析结果
+        for (const item of parsedItems) {
+            if (item.type === 'thought') {
+                const t = item.content || '';
+                thoughtContent = thoughtContent ? (thoughtContent + ' ' + t) : t;
+            } else if (item.type === 'action') {
+                // 转换 action 为旧的字符串格式以复用逻辑
+                const cmd = item.content.command;
+                const pl = item.content.payload;
+                let actionStr = `ACTION: ${cmd}`;
+                if (pl) {
+                    actionStr += `: ${pl}`;
+                }
+                actions.push(actionStr);
+            } else {
+                // 消息, 表情包, 图片, 语音 等
+                messagesList.push(item);
+            }
+        }
 
-        // 尝试 JSON 解析
-        try {
-            // 提取可能的 JSON 数组部分
-            const jsonStart = replyContent.indexOf('[');
-            const jsonEnd = replyContent.lastIndexOf(']');
-            
-            if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-                const potentialJson = replyContent.substring(jsonStart, jsonEnd + 1);
-                const parsed = JSON.parse(potentialJson);
+        // 兼容旧的 ACTION 和 心声 格式（如果解析器没处理）
+        // parseMixedAiResponse 应该已经处理了大部分 JSON，但对于纯文本中的 ACTION 标记可能需要补充
+        // 这里我们假设 AI 严格遵循 JSON 输出，但为了保险，扫描一下 text 类型的内容
+        // 如果 text 内容包含 "ACTION:", 我们将其提取出来
+        
+        // Re-scan text messages for embedded actions (legacy fallback)
+        const finalMessages = [];
+        const actionRegex = /^[\s\*\-\>]*ACTION\s*[:：]\s*(.*)$/i;
+        const thoughtRegex = /\[心声\s*[:：]\s*(.*?)\]/i;
+
+        for (const msg of messagesList) {
+            if (msg.type === '消息') {
+                let lines = msg.content.split('\n');
+                let cleanContent = '';
                 
-                if (Array.isArray(parsed)) {
-                    isJsonParsed = true;
-                    console.log('Successfully parsed AI JSON response', parsed);
-                    
-                    for (const item of parsed) {
-                        if (!item) continue;
-                        
-                        if (typeof item === 'string') {
-                            // 兼容纯字符串数组的情况
-                            messagesList.push({ type: '消息', content: item });
-                            continue;
-                        }
+                for (let line of lines) {
+                    let trimmedLine = line.trim();
+                    if (!trimmedLine) continue;
 
-                        if (item.type === 'thought') {
-                            const t = item.content || '';
-                            thoughtContent = thoughtContent ? (thoughtContent + ' ' + t) : t;
-                        } else if (item.type === 'action') {
-                            // 转换 action 为旧的字符串格式以复用逻辑
-                            let actionStr = `ACTION: ${item.command}`;
-                            if (item.payload) {
-                                actionStr += `: ${item.payload}`;
-                            }
-                            actions.push(actionStr);
-                        } else if (item.type === 'text') {
-                            messagesList.push({ type: '消息', content: item.content });
-                        } else if (item.type === 'sticker') {
-                            messagesList.push({ type: '表情包', content: item.content });
-                        } else if (item.type === 'image') {
-                            messagesList.push({ type: '图片', content: item.content });
-                        } else if (item.type === 'voice') {
-                            const duration = item.duration || 3;
-                            const text = item.content || '语音消息';
-                            messagesList.push({ type: '语音', content: `${duration} ${text}` });
-                        } else {
-                            // 未知类型，当作文本
-                            if (item.content) messagesList.push({ type: '消息', content: item.content });
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('JSON parse failed, falling back to text parsing', e);
-        }
+                    let actionMatch = trimmedLine.match(actionRegex);
+                    let thoughtMatch = trimmedLine.match(thoughtRegex);
 
-        if (!isJsonParsed) {
-            // 回退到原有的文本解析逻辑
-            let lines = replyContent.split('\n');
-            let cleanLines = [];
-
-            const actionRegex = /^[\s\*\-\>]*ACTION\s*[:：]\s*(.*)$/i;
-            const thoughtRegex = /\[心声\s*[:：]\s*(.*?)\]/i;
-
-            for (let line of lines) {
-                let trimmedLine = line.trim();
-                if (!trimmedLine) continue; 
-
-                let actionMatch = trimmedLine.match(actionRegex);
-                let thoughtMatch = trimmedLine.match(thoughtRegex);
-
-                if (actionMatch) {
-                    actions.push('ACTION: ' + actionMatch[1].trim());
-                } else if (thoughtMatch) {
-                    const content = thoughtMatch[1].trim();
-                    if (thoughtContent) {
-                        thoughtContent += ' ' + content;
+                    if (actionMatch) {
+                        actions.push('ACTION: ' + actionMatch[1].trim());
+                    } else if (thoughtMatch) {
+                        const content = thoughtMatch[1].trim();
+                        thoughtContent = thoughtContent ? (thoughtContent + ' ' + content) : content;
                     } else {
-                        thoughtContent = content;
+                        cleanContent += (cleanContent ? '\n' : '') + line;
                     }
-                    let remaining = line.replace(thoughtMatch[0], '').trim();
-                    if (remaining) {
-                        cleanLines.push(remaining);
-                    }
-                } else {
-                    cleanLines.push(line);
                 }
+                
+                if (cleanContent) {
+                    // 如果清理后还有内容，保留消息
+                    // 还要再次检查是否是 [类型:内容] 格式（如果 fallback 到 parseMixedContent）
+                    // 但 parseMixedAiResponse 已经不做这个了。
+                    // 保持简单，直接作为文本
+                    finalMessages.push({ type: '消息', content: cleanContent });
+                }
+            } else {
+                finalMessages.push(msg);
             }
-
-            replyContent = cleanLines.join('\n').trim();
-            messagesList.push(...parseMixedContent(replyContent));
         }
+        messagesList = finalMessages;
 
         // 处理指令
         let imageToSend = null;

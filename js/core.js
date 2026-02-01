@@ -711,10 +711,44 @@ function applyConfig() {
     if (window.toggleStatusBar) toggleStatusBar(state.showStatusBar);
 }
 
+// 定时写日记检查逻辑
+function checkScheduledDiaries() {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+    const todayStr = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+    if (!window.iphoneSimState.contacts) return;
+
+    window.iphoneSimState.contacts.forEach(contact => {
+        if (contact.icityData && contact.icityData.autoDiaryEnabled && contact.icityData.autoDiaryTime) {
+            // 检查时间是否匹配
+            if (contact.icityData.autoDiaryTime === currentTimeStr) {
+                // 检查今天是否已经生成过（避免重复生成）
+                if (contact.icityData.lastAutoDiaryDate !== todayStr) {
+                    console.log(`Triggering scheduled diary for ${contact.name} at ${currentTimeStr}`);
+                    contact.icityData.lastAutoDiaryDate = todayStr;
+                    saveConfig(); // 立即保存状态防止重复触发
+                    
+                    if (window.generateScheduledContactDiary) {
+                        window.generateScheduledContactDiary(contact);
+                    }
+                }
+            }
+        }
+    });
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Script loaded');
     init();
+    
+    // 启动分钟级定时器
+    setInterval(checkScheduledDiaries, 60000);
+    // 立即检查一次（防止刚好错过这一分钟的开头）
+    setTimeout(checkScheduledDiaries, 5000);
 });
 
 async function init() {
