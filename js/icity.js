@@ -1374,7 +1374,8 @@ ${contextStr}
 1. 为每个角色生成一条评论。
 2. 评论内容要符合角色人设和最近的聊天上下文。
 3. 语气要像在社交媒体上互动，口语化。
-4. 严格返回 JSON 数组格式。
+4. **严禁**输出 "BAKA"、"baka" 等词汇。
+5. 严格返回 JSON 数组格式。
 
 格式示例：
 [
@@ -1466,6 +1467,7 @@ async function generateIcityInteractions(diary) {
 4. **私信**：
    - 不要用“你好，我看到了你的动态...”这种正式开场白。
    - 就像朋友一样直接说话，或者像是在搭讪。例如：“姐妹这个哪里买的”、“笑死我了”、“dd”、“求图”。
+   - **严禁**输出 "BAKA"、"baka" 等词汇。
 
 【生成任务】
 1. 生成 ${aiCommentCount} 条评论。
@@ -1893,7 +1895,8 @@ ${historyContext}
 要求：
 1. 保持人设（${msgObj.sender}），语气口语化、生活化、像真人。
 2. 回复不要太长，符合聊天习惯。
-3. 只返回回复内容，不要包含其他文字。`;
+3. **严禁**输出 "BAKA"、"baka" 等词汇。
+4. 只返回回复内容，不要包含其他文字。`;
 
             const messages = [{ role: 'user', content: prompt }];
             
@@ -3246,7 +3249,8 @@ ${contextStr}
 5. **互动生成**：
    - 如果是 "public"：请生成较多的点赞数(likes)和一些**陌生人/路人**的评论(comments_list)。评论内容要像真实的网友互动。
    - 如果是 "friends"：点赞数较少，评论列表为空(或仅限互关好友，暂时留空即可)。
-6. 严格返回 JSON 数组格式。
+6. **严禁**输出 "BAKA"、"baka" 等词汇。
+7. 严格返回 JSON 数组格式。
 
 格式示例：
 [
@@ -3358,7 +3362,8 @@ ${chatContext}
    - 如果有特定世界观，内容要符合该世界观下的生活状态。
    - 如果没有特别的事情，可以写你的日常生活、心理活动、或者对未来的期许。
 3. **风格**：完全沉浸在角色中，使用角色的口吻。可以是感性的、碎碎念的、或者严肃的，取决于人设。
-4. **格式**：只返回日记正文内容，不要包含任何解释性文字或JSON格式。直接输出纯文本。
+4. **禁语**：**严禁**输出 "BAKA"、"baka" 等词汇。
+5. **格式**：只返回日记正文内容，不要包含任何解释性文字或JSON格式。直接输出纯文本。
 
 请开始写日记：`;
 
@@ -3977,12 +3982,19 @@ function renderBookPages(book) {
     });
 }
 
+let bookSaveTimer = null;
+
 function updateBookPageContent(index, el) {
     if (window.currentReadingBook) {
         window.currentReadingBook.pages[index].content = el.innerHTML;
         window.currentReadingBook.pages[index].lastModified = Date.now();
-        // Debounce save?
-        saveConfig();
+        
+        // Debounce save to prevent browser crash on mobile
+        if (bookSaveTimer) clearTimeout(bookSaveTimer);
+        bookSaveTimer = setTimeout(() => {
+            saveConfig();
+            bookSaveTimer = null;
+        }, 1000);
     }
 }
 
@@ -4036,6 +4048,13 @@ function closeIcityBook() {
 }
 
 function forceCloseIcityBook() {
+    // Flush pending save
+    if (bookSaveTimer) {
+        clearTimeout(bookSaveTimer);
+        bookSaveTimer = null;
+        saveConfig();
+    }
+
     const reader = document.getElementById('icity-book-reader');
     if (reader) {
         reader.classList.remove('visible');
@@ -4247,6 +4266,7 @@ ${protectedHtml}
 2. **绝对禁止**修改、删除、拆分或移动这些标记。
 3. **绝对禁止**在这些标记内部或针对这些标记的内容进行再次批注。
 4. 你只能对**没有被标记覆盖的纯文本**进行新的批注。
+5. **严禁**输出 "BAKA"、"baka" 等词汇。
 
 【批注样式与颜色】
 请**随机**使用以下颜色类名，不要总是用同一种颜色，让页面看起来丰富多彩：
@@ -4353,7 +4373,8 @@ ${stickerContext}
 1. **纯文本**：只写文字内容，不需要HTML标签。
 2. **黑色字体**：使用默认黑色字体（不需要任何颜色类名）。
 3. **表情包**：可以在合适的地方插入表情包，格式：[[STICKER:名称]]。
-4. **长度**：适中，写满一页手账的感觉（约50-150字）。
+4. **禁语**：**严禁**输出 "BAKA"、"baka" 等词汇。
+5. **长度**：适中，写满一页手账的感觉（约50-150字）。
 ${stickerContext}
 
 请直接返回内容文本。`;
@@ -4850,7 +4871,8 @@ async function generateIcityCommentReply(post, userContent) {
 要求：
 1. 简短、口语化。
 2. 符合人设。
-3. 只返回回复内容，不要包含其他文字。`;
+3. **严禁**输出 "BAKA"、"baka" 等词汇。
+4. 只返回回复内容，不要包含其他文字。`;
 
     try {
         const messages = [{ role: 'user', content: prompt }];
