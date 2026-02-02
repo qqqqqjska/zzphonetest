@@ -1758,6 +1758,16 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
             displayContent = displayContent.substring(0, 30) + '...';
         }
         
+        let commentCount = 0;
+        if (cardData.comments && Array.isArray(cardData.comments)) {
+            commentCount = cardData.comments.length;
+        }
+        
+        let commentBadge = '';
+        if (commentCount > 0) {
+            commentBadge = `<span style="margin-left: auto; background: #f0f0f0; padding: 1px 6px; border-radius: 4px; color: #666;">${commentCount}条评论</span>`;
+        }
+        
         contentHtml = `
             <div class="icity-share-card" style="background: #fff; border-radius: 8px; width: 220px; height: 110px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; margin-top: -40px;" onclick="document.getElementById('icity-app').classList.remove('hidden'); window.openIcityDiaryDetail(${cardData.diaryId});">
                 <div style="padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
@@ -1766,9 +1776,13 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                 </div>
                 <div style="padding: 4px 10px; font-size: 10px; color: #999; display: flex; align-items: center; border-top: 1px solid #f5f5f5; height: 24px; padding-top: 6px;">
                     <i class="fas fa-globe" style="margin-right: 4px;"></i> <span style="position: relative; top: 0px;">iCity 日记</span>
+                    ${commentBadge}
                 </div>
             </div>
         `;
+    } else if (type === 'minesweeper_invite') {
+        extraClass = 'minesweeper-invite-msg';
+        contentHtml = `<div class="minesweeper-card" style="display: flex; flex-direction: column; width: 100%; height: 100%; justify-content: space-between;" onclick="window.startMinesweeper()"><div class="minesweeper-invite-top" style="display: flex; align-items: center; padding: 12px 15px; gap: 12px; background: linear-gradient(135deg, #f9f9f9 0%, #ffffff 100%); border-bottom: 1px solid #f0f0f0; width: 100%;"><div class="minesweeper-icon" style="width: 40px; height: 40px; border-radius: 8px; background-color: #ff3b30; display: flex; justify-content: center; align-items: center; font-size: 20px; color: #fff;">💣</div><div class="minesweeper-info" style="display: flex; flex-direction: column; justify-content: center; flex: 1;"><div class="minesweeper-title" style="font-size: 16px; font-weight: 600; color: #000; margin-bottom: 2px;">扫雷</div><div class="minesweeper-desc" style="font-size: 12px; color: #8e8e93;">邀请你玩游戏</div></div></div><div class="minesweeper-invite-bottom" style="padding: 8px 15px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #8e8e93; width: 100%;"><span>经典游戏</span><i class="fas fa-chevron-right"></i></div></div>`;
     }
 
     let replyHtml = '';
@@ -2024,6 +2038,7 @@ function showContextMenu(targetEl, msgData) {
     menu.innerHTML = `
         <div class="context-menu-item" id="menu-quote">引用</div>
         <div class="context-menu-item" id="menu-copy">复制</div>
+        ${(msgData.type === 'image' || msgData.type === 'sticker' || msgData.type === 'virtual_image') ? '<div class="context-menu-item" id="menu-set-avatar">设为头像</div>' : ''}
         <div class="context-menu-item" id="menu-edit">编辑</div>
         <div class="context-menu-item" id="menu-delete" style="color: #ff3b30;">删除</div>
     `;
@@ -2075,6 +2090,47 @@ function showContextMenu(targetEl, msgData) {
         }
         menu.remove();
     };
+    const setAvatarBtn = menu.querySelector('#menu-set-avatar');
+    if (setAvatarBtn) {
+        setAvatarBtn.onclick = () => {
+            menu.remove();
+            if (!window.iphoneSimState.currentChatContactId) return;
+            const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
+            if (!contact) return;
+
+            if (confirm(`确定要将这张图片设为 "${contact.remark || contact.name}" 的头像吗？`)) {
+                let newAvatar = msgData.content;
+                // If it's a sticker or virtual image with complex structure, handle it?
+                // Usually msgData.content is the URL/Base64 for these types in appendMessageToUI calls
+                // But for virtual_image in showContextMenu caller, content passed might be just URL if extracted correctly.
+                // handleMessageLongPress passes 'content' which is 'text' from appendMessageToUI args.
+                // In appendMessageToUI:
+                // if type is image/sticker, text is URL.
+                // if type is virtual_image, text is URL.
+                
+                contact.avatar = newAvatar;
+                saveConfig();
+                
+                // Refresh UI
+                if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
+                
+                // Refresh chat history (to update avatars in message list)
+                renderChatHistory(contact.id, true);
+                
+                // Update chat title avatar if exists (usually handled by renderChatHistory or openChat)
+                // But we should refresh the header info if possible. 
+                // Currently chat header doesn't show avatar, just name.
+                // The contact list and message list avatars will be updated.
+                
+                // Send a system message indicating change?
+                // sendMessage(`[系统消息]: 已将图片设为头像`, false, 'text');
+                // Maybe just a toast?
+                if (window.showChatToast) window.showChatToast('头像已更新');
+                else alert('头像已更新');
+            }
+        };
+    }
+
     menu.querySelector('#menu-edit').onclick = () => {
         if (msgData.msgId) {
             menu.remove();
@@ -2444,6 +2500,12 @@ async function generateAiReply(instruction = null) {
 
     let icityBookContext = getLinkedIcityBooksContext(contact.id);
 
+    let minesweeperContext = '';
+    const msModal = document.getElementById('minesweeper-modal');
+    if (msModal && !msModal.classList.contains('hidden') && window.getMinesweeperGameState) {
+        minesweeperContext = '\n【当前扫雷游戏状态】\n' + window.getMinesweeperGameState() + '\n\n【扫雷操作指令】\n如果你想操作扫雷游戏，请使用以下指令：\n- 点击/揭开格子: ACTION: MINESWEEPER_CLICK: 行,列 (例如: ACTION: MINESWEEPER_CLICK: 0,0)\n- 插旗/标记地雷: ACTION: MINESWEEPER_FLAG: 行,列\n请分析局势，做出明智的决策。\n⚠️ 重要提示：\n1. 绝对不要点击已经揭开的数字格子或空格子。\n2. 绝对不要点击已经插旗的格子。\n3. 请只点击未知区域（显示为 ? 的位置）。';
+    }
+
     let systemPrompt = `你现在扮演 ${contact.name}。
 人设：${contact.persona || '无'}
 聊天风格：${contact.style || '正常'}
@@ -2453,6 +2515,7 @@ ${icityContext}
 ${memoryContext}
 ${meetingContext}
 ${icityBookContext}
+${minesweeperContext}
 ${timeContext}
 ${itineraryContext}
 
@@ -2517,6 +2580,7 @@ ${itineraryContext}
   - command: "UPDATE_NAME", payload: "新网名"
   - command: "UPDATE_WXID", payload: "新微信号"
   - command: "UPDATE_SIGNATURE", payload: "新签名"
+  - command: "UPDATE_AVATAR", payload: "" (将用户发送的最后一张图片设为自己的头像)
 
 【记忆提取指令】
 在对话过程中，当你注意到用户提到关于自己的新信息时（如喜好、习惯、特征、经历等），请将其记录下来。
@@ -2775,7 +2839,14 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                     authorInfo = `作者: 我(用户)`;
                 }
                 
-                return { role: h.role, content: `[分享了 iCity 日记 (${authorInfo}): "${cardData.content || '内容'}"]` };
+                let commentsInfo = '';
+                if (cardData.comments && cardData.comments.length > 0) {
+                    // Limit to last 5 comments to avoid token limit
+                    const recentComments = cardData.comments.slice(-5);
+                    commentsInfo = '\n评论区:\n' + recentComments.map(c => `${c.name}: ${c.content}`).join('\n');
+                }
+                
+                return { role: h.role, content: `[分享了 iCity 日记 (${authorInfo}): "${cardData.content || '内容'}"${commentsInfo}]` };
             } else {
                 if (typeof content === 'string' && (content.startsWith('{') || content.startsWith('['))) {
                      try {
@@ -2933,9 +3004,12 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
         const updateNameRegex = /ACTION:\s*UPDATE_NAME:\s*(.*?)(?:\n|$)/;
         const updateWxidRegex = /ACTION:\s*UPDATE_WXID:\s*(.*?)(?:\n|$)/;
         const updateSignatureRegex = /ACTION:\s*UPDATE_SIGNATURE:\s*(.*?)(?:\n|$)/;
+        const updateAvatarRegex = /ACTION:\s*UPDATE_AVATAR(?:\s*|$)/;
         const quoteMessageRegex = /ACTION:\s*QUOTE_MESSAGE:\s*(.*?)(?:\n|$)/;
         const recordUserInfoRegex = /ACTION:\s*RECORD_USER_INFO:\s*(.*?)(?:\n|$)/;
         const sendVoiceRegex = /ACTION:\s*SEND_VOICE:\s*(\d+)\s*(.*?)(?:\n|$)/;
+        const msClickRegex = /ACTION:\s*MINESWEEPER_CLICK:\s*(\d+)\s*,\s*(\d+)(?:\n|$)/;
+        const msFlagRegex = /ACTION:\s*MINESWEEPER_FLAG:\s*(\d+)\s*,\s*(\d+)(?:\n|$)/;
 
         let replyToObj = null;
         let hasUpdatedName = false;
@@ -3049,6 +3123,42 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                 processedSegment = processedSegment.replace(updateSignatureMatch[0], '');
             }
 
+            let updateAvatarMatch;
+            while ((updateAvatarMatch = processedSegment.match(updateAvatarRegex)) !== null) {
+                // Find the last image sent by user
+                let lastImageMsg = null;
+                for (let j = history.length - 1; j >= 0; j--) {
+                    if (history[j].role === 'user' && history[j].type === 'image') {
+                        lastImageMsg = history[j];
+                        break;
+                    }
+                }
+
+                if (lastImageMsg && lastImageMsg.content) {
+                    contact.avatar = lastImageMsg.content;
+                    saveConfig();
+                    
+                    // Refresh UI
+                    if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
+                    
+                    // Update header avatar if needed
+                    // (Header usually updates on chat open, but we can try to find the element)
+                    // Actually, re-opening chat or just updating the img src in DOM would be better.
+                    // But for simplicity, we rely on the system message to prompt user attention, 
+                    // and next render will show new avatar.
+                    // Or we can try to update the avatar in the message list if any are visible? 
+                    // The messages use contact.avatar when rendering 'other' messages.
+                    // We might need to refresh the current chat view to reflect the new avatar on old messages?
+                    // renderChatHistory(contact.id, true); // Preserve scroll
+                    
+                    setTimeout(() => {
+                        renderChatHistory(contact.id, true);
+                        sendMessage(`[系统消息]: 对方更换了头像`, false, 'text');
+                    }, 500);
+                }
+                processedSegment = processedSegment.replace(updateAvatarMatch[0], '');
+            }
+
             let momentMatch;
             while ((momentMatch = processedSegment.match(momentRegex)) !== null) {
                 const momentContent = momentMatch[1].trim();
@@ -3147,6 +3257,26 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                     }, 1500);
                 }
                 processedSegment = processedSegment.replace(sendVoiceMatch[0], '');
+            }
+
+            let msClickMatch;
+            while ((msClickMatch = processedSegment.match(msClickRegex)) !== null) {
+                const r = msClickMatch[1];
+                const c = msClickMatch[2];
+                if (window.handleAiMinesweeperMove) {
+                    window.handleAiMinesweeperMove('CLICK', r, c);
+                }
+                processedSegment = processedSegment.replace(msClickMatch[0], '');
+            }
+
+            let msFlagMatch;
+            while ((msFlagMatch = processedSegment.match(msFlagRegex)) !== null) {
+                const r = msFlagMatch[1];
+                const c = msFlagMatch[2];
+                if (window.handleAiMinesweeperMove) {
+                    window.handleAiMinesweeperMove('FLAG', r, c);
+                }
+                processedSegment = processedSegment.replace(msFlagMatch[0], '');
             }
 
             let transferMatch;
@@ -6825,8 +6955,8 @@ function setupChatListeners() {
                 }
 
                 // 如果是第二页的新按钮，也需要处理
-                if (item.id === 'chat-more-favorites-btn') {
-                    // 已在 HTML 中 onclick 处理，这里不需要阻止
+                if (item.id === 'chat-more-games-btn') {
+                    // 已在 js/games.js 中处理，这里只需关闭面板
                     closeAllPanels();
                     return;
                 }

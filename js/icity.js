@@ -1415,9 +1415,34 @@ async function generateIcityInteractions(diary) {
             if (!window.iphoneSimState.icityProfile.totalLikes) window.iphoneSimState.icityProfile.totalLikes = 0;
             window.iphoneSimState.icityProfile.totalLikes += newLikes;
             
+            // Generate Mock Likers for the Like Page
+            if (newLikes > 0) {
+                if (!window.iphoneSimState.icityLikes) window.iphoneSimState.icityLikes = [];
+                const likerCount = Math.min(newLikes, 5); 
+                for(let i=0; i<likerCount; i++) {
+                    const names = ["momo", "Lulala", "Kiki", "Jia", "Cloud", "Seven", "Zero", "Echo", "Nana", "Vivi"];
+                    const name = names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random()*100);
+                    
+                    window.iphoneSimState.icityLikes.unshift({
+                        id: Date.now() + Math.random(),
+                        name: name,
+                        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+                        time: Date.now(),
+                        diaryId: diary.id
+                    });
+                }
+                if (window.iphoneSimState.icityLikes.length > 50) {
+                    window.iphoneSimState.icityLikes = window.iphoneSimState.icityLikes.slice(0, 50);
+                }
+            }
+
             saveConfig();
             renderIcityDiaryList(); // Refresh list to show like
             renderIcityProfile(); // Refresh profile to show total likes
+            const likesTab = document.getElementById('icity-likes-list');
+            if (likesTab && likesTab.style.display !== 'none') {
+                renderIcityLikes();
+            }
         }
     }, 2000);
 
@@ -1452,6 +1477,8 @@ async function generateIcityInteractions(diary) {
             notification.classList.remove('hidden');
         }
 
+        const myName = (window.iphoneSimState.icityProfile && window.iphoneSimState.icityProfile.nickname) || 'Kaneki';
+
         const prompt = `用户在潮流社交APP（类似小红书/Instagram/即刻）发布了一篇日记：
 "${diary.content}"
 
@@ -1464,6 +1491,7 @@ async function generateIcityInteractions(diary) {
    - 可以是简短的吐槽、共鸣（"演我"）、夸奖（"好美！"）。
    - 可以只发emoji，或者很短的一句话。
    - 甚至可以稍微有点阴阳怪气或无厘头。
+   - **重要**：请在部分评论中加入艾特用户的行为，例如 "@${myName}"，表示在跟博主互动。
 4. **私信**：
    - 不要用“你好，我看到了你的动态...”这种正式开场白。
    - 就像朋友一样直接说话，或者像是在搭讪。例如：“姐妹这个哪里买的”、“笑死我了”、“dd”、“求图”。
@@ -1509,18 +1537,42 @@ async function generateIcityInteractions(diary) {
                     if (!targetDiary.commentsList) targetDiary.commentsList = [];
                     
                     data.comments.forEach(c => {
+                        const commentId = Date.now() + Math.random();
                         targetDiary.commentsList.push({
-                            id: Date.now() + Math.random(),
+                            id: commentId,
                             name: c.name,
                             content: c.content,
                             time: Date.now()
                         });
+
+                        // Add to Notifications
+                        if (!window.iphoneSimState.icityNotifications) window.iphoneSimState.icityNotifications = [];
+                        window.iphoneSimState.icityNotifications.unshift({
+                            id: Date.now() + Math.random(),
+                            name: c.name,
+                            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`,
+                            content: c.content,
+                            time: Date.now(),
+                            diaryId: diary.id,
+                            commentId: commentId
+                        });
                     });
+                    
+                    // Limit notification history
+                    if (window.iphoneSimState.icityNotifications.length > 50) {
+                        window.iphoneSimState.icityNotifications = window.iphoneSimState.icityNotifications.slice(0, 50);
+                    }
                     
                     // If totalComments is higher than what we generated, assume "ghost" comments
                     targetDiary.comments = (targetDiary.comments || 0) + Math.max(data.comments.length, totalComments);
                     saveConfig();
                     renderIcityDiaryList();
+                    
+                    // Refresh notification tab if active
+                    const notifTab = document.getElementById('icity-notifications-list');
+                    if (notifTab && notifTab.style.display !== 'none') {
+                        renderIcityNotifications();
+                    }
                 }
             }
 
@@ -2533,6 +2585,7 @@ function openIcityDiaryDetail(id, source = 'diary') {
     
     comments.forEach(comment => {
         const commentItem = document.createElement('div');
+        if (comment.id) commentItem.id = 'icity-comment-' + comment.id;
         commentItem.style.display = 'flex';
         commentItem.style.marginBottom = '15px';
         commentItem.style.borderBottom = '1px dashed #f0f0f0';
@@ -2872,36 +2925,224 @@ window.icityFeedSelectionMode = false;
 window.selectedIcityFeedIds = new Set();
 
 function switchIcityFeedTab(tab) {
-    const headerWorld = document.getElementById('icity-header-world');
-    const headerFriends = document.getElementById('icity-header-friends');
-    
-    if (tab === 'world') {
-        if (headerWorld) {
-            headerWorld.style.color = '#000';
-            headerWorld.style.borderBottom = '2px solid #000';
-            headerWorld.dataset.active = 'true';
+    const headers = {
+        'world': document.getElementById('icity-header-world'),
+        'friends': document.getElementById('icity-header-friends'),
+        'notifications': document.getElementById('icity-header-notifications'),
+        'likes': document.getElementById('icity-header-likes')
+    };
+
+    // Reset all headers
+    Object.values(headers).forEach(el => {
+        if (el) {
+            el.style.color = '#999';
+            el.style.borderBottom = 'none';
+            el.style.fontWeight = 'normal';
+            el.dataset.active = 'false';
         }
-        if (headerFriends) {
-            headerFriends.style.color = '#999';
-            headerFriends.style.borderBottom = 'none';
-            headerFriends.dataset.active = 'false';
+    });
+
+    // Activate selected
+    if (headers[tab]) {
+        headers[tab].style.color = '#000';
+        headers[tab].style.borderBottom = '2px solid #000';
+        headers[tab].style.fontWeight = 'bold';
+        headers[tab].dataset.active = 'true';
+    }
+
+    // Toggle Lists
+    const listWorld = document.getElementById('icity-world-list');
+    const listNotif = document.getElementById('icity-notifications-list');
+    const listLikes = document.getElementById('icity-likes-list');
+
+    if (listWorld) listWorld.style.display = 'none';
+    if (listNotif) listNotif.style.display = 'none';
+    if (listLikes) listLikes.style.display = 'none';
+
+    // Toggle Generation Button visibility
+    const genBtn = document.getElementById('icity-world-generate-btn');
+    if (genBtn) genBtn.style.display = 'block';
+
+    if (tab === 'world') {
+        if (listWorld) listWorld.style.display = 'block';
+        if (genBtn) {
+            genBtn.onclick = window.handleGenerateIcityWorld;
+            genBtn.innerHTML = '<i class="fas fa-magic"></i>';
         }
         renderIcityWorld();
-    } else {
-        if (headerFriends) {
-            headerFriends.style.color = '#000';
-            headerFriends.style.borderBottom = '2px solid #000';
-            headerFriends.dataset.active = 'true';
-        }
-        if (headerWorld) {
-            headerWorld.style.color = '#999';
-            headerWorld.style.borderBottom = 'none';
-            headerWorld.dataset.active = 'false';
+    } else if (tab === 'friends') {
+        if (listWorld) listWorld.style.display = 'block';
+        if (genBtn) {
+            genBtn.onclick = window.handleGenerateIcityFriends;
+            genBtn.innerHTML = '<i class="fas fa-magic"></i>';
         }
         renderIcityFriends();
+    } else if (tab === 'notifications') {
+        if (listNotif) listNotif.style.display = 'block';
+        if (genBtn) genBtn.style.display = 'none'; // Hide gen button for notifications
+        renderIcityNotifications();
+    } else if (tab === 'likes') {
+        if (listLikes) listLikes.style.display = 'block';
+        if (genBtn) genBtn.style.display = 'none'; // Hide gen button for likes
+        renderIcityLikes();
     }
 }
 window.switchIcityFeedTab = switchIcityFeedTab;
+
+function renderIcityNotifications() {
+    const list = document.getElementById('icity-notifications-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const notifications = window.iphoneSimState.icityNotifications || [];
+    
+    if (notifications.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 50px; color: #999;">暂无通知</div>';
+        return;
+    }
+    
+    // Sort by time desc
+    const sorted = [...notifications].sort((a, b) => b.time - a.time);
+    
+    sorted.forEach(notif => {
+        const item = document.createElement('div');
+        item.style.padding = '15px';
+        item.style.borderBottom = '1px solid #f0f0f0';
+        item.style.display = 'flex';
+        item.style.alignItems = 'flex-start';
+        item.style.cursor = 'pointer';
+        item.onclick = () => handleNotificationClick(notif);
+        
+        let avatarStyle = 'background: #ccc;';
+        if (notif.avatar) {
+            avatarStyle = `background-image: url('${notif.avatar}'); background-size: cover; background-position: center;`;
+        }
+        
+        const timeStr = formatIcityTime(notif.time);
+        
+        item.innerHTML = `
+            <div style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; ${avatarStyle} display: flex; align-items: center; justify-content: center;">
+                ${!notif.avatar ? '<i class="fas fa-user" style="color: #fff;"></i>' : ''}
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 14px; margin-bottom: 4px;">
+                    <span style="font-weight: bold;">${notif.name}</span>
+                    <span style="color: #666;">在评论中提到了你</span>
+                </div>
+                <div style="font-size: 14px; color: #333; background: #f9f9f9; padding: 8px; border-radius: 4px; border-left: 3px solid #007AFF;">
+                    ${notif.content}
+                </div>
+                <div style="font-size: 12px; color: #ccc; margin-top: 5px;">${timeStr}</div>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+function renderIcityLikes() {
+    const list = document.getElementById('icity-likes-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const likes = window.iphoneSimState.icityLikes || [];
+    
+    if (likes.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 50px; color: #999;">暂无喜欢</div>';
+        return;
+    }
+    
+    const sorted = [...likes].sort((a, b) => b.time - a.time);
+    
+    sorted.forEach(like => {
+        const item = document.createElement('div');
+        item.style.padding = '15px';
+        item.style.borderBottom = '1px solid #f0f0f0';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        
+        let avatarStyle = 'background: #ccc;';
+        if (like.avatar) {
+            avatarStyle = `background-image: url('${like.avatar}'); background-size: cover; background-position: center;`;
+        }
+        
+        const timeStr = formatIcityTime(like.time);
+        
+        item.innerHTML = `
+            <div style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; ${avatarStyle} display: flex; align-items: center; justify-content: center;">
+                ${!like.avatar ? '<i class="fas fa-user" style="color: #fff;"></i>' : ''}
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 14px;">
+                    <span style="font-weight: bold;">${like.name}</span>
+                    <span style="color: #666;">赞了你的日记</span>
+                </div>
+                <div style="font-size: 12px; color: #ccc; margin-top: 2px;">${timeStr}</div>
+            </div>
+            <div style="width: 40px; height: 40px; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #999;">
+                <i class="fas fa-book"></i>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+function formatIcityTime(timestamp) {
+    const diff = Date.now() - timestamp;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff/3600000) + '小时前';
+    return new Date(timestamp).toLocaleDateString();
+}
+
+function handleNotificationClick(notif) {
+    // Open diary detail
+    // We need to know which diary it is.
+    // If notification has diaryId, use it.
+    if (notif.diaryId) {
+        // Determine source. Usually notifications come from 'diary' (my posts)
+        // But could be others.
+        // Assuming notifications are for user's own content or where they are mentioned.
+        // For simplicity, search in all sources or assume source 'diary' if it's my post.
+        
+        // Check if diary exists in my diaries
+        const myDiary = window.iphoneSimState.icityDiaries.find(d => d.id === notif.diaryId);
+        let source = 'diary';
+        if (!myDiary) {
+            // Check friends
+            const friendPost = window.iphoneSimState.icityFriendsPosts.find(p => p.id === notif.diaryId);
+            if (friendPost) source = 'friends';
+            else {
+                // Check world
+                const worldPost = window.iphoneSimState.icityWorldPosts.find(p => p.id === notif.diaryId);
+                if (worldPost) source = 'world';
+            }
+        }
+        
+        openIcityDiaryDetail(notif.diaryId, source);
+        
+        // Scroll to comment?
+        // This is complex as comments are rendered after opening.
+        // We can set a global flag
+        window.icityScrollToCommentId = notif.commentId;
+    }
+}
+
+// Hook into openIcityDiaryDetail to scroll if needed
+const originalOpenIcityDiaryDetail = window.openIcityDiaryDetail;
+window.openIcityDiaryDetail = function(id, source) {
+    originalOpenIcityDiaryDetail(id, source);
+    if (window.icityScrollToCommentId) {
+        setTimeout(() => {
+            const el = document.getElementById('icity-comment-' + window.icityScrollToCommentId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.backgroundColor = '#fff9c4'; // Highlight
+                setTimeout(() => el.style.backgroundColor = 'transparent', 2000);
+            }
+            window.icityScrollToCommentId = null;
+        }, 500);
+    }
+};
 
 function updateIcityFeedHeader() {
     const header = document.querySelector('#icity-tab-content-world .app-header');
@@ -2917,12 +3158,13 @@ function updateIcityFeedHeader() {
         `;
     } else {
         // Restore Default Header
+        // Note: Using the updated onclicks
         header.innerHTML = `
             <div style="display: flex; gap: 20px; font-size: 16px;">
                 <span id="icity-header-world" style="color: #999; border-bottom: none; padding-bottom: 5px; cursor: pointer;" onclick="window.switchIcityFeedTab('world')">世界</span>
                 <span id="icity-header-friends" style="font-weight: bold; color: #000; cursor: pointer; border-bottom: 2px solid #000; padding-bottom: 5px;" data-active="true" onclick="window.switchIcityFeedTab('friends')">朋友</span>
-                <span style="color: #999;">@ 通知</span>
-                <span style="color: #999;">♡ 喜欢</span>
+                <span id="icity-header-notifications" style="color: #999; cursor: pointer;" onclick="window.switchIcityFeedTab('notifications')">@ 通知</span>
+                <span id="icity-header-likes" style="color: #999; cursor: pointer;" onclick="window.switchIcityFeedTab('likes')">♡ 喜欢</span>
             </div>
             <button id="icity-world-generate-btn" style="position: absolute; right: 15px; background: none; border: none; color: #007AFF; font-size: 16px;" onclick="window.handleGenerateIcityFriends()"><i class="fas fa-magic"></i></button>
         `;
@@ -3750,7 +3992,7 @@ function injectBookStyles() {
             opacity: 1; pointer-events: auto;
         }
         .book-reader-header {
-            padding: 40px 20px 10px; display: flex; justify-content: space-between;
+            padding: 60px 20px 10px; display: flex; justify-content: space-between;
             align-items: center; background: transparent; z-index: 10;
         }
         .book-stage {
@@ -4084,7 +4326,7 @@ function showIcityCloseOptions(book) {
     `;
     
     const title = document.createElement('div');
-    title.textContent = '关闭后，你希望 AI 做什么？';
+    title.textContent = '关闭后，你希望TA做什么？';
     title.style.cssText = 'text-align: center; color: #8e8e93; font-size: 13px; margin-bottom: 15px;';
     sheet.appendChild(title);
 
@@ -4540,13 +4782,18 @@ function toggleIcityFormatToolbar() {
     let toolbar = document.getElementById('icity-format-toolbar');
     if (toolbar) {
         toolbar.classList.toggle('hidden');
+        if (!toolbar.classList.contains('hidden')) {
+            setTimeout(() => document.addEventListener('click', closeFormatToolbarOutside), 0);
+        } else {
+            document.removeEventListener('click', closeFormatToolbarOutside);
+        }
         return;
     }
     
     toolbar = document.createElement('div');
     toolbar.id = 'icity-format-toolbar';
     toolbar.style.cssText = `
-        position: absolute; top: 60px; right: 60px; 
+        position: absolute; top: 100px; right: 60px; 
         background: #fff; padding: 10px; border-radius: 8px; 
         box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2100;
         display: flex; flex-direction: column; gap: 8px; width: 200px;
@@ -4617,6 +4864,16 @@ function toggleIcityFormatToolbar() {
     
     const reader = document.getElementById('icity-book-reader');
     if (reader) reader.appendChild(toolbar);
+    
+    setTimeout(() => document.addEventListener('click', closeFormatToolbarOutside), 0);
+}
+
+function closeFormatToolbarOutside(e) {
+    const toolbar = document.getElementById('icity-format-toolbar');
+    if (toolbar && !toolbar.classList.contains('hidden') && !toolbar.contains(e.target)) {
+        toolbar.classList.add('hidden');
+        document.removeEventListener('click', closeFormatToolbarOutside);
+    }
 }
 
 function applyCustomFormat(type, className) {
@@ -5016,7 +5273,8 @@ function handleContactPickerSend() {
         authorName: authorName,
         authorAvatar: authorAvatar,
         time: post.time,
-        source: window.currentForwardSource // Add source to help identify author context
+        source: window.currentForwardSource, // Add source to help identify author context
+        comments: post.commentsList || []
     };
     
     selectedIds.forEach(contactId => {

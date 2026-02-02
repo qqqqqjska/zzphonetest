@@ -1117,9 +1117,9 @@
                                 <div class="more-icon"><i class="fas fa-comment-dots"></i></div>
                                 <div class="more-label">让TA发消息</div>
                             </div>
-                            <div class="more-item" id="chat-more-favorites-btn" onclick="alert('收藏功能开发中...')">
-                                <div class="more-icon"><i class="fas fa-cube"></i></div>
-                                <div class="more-label">收藏</div>
+                            <div class="more-item" id="chat-more-games-btn">
+                                <div class="more-icon"><i class="fas fa-gamepad"></i></div>
+                                <div class="more-label">小游戏</div>
                             </div>
                         </div>
                     </div>
@@ -2497,6 +2497,7 @@
         <!-- Tab 0: Books (New) -->
         <div id="icity-tab-content-books" class="icity-tab-content" style="display: none; height: 100%; flex-direction: column;">
             <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: center; position: relative; padding-top: max(10px, env(safe-area-inset-top));">
+                <button onclick="document.getElementById('icity-app').classList.add('hidden')" style="position: absolute; left: 15px; background: none; border: none; font-size: 16px; color: #333;"><i class="fas fa-chevron-left"></i></button>
                 <div style="font-weight: bold; font-size: 17px;">书架</div>
                 <button id="icity-add-book-btn" style="position: absolute; right: 15px; background: none; border: none; font-size: 20px; color: #333;"><i class="fas fa-plus"></i></button>
             </div>
@@ -2569,27 +2570,33 @@
 
         <!-- Tab 2: World (New) -->
         <div id="icity-tab-content-world" class="icity-tab-content" style="display: block; height: 100%;">
-            <div class="app-header" style="background: #fff; border-bottom: 1px solid #eee; justify-content: center; padding-top: max(10px, env(safe-area-inset-top));">
+            <div class="app-header" style="background: #fff; border-bottom: 1px solid #eee; justify-content: center; padding-top: max(10px, env(safe-area-inset-top)); position: relative;">
+                <button onclick="document.getElementById('icity-app').classList.add('hidden')" style="position: absolute; left: 15px; background: none; border: none; font-size: 16px; color: #333;"><i class="fas fa-chevron-left"></i></button>
                 <div style="display: flex; gap: 20px; font-size: 16px;">
-                    <span id="icity-header-world" style="font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; cursor: pointer;">世界</span>
-                    <span id="icity-header-friends" style="color: #999; cursor: pointer;">朋友</span>
-                    <span style="color: #999;">@ 通知</span>
-                    <span style="color: #999;">♡ 喜欢</span>
+                    <span id="icity-header-world" style="font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; cursor: pointer;" onclick="window.switchIcityFeedTab('world')">世界</span>
+                    <span id="icity-header-friends" style="color: #999; cursor: pointer;" onclick="window.switchIcityFeedTab('friends')">朋友</span>
+                    <span id="icity-header-notifications" style="color: #999; cursor: pointer;" onclick="window.switchIcityFeedTab('notifications')">@ 通知</span>
+                    <span id="icity-header-likes" style="color: #999; cursor: pointer;" onclick="window.switchIcityFeedTab('likes')">♡ 喜欢</span>
                 </div>
                 <button id="icity-world-generate-btn" style="position: absolute; right: 15px; background: none; border: none; color: #007AFF; font-size: 16px;"><i class="fas fa-magic"></i></button>
             </div>
             
-            <div class="app-body" id="icity-world-list" style="padding: 0; padding-bottom: 60px; overflow-y: auto; background-color: #fff; flex: 1;">
-                <!-- World content will be generated here -->
-                <div style="text-align: center; padding: 50px; color: #999;">
-                    点击右上角生成动态
+            <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto; background-color: #fff; flex: 1;">
+                <div id="icity-world-list">
+                    <!-- World content will be generated here -->
+                    <div style="text-align: center; padding: 50px; color: #999;">
+                        点击右上角生成动态
+                    </div>
                 </div>
+                <div id="icity-notifications-list" style="display: none;"></div>
+                <div id="icity-likes-list" style="display: none;"></div>
             </div>
         </div>
 
         <!-- Tab 3: Messages -->
         <div id="icity-tab-content-messages" class="icity-tab-content" style="display: none; height: 100%; flex-direction: column;">
             <div class="app-header" style="background: #fff; border-bottom: 1px solid #f0f0f0; justify-content: center; position: relative;">
+                <button onclick="document.getElementById('icity-app').classList.add('hidden')" style="position: absolute; left: 15px; background: none; border: none; font-size: 16px; color: #333;"><i class="fas fa-chevron-left"></i></button>
                 <div style="display: flex; background: #f0f0f0; border-radius: 8px; padding: 2px;">
                     <div style="padding: 4px 15px; font-size: 14px; color: #666; cursor: pointer;">通讯录</div>
                     <div style="padding: 4px 15px; font-size: 14px; font-weight: bold; background: #fff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer;">私信</div>
@@ -3509,6 +3516,7 @@
     <script src="js/home.js"></script>
     <script src="js/check_phone.js"></script>
     <script src="js/chat.js"></script>
+    <script src="js/games.js"></script>
     <script src="js/call_history.js"></script>
 
 <!-- 在 index.html 中找到 <!-- 编辑记忆弹窗 --> 附近，添加以下代码 -->
@@ -3549,8 +3557,122 @@
             </div>
 <!-- 在 index.html 中找到 <!-- 编辑消息弹窗 --> 附近，添加以下代码 -->
 
+            <!-- 游戏选择弹窗 -->
+            <div id="game-selection-modal" class="modal hidden" style="z-index: 250;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>选择小游戏</h3>
+                        <button class="close-btn" id="close-game-selection">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ios-list-group">
+                            <div class="list-item" onclick="window.openMinesweeperModeSelection()">
+                                <div class="list-content">
+                                    <div style="width: 40px; height: 40px; background: #eee; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                                        <i class="fas fa-bomb" style="font-size: 20px; color: #333;"></i>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: bold;">扫雷</div>
+                                        <div style="font-size: 12px; color: #888;">经典益智游戏</div>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 扫雷模式选择弹窗 -->
+            <div id="minesweeper-mode-modal" class="modal hidden" style="z-index: 260;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>扫雷模式</h3>
+                        <button class="close-btn" id="close-minesweeper-mode">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="ios-list-group">
+                            <div class="list-item" id="ms-mode-solo" style="cursor: pointer;">
+                                <div class="list-content center-content">
+                                    <span style="color: #007AFF; font-size: 16px;">自己玩</span>
+                                </div>
+                            </div>
+                            <div class="list-item" id="ms-mode-coop" style="cursor: pointer;">
+                                <div class="list-content center-content">
+                                    <span style="color: #007AFF; font-size: 16px;">和联系人一起玩</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+    <!-- 扫雷游戏小窗 -->
+            <!-- 最小化悬浮球 (添加在 modal 外面) -->
+            <div id="minesweeper-minimized" class="ms-icon-transition ms-icon-hidden" style="position: absolute; top: 100px; right: 20px; width: 50px; height: 50px; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 301; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid rgba(0,0,0,0.05);">
+                <span style="font-size: 24px;">💣</span>
+            </div>
+
+            <div id="minesweeper-modal" class="modal hidden" style="z-index: 300; background-color: transparent; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; align-items: center; justify-content: center; pointer-events: none;">
+                <div id="minesweeper-window" class="ms-window-transition" style="background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); pointer-events: auto; min-width: 320px; position: absolute; overflow: hidden; border: 1px solid rgba(255,255,255,0.5);">
+                    <!-- 标题栏 (可拖动) -->
+                    <div id="minesweeper-header" style="padding: 20px 20px 10px; display: flex; justify-content: space-between; align-items: center; cursor: move;">
+                        <span style="font-size: 18px; font-weight: 700; color: #333;">扫雷</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="minimize-minesweeper" style="background: #f2f2f7; border: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; color: #8e8e93; transition: all 0.2s;">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button id="close-minesweeper" style="background: #f2f2f7; border: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; color: #8e8e93; transition: all 0.2s;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="app-body" style="padding: 0 20px 25px; display: flex; flex-direction: column; align-items: center; background-color: transparent;">
+                        
+                        <!-- 游戏头部信息 -->
+                        <div style="background: #f2f2f7; border-radius: 16px; padding: 12px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);">
+                            <!-- 剩余雷数 -->
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <span style="font-size: 10px; color: #8e8e93; font-weight: 600; text-transform: uppercase;">Mines</span>
+                                <div id="ms-mines-count" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 20px; font-weight: 700; color: #FF3B30;">10</div>
+                            </div>
+                            
+                            <!-- 表情状态 -->
+                            <button id="ms-face-btn" style="width: 44px; height: 44px; background: #fff; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: transform 0.1s;">🙂</button>
+                            
+                            <!-- 计时器 -->
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <span style="font-size: 10px; color: #8e8e93; font-weight: 600; text-transform: uppercase;">Time</span>
+                                <div id="ms-timer" style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 20px; font-weight: 700; color: #333;">000</div>
+                            </div>
+                        </div>
+
+                        <!-- 游戏网格 -->
+                        <div id="ms-grid" style="display: grid; gap: 4px; user-select: none; background: transparent; border: none; padding: 4px;">
+                            <!-- 格子生成区域 -->
+                        </div>
+
+                        <!-- 难度选择 -->
+                        <div style="margin-top: 25px; display: flex; gap: 8px; width: 100%; justify-content: center; background: #f2f2f7; padding: 4px; border-radius: 12px;">
+                            <button class="ms-level-btn active" data-level="easy" style="flex: 1; padding: 8px 0; font-size: 13px; font-weight: 600; border: none; border-radius: 8px; background: #fff; color: #000; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s;">初级</button>
+                            <button class="ms-level-btn" data-level="medium" style="flex: 1; padding: 8px 0; font-size: 13px; font-weight: 600; border: none; border-radius: 8px; background: transparent; color: #8e8e93; cursor: pointer; transition: all 0.2s;">中级</button>
+                            <button class="ms-level-btn" data-level="hard" style="flex: 1; padding: 8px 0; font-size: 13px; font-weight: 600; border: none; border-radius: 8px; background: transparent; color: #8e8e93; cursor: pointer; transition: all 0.2s;">高级</button>
+                        </div>
+                        
+                        <div style="margin-top: 10px; width: 100%; display: flex; justify-content: center;">
+                            <button id="ms-ai-help-btn" style="background: transparent; border: 1px solid #007AFF; color: #007AFF; border-radius: 15px; padding: 5px 15px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                <i class="fas fa-magic"></i> 让TA操作
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
             <!-- 发送语音弹窗 -->
             <div id="voice-input-modal" class="modal hidden">
+
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3>发送语音</h3>
