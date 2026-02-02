@@ -5473,3 +5473,91 @@ html body .chat-message.user .voice-icon-box i { transform: rotate(-90deg); }
     opacity: 0 !important;
     pointer-events: none !important;
 }
+
+/* Truth or Dare Wheel Styles */
+#wheel-container {
+    width: 250px;
+    height: 250px;
+    position: relative;
+    margin: 0 auto 20px;
+}
+
+#wheel-canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transform: rotate(0deg);
+    transition: transform 4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+#wheel-pointer {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-top: 30px solid #FF3B30;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+#wheel-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 5;
+    border: 4px solid #e5e5ea;
+}
+
+.tod-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    width: 100%;
+}
+
+.tod-btn {
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: transform 0.1s;
+    min-width: 100px;
+}
+
+.tod-btn:active {
+    transform: scale(0.95);
+}
+
+.tod-btn.truth {
+    background: #5AC8FA;
+    color: #fff;
+}
+
+.tod-btn.dare {
+    background: #FF2D55;
+    color: #fff;
+}
+
+.tod-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

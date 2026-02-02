@@ -2338,8 +2338,8 @@ function parseMixedAiResponse(content) {
     return results;
 }
 
-// Fallback legacy parser
-function parseMixedContent(content) {
+// Helper to force split text containing stickers/images
+function forceSplitMixedContent(content) {
     const results = [];
     // 预处理：统一符号
     let processed = content.replace(/【/g, '[').replace(/】/g, ']').replace(/：/g, ':');
@@ -2352,19 +2352,22 @@ function parseMixedContent(content) {
     let match;
 
     while ((match = regex.exec(processed)) !== null) {
-        // 1. 捕获当前匹配项之前的文本（可能是漏掉格式的普通消息）
+        // 1. 捕获当前匹配项之前的文本
         const preText = processed.substring(lastIndex, match.index).trim();
         if (preText) {
-            // 如果之前的文本不是空的，将其作为普通消息添加
             results.push({ type: '消息', content: preText });
         }
 
         // 2. 添加当前匹配项
         let type = match[1];
-        if (type === '发送了表情包' || type === '发送了一个表情包') type = '表情包'; // 归一化类型
+        if (type.includes('表情包')) type = '表情包';
+        else if (type === '图片') type = '图片';
+        else if (type === '语音') type = '语音';
+        else if (type === '旁白') type = '旁白';
+        else type = '消息';
 
         results.push({
-            type: type, // 消息/表情包/语音...
+            type: type, 
             content: match[2].trim()
         });
 
@@ -2377,7 +2380,12 @@ function parseMixedContent(content) {
         results.push({ type: '消息', content: postText });
     }
 
-    return results;
+    return results.length > 0 ? results : [{ type: '消息', content: content }];
+}
+
+// Fallback legacy parser (kept for compatibility)
+function parseMixedContent(content) {
+    return forceSplitMixedContent(content);
 }
 
 async function generateAiReply(instruction = null) {
@@ -2394,6 +2402,27 @@ async function generateAiReply(instruction = null) {
 
     const history = window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId] || [];
     
+    // Check for Truth or Dare triggers
+    if (window.currentMiniGame === 'truth_dare') {
+        const modal = document.getElementById('mini-game-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            const lastMsg = history[history.length - 1];
+            if (lastMsg && lastMsg.role === 'user') {
+                const content = lastMsg.content;
+                // Only trigger if content is simple (avoid false positives in long texts)
+                if (content.length < 20) {
+                    if (content.includes('真心话')) {
+                        if (window.handleAiTruthDare) window.handleAiTruthDare('truth');
+                    } else if (content.includes('大冒险')) {
+                        if (window.handleAiTruthDare) window.handleAiTruthDare('dare');
+                    } else if (content.includes('转') || content.includes('开始') || content.toLowerCase().includes('spin')) {
+                        if (window.handleAiTruthDare) window.handleAiTruthDare(null); // null means random choice or just spin
+                    }
+                }
+            }
+        }
+    }
+
     let userPromptInfo = '';
     let currentPersona = null;
 
@@ -2451,6 +2480,18 @@ async function generateAiReply(instruction = null) {
         }
     }
 
+    if (window.iphoneSimState.icityFriendsPosts && window.iphoneSimState.icityFriendsPosts.length > 0) {
+        const aiPosts = window.iphoneSimState.icityFriendsPosts.filter(p => p.contactId === contact.id).slice(0, 3);
+        if (aiPosts.length > 0) {
+            icityContext += '\n【你最近发布的 iCity 动态】\n';
+            aiPosts.forEach(p => {
+                const date = new Date(p.time);
+                const timeStr = `${date.getMonth() + 1}月${date.getDate()}日`;
+                icityContext += `[${timeStr}] ${p.content}\n`;
+            });
+        }
+    }
+
     let memoryContext = '';
     if (contact.memorySendLimit && contact.memorySendLimit > 0) {
         const contactMemories = window.iphoneSimState.memories.filter(m => m.contactId === contact.id);
@@ -2503,7 +2544,17 @@ async function generateAiReply(instruction = null) {
     let minesweeperContext = '';
     const msModal = document.getElementById('minesweeper-modal');
     if (msModal && !msModal.classList.contains('hidden') && window.getMinesweeperGameState) {
-        minesweeperContext = '\n【当前扫雷游戏状态】\n' + window.getMinesweeperGameState() + '\n\n【扫雷操作指令】\n如果你想操作扫雷游戏，请使用以下指令：\n- 点击/揭开格子: ACTION: MINESWEEPER_CLICK: 行,列 (例如: ACTION: MINESWEEPER_CLICK: 0,0)\n- 插旗/标记地雷: ACTION: MINESWEEPER_FLAG: 行,列\n请分析局势，做出明智的决策。\n⚠️ 重要提示：\n1. 绝对不要点击已经揭开的数字格子或空格子。\n2. 绝对不要点击已经插旗的格子。\n3. 请只点击未知区域（显示为 ? 的位置）。';
+        minesweeperContext = '\n【当前扫雷游戏状态】\n' + window.getMinesweeperGameState() + '\n\n【扫雷操作指令】\n如果你想操作扫雷游戏，请使用以下指令：\n- 点击/揭开格子: ACTION: MINESWEEPER_CLICK: 行,列 (例如: ACTION: MINESWEEPER_CLICK: 0,0)\n- 插旗/标记地雷: ACTION: MINESWEEPER_FLAG: 行,列\n请分析局势，做出明智的决策。\n⚠️ 重要提示：\n1. 绝对不要点击已经揭开的数字格子或空格子。\n2. 绝对不要点击已经插旗的格子。\n3. 请只点击未知区域（显示为 ? 的位置）。\n4. 如果你推断某个位置是地雷，请务必使用 MINESWEEPER_FLAG 进行插旗，而不要点击它。\n5. 获胜条件是找出并标记所有地雷。';
+    }
+
+    let witchGameContext = '';
+    const miniGameModal = document.getElementById('mini-game-modal');
+    // Check if witch game is active (by checking title or state)
+    if (miniGameModal && !miniGameModal.classList.contains('hidden') && window.getWitchGameState) {
+        const witchState = window.getWitchGameState();
+        if (witchState) {
+            witchGameContext = '\n' + witchState + '\n\n【女巫的毒药操作指令】\n轮到你行动时，请选择用户区域（右侧）的一个格子进行猜测。\n指令：ACTION: WITCH_GUESS: 行,列 (行1-5, 列1-5)\n目标：找出用户藏的3瓶毒药。不要重复选择已经揭开的格子(⭕或☠️)。\n';
+        }
     }
 
     let systemPrompt = `你现在扮演 ${contact.name}。
@@ -2516,6 +2567,7 @@ ${memoryContext}
 ${meetingContext}
 ${icityBookContext}
 ${minesweeperContext}
+${witchGameContext}
 ${timeContext}
 ${itineraryContext}
 
@@ -2564,7 +2616,9 @@ ${itineraryContext}
 ]
 
 【指令说明 (请封装为 type="action")】
-- 发朋友圈 -> command: "POST_MOMENT", payload: "内容"
+- 发朋友圈 -> command: "POST_MOMENT", payload: "内容" (注意：朋友圈是公开的社交动态，类似于微信朋友圈)
+- 发 iCity 日记 -> command: "POST_ICITY_DIARY", payload: "内容" (注意：iCity 是更私密、情绪化的日记，类似于微博/Instagram/小红书，用来记录心情、碎碎念或emo时刻)
+- 编辑 iCity 手账 -> command: "EDIT_ICITY_BOOK", payload: "内容" (注意：这是你和用户共同编辑的手账本/交换日记。你可以另起一页写下你的回应、感悟或日记。纯文本内容，不需要HTML标签)
 - 点赞动态 -> command: "LIKE_MOMENT", payload: "" (留空)
 - 评论动态 -> command: "COMMENT_MOMENT", payload: "评论内容"
 - 发送图片 -> command: "SEND_IMAGE", payload: "图片描述"
@@ -2752,13 +2806,19 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
             
             // Parse hidden images from text content (e.g. from Moments)
             let embeddedImages = [];
-            if (typeof content === 'string' && content.includes('<hidden_img>')) {
-                const imgRegex = /<hidden_img>(.*?)<\/hidden_img>/g;
-                let match;
-                while ((match = imgRegex.exec(content)) !== null) {
-                    embeddedImages.push(match[1]);
+            if (typeof content === 'string') {
+                // Strip pollution from text messages to prevent AI from learning bad formats
+                // This removes patterns like [发送了一个表情包:...] or [表情包] from text history
+                content = content.replace(/\[(发送了一个)?(表情包|图片|语音).*?\]/g, '').trim();
+
+                if (content.includes('<hidden_img>')) {
+                    const imgRegex = /<hidden_img>(.*?)<\/hidden_img>/g;
+                    let match;
+                    while ((match = imgRegex.exec(content)) !== null) {
+                        embeddedImages.push(match[1]);
+                    }
+                    content = content.replace(imgRegex, '').trim();
                 }
-                content = content.replace(imgRegex, '').trim();
             }
 
             if (contact.thoughtVisible && h.thought) {
@@ -2786,12 +2846,12 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
             } else if (h.type === 'virtual_image') {
                 return {
                     role: h.role,
-                    content: `[发送了一张图片：${h.description}]`
+                    content: `[图片]`
                 };
             } else if (h.type === 'sticker') {
                 return {
                     role: h.role,
-                    content: `[发送了一个表情包：${h.description}]`
+                    content: `[表情包]`
                 };
             } else if (h.type === 'voice') {
                 let voiceText = '语音消息';
@@ -2803,7 +2863,7 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                 }
                 return {
                     role: h.role,
-                    content: `[发送了一条语音：${voiceText}]`
+                    content: `[语音: ${voiceText}]`
                 };
             } else if (h.type === 'voice_call_text') {
                 let callText = '通话内容';
@@ -2991,7 +3051,9 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
         let imageToSend = null;
         let hasTransferred = false;
         
-        const momentRegex = /ACTION:\s*POST_MOMENT:\s*(.*?)(?:\n|$)/;
+const momentRegex = /ACTION:\s*POST_MOMENT:\s*(.*?)(?:\n|$)/;
+const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
+        const editIcityBookRegex = /ACTION:\s*EDIT_ICITY_BOOK:\s*(.*?)(?:\n|$)/;
         const likeRegex = /ACTION:\s*LIKE_MOMENT(?:\s*|$)/;
         const commentRegex = /ACTION:\s*COMMENT_MOMENT:\s*(.*?)(?:\n|$)/;
         const sendImageRegex = /ACTION:\s*SEND_IMAGE:\s*(.*?)(?:\n|$)/;
@@ -3010,6 +3072,7 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
         const sendVoiceRegex = /ACTION:\s*SEND_VOICE:\s*(\d+)\s*(.*?)(?:\n|$)/;
         const msClickRegex = /ACTION:\s*MINESWEEPER_CLICK:\s*(\d+)\s*,\s*(\d+)(?:\n|$)/;
         const msFlagRegex = /ACTION:\s*MINESWEEPER_FLAG:\s*(\d+)\s*,\s*(\d+)(?:\n|$)/;
+        const witchGuessRegex = /ACTION:\s*WITCH_GUESS:\s*(\d+)\s*,\s*(\d+)(?:\n|$)/;
 
         let replyToObj = null;
         let hasUpdatedName = false;
@@ -3168,6 +3231,24 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                 processedSegment = processedSegment.replace(momentMatch[0], '');
             }
 
+            let icityDiaryMatch;
+            while ((icityDiaryMatch = processedSegment.match(icityDiaryRegex)) !== null) {
+                const diaryContent = icityDiaryMatch[1].trim();
+                if (diaryContent) {
+                    if (window.addIcityPost) window.addIcityPost(contact.id, diaryContent, 'friends');
+                }
+                processedSegment = processedSegment.replace(icityDiaryMatch[0], '');
+            }
+
+            let editIcityBookMatch;
+            while ((editIcityBookMatch = processedSegment.match(editIcityBookRegex)) !== null) {
+                const content = editIcityBookMatch[1].trim();
+                if (content) {
+                    if (window.writeToIcityBook) window.writeToIcityBook(contact.id, content);
+                }
+                processedSegment = processedSegment.replace(editIcityBookMatch[0], '');
+            }
+
             let likeMatch;
             while ((likeMatch = processedSegment.match(likeRegex)) !== null) {
                 const userMoments = window.iphoneSimState.moments.filter(m => m.contactId === 'me');
@@ -3277,6 +3358,19 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                     window.handleAiMinesweeperMove('FLAG', r, c);
                 }
                 processedSegment = processedSegment.replace(msFlagMatch[0], '');
+            }
+
+            let witchGuessMatch;
+            while ((witchGuessMatch = processedSegment.match(witchGuessRegex)) !== null) {
+                const r = witchGuessMatch[1];
+                const c = witchGuessMatch[2];
+                if (window.handleAiWitchGuess) {
+                    // Delay slightly to look natural
+                    setTimeout(() => {
+                        window.handleAiWitchGuess(r, c);
+                    }, 1000);
+                }
+                processedSegment = processedSegment.replace(witchGuessMatch[0], '');
             }
 
             let transferMatch;
@@ -5073,33 +5167,37 @@ function makeDraggable(element, onClickCallback) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     let isDragging = false;
     
-    element.onmousedown = dragMouseDown;
-    element.ontouchstart = dragMouseDown;
+    element.addEventListener('mousedown', dragMouseDown);
+    element.addEventListener('touchstart', dragMouseDown, { passive: false });
     
     element.onclick = null;
 
     function dragMouseDown(e) {
         e = e || window.event;
-        
         isDragging = false;
 
         if (e.type === 'touchstart') {
             pos3 = e.touches[0].clientX;
             pos4 = e.touches[0].clientY;
+            
+            document.addEventListener('touchend', closeDragElement, { passive: false });
+            document.addEventListener('touchmove', elementDrag, { passive: false });
         } else {
+            e.preventDefault();
             pos3 = e.clientX;
             pos4 = e.clientY;
+            
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
         }
-        
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-        document.ontouchend = closeDragElement;
-        document.ontouchmove = elementDrag;
     }
 
     function elementDrag(e) {
         e = e || window.event;
-        e.preventDefault();
+        
+        if (e.cancelable) {
+            e.preventDefault();
+        }
         
         isDragging = true;
         
@@ -5136,8 +5234,9 @@ function makeDraggable(element, onClickCallback) {
     function closeDragElement() {
         document.onmouseup = null;
         document.onmousemove = null;
-        document.ontouchend = null;
-        document.ontouchmove = null;
+        
+        document.removeEventListener('touchend', closeDragElement);
+        document.removeEventListener('touchmove', elementDrag);
         
         if (!isDragging && onClickCallback) {
             onClickCallback();

@@ -1,6 +1,6 @@
 // 小游戏功能模块
 
-let currentGame = null;
+window.currentMiniGame = null;
 let minesweeperState = {
     grid: [],
     rows: 9,
@@ -113,36 +113,96 @@ function initGames() {
             }, 500);
         });
     }
+
+    // Mini Game Generic Modal
+    const closeMiniGameBtn = document.getElementById('close-mini-game');
+    if (closeMiniGameBtn) {
+        closeMiniGameBtn.addEventListener('click', () => {
+            document.getElementById('mini-game-modal').classList.add('hidden');
+        });
+    }
+
+    const minimizeMiniGameBtn = document.getElementById('minimize-mini-game');
+    if (minimizeMiniGameBtn) {
+        minimizeMiniGameBtn.addEventListener('click', minimizeMiniGame);
+    }
+
+    const miniGameMinimized = document.getElementById('mini-game-minimized');
+    if (miniGameMinimized) {
+        miniGameMinimized.addEventListener('click', (e) => {
+            if (miniGameMinimized.dataset.isDragging === 'true') {
+                return;
+            }
+            restoreMiniGame();
+        });
+        makeDraggable(miniGameMinimized, miniGameMinimized);
+    }
+
+    const miniGameWindow = document.getElementById('mini-game-window');
+    const miniGameHeader = document.getElementById('mini-game-header');
+    if (miniGameWindow && miniGameHeader) {
+        makeDraggable(miniGameWindow, miniGameHeader);
+    }
+}
+
+function minimizeMiniGame() {
+    const windowEl = document.getElementById('mini-game-window');
+    const minimizedIcon = document.getElementById('mini-game-minimized');
+    
+    // Hide window, show icon
+    windowEl.classList.add('ms-window-hidden'); // Reuse same class as minesweeper for transition
+    minimizedIcon.classList.remove('ms-icon-hidden');
+    
+    // Also hide the modal container background (since it's transparent now, but good practice)
+    document.getElementById('mini-game-modal').classList.add('hidden'); 
+    // Wait, if I hide modal, the icon needs to be outside modal? 
+    // In index.html, icon is outside modal. Correct.
+}
+
+function restoreMiniGame() {
+    const windowEl = document.getElementById('mini-game-window');
+    const minimizedIcon = document.getElementById('mini-game-minimized');
+    
+    document.getElementById('mini-game-modal').classList.remove('hidden');
+    windowEl.classList.remove('ms-window-hidden');
+    minimizedIcon.classList.add('ms-icon-hidden');
 }
 
 function makeDraggable(element, handle) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     
-    handle.onmousedown = dragMouseDown;
-    handle.ontouchstart = dragMouseDown;
+    handle.addEventListener('mousedown', dragMouseDown);
+    handle.addEventListener('touchstart', dragMouseDown, { passive: false });
 
     function dragMouseDown(e) {
         element.dataset.isDragging = 'false'; // Reset drag state
         e = e || window.event;
-        // get the mouse cursor position at startup:
+        
         if (e.type === 'touchstart') {
+            // e.preventDefault(); // Allow tap
             pos3 = e.touches[0].clientX;
             pos4 = e.touches[0].clientY;
+            
+            document.addEventListener('touchend', closeDragElement, { passive: false });
+            document.addEventListener('touchmove', elementDrag, { passive: false });
         } else {
-            // e.preventDefault(); // Remove preventDefault to allow click if no drag
+            e.preventDefault();
             pos3 = e.clientX;
             pos4 = e.clientY;
+            
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
         }
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-        document.ontouchend = closeDragElement;
-        document.ontouchmove = elementDrag;
     }
 
     function elementDrag(e) {
         element.dataset.isDragging = 'true'; // Mark as dragging
         e = e || window.event;
-        e.preventDefault(); // Prevent default only during drag
+        
+        if (e.cancelable) {
+            e.preventDefault(); // Prevent default (scrolling) during drag
+        }
+        
         // calculate the new cursor position:
         let clientX, clientY;
         if (e.type === 'touchmove') {
@@ -166,8 +226,9 @@ function makeDraggable(element, handle) {
         // stop moving when mouse button is released:
         document.onmouseup = null;
         document.onmousemove = null;
-        document.ontouchend = null;
-        document.ontouchmove = null;
+        
+        document.removeEventListener('touchend', closeDragElement);
+        document.removeEventListener('touchmove', elementDrag);
     }
 }
 
@@ -291,16 +352,34 @@ window.handleAiMinesweeperMove = function(command, r, c) {
     if (isNaN(r) || isNaN(c)) return;
     if (r < 0 || r >= minesweeperState.rows || c < 0 || c >= minesweeperState.cols) return;
     
+    // 检查有效性
+    const cellData = minesweeperState.grid[r][c];
+    if ((command === 'CLICK' || command === 'REVEAL')) {
+        // 如果已经揭开，忽略
+        if (cellData.isRevealed) return;
+        // 如果已插旗，忽略点击（必须先取消插旗）
+        if (cellData.isFlagged) return;
+    } else if (command === 'FLAG') {
+        // 如果已经揭开，不能插旗
+        if (cellData.isRevealed) return;
+    }
+
     // Highlight cell
     const cellEl = document.querySelector(`.ms-cell[data-row="${r}"][data-col="${c}"]`);
     if (cellEl) {
         const originalBorder = cellEl.style.border;
+        const originalTransform = cellEl.style.transform;
+        
         cellEl.style.border = '2px solid #007AFF';
         cellEl.style.zIndex = '10';
+        cellEl.style.transform = 'scale(1.1)';
+        cellEl.style.transition = 'all 0.3s ease';
         
         setTimeout(() => {
             cellEl.style.border = originalBorder;
             cellEl.style.zIndex = '';
+            cellEl.style.transform = originalTransform;
+            
             if (command === 'CLICK' || command === 'REVEAL') {
                 revealCell(r, c);
             } else if (command === 'FLAG') {
@@ -325,8 +404,6 @@ window.startMinesweeper = function(level = 'easy') {
     minimizedIcon.classList.add('ms-icon-hidden');
     
     // 设置难度
-    
-    // 设置难度
     minesweeperState.level = level;
     if (level === 'easy') {
         minesweeperState.rows = 9;
@@ -337,11 +414,6 @@ window.startMinesweeper = function(level = 'easy') {
         minesweeperState.cols = 16;
         minesweeperState.mines = 40;
     } else if (level === 'hard') {
-        minesweeperState.rows = 16;
-        minesweeperState.cols = 30; // 移动端可能需要适配宽度，暂定 16x16 或调整css
-        // 为了适应手机竖屏，Hard 模式也许可以是 24x12? 
-        // 经典高级是 16x30。这里为了 UI 适配，如果是竖屏手机，可能需要调整。
-        // 考虑到容器宽度，这里先限制一下。
         minesweeperState.rows = 20;
         minesweeperState.cols = 15;
         minesweeperState.mines = 50;
@@ -426,9 +498,8 @@ function renderMinesweeperGrid() {
     gridEl.style.gridTemplateColumns = `repeat(${minesweeperState.cols}, 1fr)`;
     
     // 动态调整格子大小以适应屏幕
-    // 对于移动端，最大宽度限制为 320px
     const containerWidth = 320; 
-    const gap = 4; // 间隙
+    const gap = 4;
     const totalGap = (minesweeperState.cols - 1) * gap;
     const cellSize = (containerWidth - totalGap) / minesweeperState.cols;
     
@@ -442,11 +513,10 @@ function renderMinesweeperGrid() {
             cell.dataset.row = r;
             cell.dataset.col = c;
             
-            // Modern styling
             cell.style.width = '100%';
             cell.style.aspectRatio = '1/1';
             cell.style.borderRadius = '4px';
-            cell.style.backgroundColor = '#E5E5EA'; // iOS gray
+            cell.style.backgroundColor = '#E5E5EA'; 
             cell.style.display = 'flex';
             cell.style.alignItems = 'center';
             cell.style.justifyContent = 'center';
@@ -456,14 +526,12 @@ function renderMinesweeperGrid() {
             cell.style.transition = 'all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
             cell.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
             
-            // 移动端适配：长按插旗
             let touchTimer = null;
             cell.addEventListener('touchstart', (e) => {
                 if (minesweeperState.gameOver || minesweeperState.grid[r][c].isRevealed) return;
                 touchTimer = setTimeout(() => {
                     e.preventDefault();
                     toggleFlag(r, c);
-                    // Haptic feedback if available
                     if (navigator.vibrate) navigator.vibrate(50);
                 }, 400);
             });
@@ -474,7 +542,6 @@ function renderMinesweeperGrid() {
 
             cell.addEventListener('click', () => {
                 if (minesweeperState.gameOver) return;
-                // 如果已插旗，不可点击
                 if (minesweeperState.grid[r][c].isFlagged) return;
                 revealCell(r, c);
             });
@@ -494,7 +561,6 @@ function revealCell(r, c) {
     const cellData = minesweeperState.grid[r][c];
     if (cellData.isRevealed || cellData.isFlagged) return;
 
-    // 开始计时
     if (!minesweeperState.startTime) {
         minesweeperState.startTime = Date.now();
         minesweeperState.timerInterval = setInterval(updateTimer, 1000);
@@ -507,7 +573,6 @@ function revealCell(r, c) {
         gameOver(false);
     } else {
         if (cellData.neighborMines === 0) {
-            // 递归揭开
             for (let i = -1; i <= 1; i++) {
                 for (let j = -1; j <= 1; j++) {
                     const nr = r + i;
@@ -534,7 +599,7 @@ function toggleFlag(r, c) {
             cellData.isFlagged = true;
             minesweeperState.flags++;
         } else {
-            return; // 旗子用完了
+            return; 
         }
     }
     
@@ -546,16 +611,15 @@ function updateCellUI(r, c) {
     const cell = document.querySelector(`.ms-cell[data-row="${r}"][data-col="${c}"]`);
     const data = minesweeperState.grid[r][c];
 
-    // Reset styles first
     cell.style.boxShadow = 'none';
     cell.style.transform = 'scale(1)';
 
     if (data.isRevealed) {
-        cell.style.backgroundColor = '#fff'; // White for revealed
+        cell.style.backgroundColor = '#fff';
         cell.style.border = '1px solid #f0f0f0';
         
         if (data.isMine) {
-            cell.style.backgroundColor = '#FF3B30'; // iOS Red
+            cell.style.backgroundColor = '#FF3B30';
             cell.style.border = 'none';
             cell.textContent = '💣';
             cell.style.color = '#fff';
@@ -568,7 +632,7 @@ function updateCellUI(r, c) {
             }
         }
     } else if (data.isFlagged) {
-        cell.style.backgroundColor = '#FF9500'; // iOS Orange
+        cell.style.backgroundColor = '#FF9500';
         cell.textContent = '🚩';
         cell.style.color = '#fff';
         cell.style.border = 'none';
@@ -592,7 +656,6 @@ function gameOver(win) {
     document.getElementById('ms-face-btn').textContent = win ? '😎' : '😵';
 
     if (!win) {
-        // 显示所有雷
         for (let r = 0; r < minesweeperState.rows; r++) {
             for (let c = 0; c < minesweeperState.cols; c++) {
                 if (minesweeperState.grid[r][c].isMine) {
@@ -604,16 +667,21 @@ function gameOver(win) {
     } else {
         showVictoryAnimation();
     }
+
+    if (window.iphoneSimState && window.iphoneSimState.currentChatContactId && window.generateAiReply) {
+        setTimeout(() => {
+            const resultText = win ? "游戏胜利！所有地雷都已找出。" : "游戏失败！不小心踩到了地雷。";
+            window.generateAiReply(`[系统通知]: 扫雷${resultText} 请根据当前游戏结果发表一句简短的评论。`);
+        }, 1500);
+    }
 }
 
 function showVictoryAnimation() {
     const windowEl = document.getElementById('minesweeper-window');
     
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.className = 'victory-overlay';
     
-    // Create content
     const content = `
         <div class="victory-emoji">🏆</div>
         <div class="victory-title">Victory!</div>
@@ -626,7 +694,6 @@ function showVictoryAnimation() {
     `;
     overlay.innerHTML = content;
     
-    // Add confetti
     for (let i = 0; i < 30; i++) {
         const confetti = document.createElement('div');
         confetti.className = 'ms-confetti';
@@ -639,7 +706,6 @@ function showVictoryAnimation() {
     
     windowEl.appendChild(overlay);
     
-    // Bind restart button
     document.getElementById('ms-restart-btn').addEventListener('click', () => {
         overlay.remove();
         startMinesweeper(minesweeperState.level);
@@ -668,6 +734,774 @@ function updateTimer() {
 
 function formatNumber(num) {
     return num.toString().padStart(3, '0');
+}
+
+// --- New Mini Games Logic ---
+
+window.startMiniGame = function(gameType) {
+    document.getElementById('game-selection-modal').classList.add('hidden');
+    
+    const modal = document.getElementById('mini-game-modal');
+    modal.classList.remove('hidden');
+    
+    // Ensure window is visible and icon hidden
+    const windowEl = document.getElementById('mini-game-window');
+    const minimizedIcon = document.getElementById('mini-game-minimized');
+    windowEl.classList.remove('ms-window-hidden');
+    minimizedIcon.classList.add('ms-icon-hidden');
+
+    const title = document.getElementById('mini-game-title');
+    const content = document.getElementById('mini-game-content');
+    const resultDiv = document.getElementById('mini-game-result');
+    
+    resultDiv.innerHTML = '';
+    content.innerHTML = '';
+    
+    // Reset max-width if changed by specific games
+    windowEl.style.maxWidth = '320px';
+
+    // Clear any previous AI help buttons in header
+    const oldAiBtn = document.getElementById('mini-game-ai-btn');
+    if(oldAiBtn) oldAiBtn.remove();
+
+    if (gameType === 'rps') {
+        title.textContent = '猜拳';
+        content.innerHTML = `
+            <div style="display: flex; gap: 20px;">
+                <button class="rps-btn" data-choice="rock" style="font-size: 40px; width: 80px; height: 80px; border-radius: 50%; border: none; background: #eee; cursor: pointer; transition: transform 0.2s;">✊</button>
+                <button class="rps-btn" data-choice="scissors" style="font-size: 40px; width: 80px; height: 80px; border-radius: 50%; border: none; background: #eee; cursor: pointer; transition: transform 0.2s;">✌️</button>
+                <button class="rps-btn" data-choice="paper" style="font-size: 40px; width: 80px; height: 80px; border-radius: 50%; border: none; background: #eee; cursor: pointer; transition: transform 0.2s;">✋</button>
+            </div>
+            <div id="rps-opponent" style="margin-top: 20px; font-size: 60px; min-height: 80px;">❓</div>
+        `;
+        
+        const btns = content.querySelectorAll('.rps-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => playRPS(btn.dataset.choice));
+        });
+        
+    } else if (gameType === 'dice') {
+        title.textContent = '投骰子';
+        content.innerHTML = `
+            <div style="display: flex; gap: 30px; align-items: center;">
+                <div style="text-align: center;">
+                    <div style="margin-bottom: 10px; color: #666;">你</div>
+                    <div id="dice-user" style="font-size: 60px; width: 80px; height: 80px; background: #f9f9f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);">🎲</div>
+                </div>
+                <div style="font-size: 24px; color: #ccc;">VS</div>
+                <div style="text-align: center;">
+                    <div style="margin-bottom: 10px; color: #666;">TA</div>
+                    <div id="dice-opponent" style="font-size: 60px; width: 80px; height: 80px; background: #f9f9f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);">❓</div>
+                </div>
+            </div>
+            <button id="roll-dice-btn" style="margin-top: 30px; padding: 12px 40px; background: #34C759; color: white; border: none; border-radius: 25px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);">
+                投掷
+            </button>
+        `;
+        
+        document.getElementById('roll-dice-btn').addEventListener('click', playDice);
+        
+    } else if (gameType === 'witch') {
+        title.textContent = '女巫的毒药';
+        // Widening the modal for this game
+        document.getElementById('mini-game-window').style.maxWidth = '360px';
+        
+        content.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                <div style="display: flex; gap: 15px; align-items: flex-start; justify-content: center; width: 100%;">
+                    <div style="text-align: center;">
+                        <div style="margin-bottom: 5px; font-size: 12px; color: #666;">TA <span id="witch-score-opp" style="color: #FF3B30; font-weight: bold;"></span></div>
+                        <div id="witch-grid-opponent" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; width: 130px; height: 130px; background: #f0f0f0; padding: 3px; border-radius: 4px;">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <div style="margin-bottom: 5px; font-size: 12px; color: #666;">你 <span id="witch-score-user" style="color: #FF3B30; font-weight: bold;"></span></div>
+                        <div id="witch-grid-user" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; width: 130px; height: 130px; background: #f0f0f0; padding: 3px; border-radius: 4px;">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                </div>
+                <button id="witch-action-btn" style="padding: 8px 20px; background: #007AFF; color: white; border: none; border-radius: 15px; font-size: 14px; cursor: pointer; display: none;">确认布阵</button>
+            </div>
+            <div id="witch-status" style="margin-top: 10px; font-size: 13px; color: #666; text-align: center;">正在初始化...</div>
+        `;
+        
+        startWitchGame();
+    } else if (gameType === 'truth_dare') {
+        title.textContent = '真心话大冒险';
+        startTruthDareGame();
+    }
+};
+
+let tdState = {
+    isSpinning: false,
+    currentRotation: 0,
+    currentType: null, // 'truth' or 'dare'
+    currentOptions: [], // Array of strings (questions)
+    pools: {
+        'truth': [
+            "最大的恐惧？",
+            "最丢脸的事？",
+            "暗恋过谁？",
+            "最后一次哭？",
+            "隐身想做啥？",
+            "撒过最大的谎？",
+            "想回到何时？",
+            "讨厌的缺点？",
+            "最喜欢的异性？",
+            "初吻还在吗？"
+        ],
+        'dare': [
+            "发鬼脸自拍",
+            "发语音学猫叫",
+            "给第三人发爱你",
+            "改昵称我是猪",
+            "左手打字十句",
+            "发环境照片",
+            "夸赞AI三句",
+            "发尴尬表情包",
+            "深情朗读一段话",
+            "唱一首歌"
+        ]
+    }
+};
+
+function startTruthDareGame() {
+    const content = document.getElementById('mini-game-content');
+    content.innerHTML = `
+        <div class="tod-selection" style="display: flex; gap: 20px; width: 100%; justify-content: center; padding: 20px 0;">
+            <button id="btn-select-truth" style="
+                width: 100px; 
+                height: 120px; 
+                border: none; 
+                border-radius: 16px; 
+                background: linear-gradient(135deg, #5AC8FA, #007AFF); 
+                color: white; 
+                font-size: 20px; 
+                font-weight: bold; 
+                cursor: pointer; 
+                box-shadow: 0 8px 20px rgba(90, 200, 250, 0.4);
+                transition: transform 0.2s;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            ">
+                <i class="fas fa-heart" style="font-size: 32px;"></i>
+                真心话
+            </button>
+            <button id="btn-select-dare" style="
+                width: 100px; 
+                height: 120px; 
+                border: none; 
+                border-radius: 16px; 
+                background: linear-gradient(135deg, #FF2D55, #FF9500); 
+                color: white; 
+                font-size: 20px; 
+                font-weight: bold; 
+                cursor: pointer; 
+                box-shadow: 0 8px 20px rgba(255, 45, 85, 0.4);
+                transition: transform 0.2s;
+                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            ">
+                <i class="fas fa-fire" style="font-size: 32px;"></i>
+                大冒险
+            </button>
+        </div>
+        <div style="margin-top: 10px; font-size: 14px; color: #666; text-align: center;">请选择游戏模式</div>
+    `;
+    
+    document.getElementById('btn-select-truth').addEventListener('click', () => initTodWheel('truth'));
+    document.getElementById('btn-select-dare').addEventListener('click', () => initTodWheel('dare'));
+    
+    // Reset state
+    tdState.currentRotation = 0;
+    document.getElementById('mini-game-result').textContent = '';
+}
+
+function initTodWheel(type) {
+    tdState.currentType = type;
+    // Randomly select 6 distinct options
+    const pool = [...tdState.pools[type]];
+    const selected = [];
+    while(selected.length < 6 && pool.length > 0) {
+        const idx = Math.floor(Math.random() * pool.length);
+        selected.push(pool[idx]);
+        pool.splice(idx, 1);
+    }
+    tdState.currentOptions = selected;
+    
+    // Render Wheel View
+    const content = document.getElementById('mini-game-content');
+    content.innerHTML = `
+        <div id="wheel-container">
+            <div id="wheel-pointer"></div>
+            <canvas id="wheel-canvas" width="250" height="250"></canvas>
+            <div id="wheel-center" style="cursor: pointer;">GO</div>
+        </div>
+        <button id="tod-back-btn" style="
+            background: none; border: none; color: #888; font-size: 14px; cursor: pointer; text-decoration: underline; margin-top: 10px;
+        ">返回选择</button>
+    `;
+    
+    drawWheel();
+    
+    document.getElementById('wheel-center').addEventListener('click', spinTodWheel);
+    document.getElementById('tod-back-btn').addEventListener('click', startTruthDareGame);
+}
+
+function drawWheel() {
+    const canvas = document.getElementById('wheel-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = canvas.width / 2;
+    const arc = Math.PI * 2 / 6;
+    
+    const colors = tdState.currentType === 'truth' 
+        ? ['#5AC8FA', '#4CD964', '#FF9500', '#FF2D55', '#5856D6', '#FFCC00']
+        : ['#FF2D55', '#FF9500', '#FFCC00', '#4CD964', '#5AC8FA', '#5856D6'];
+    
+    // Or alternating colors for better look
+    const altColors = tdState.currentType === 'truth'
+        ? ['#5AC8FA', '#007AFF']
+        : ['#FF2D55', '#FF9500'];
+
+    tdState.currentOptions.forEach((text, i) => {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, i * arc, (i + 1) * arc);
+        ctx.arc(centerX, centerY, 0, (i + 1) * arc, i * arc, true);
+        ctx.fillStyle = altColors[i % 2];
+        ctx.fill();
+        
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(i * arc + arc / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, sans-serif";
+        // Truncate text if too long
+        let displayText = text;
+        if (text.length > 6) displayText = text.substring(0, 5) + '..';
+        ctx.fillText(displayText, radius - 20, 5);
+        ctx.restore();
+    });
+}
+
+function spinTodWheel() {
+    if (tdState.isSpinning) return;
+    tdState.isSpinning = true;
+    document.getElementById('mini-game-result').textContent = '';
+    
+    let extraSpins = 5 + Math.floor(Math.random() * 5); 
+    let randomDeg = Math.floor(Math.random() * 360);
+    let targetRotation = tdState.currentRotation + (extraSpins * 360) + randomDeg;
+    
+    // Normalize to 0-360
+    let finalDeg = targetRotation % 360; 
+    
+    // Calculate index
+    // Pointer at 270 (-90). Wheel rotates clockwise.
+    let pointerAngle = 270;
+    let effectiveAngle = (pointerAngle - finalDeg + 7200) % 360; 
+    let index = Math.floor(effectiveAngle / 60);
+    let resultText = tdState.currentOptions[index];
+    
+    const wheel = document.getElementById('wheel-canvas');
+    wheel.style.transform = `rotate(${targetRotation}deg)`;
+    tdState.currentRotation = targetRotation;
+    
+    setTimeout(() => {
+        tdState.isSpinning = false;
+        handleTodFinalResult(resultText);
+    }, 4000);
+}
+
+function handleTodFinalResult(text) {
+    const prefix = tdState.currentType === 'truth' ? '真心话' : '大冒险';
+    document.getElementById('mini-game-result').textContent = `${prefix}: ${text}`;
+    
+    // Auto send system message
+    if (window.sendMessage) {
+        window.sendMessage(`[系统消息]: 选择了【${prefix}】\n内容：${text}`, true, 'text');
+    }
+}
+
+window.handleAiTruthDare = function(intent = null) {
+    // Check if we are in selection mode
+    const selectionDiv = document.querySelector('.tod-selection');
+    if (selectionDiv) {
+        // Determine type based on intent or random
+        let type;
+        if (intent === 'truth') type = 'truth';
+        else if (intent === 'dare') type = 'dare';
+        else type = Math.random() > 0.5 ? 'truth' : 'dare';
+        
+        // Visual feedback simulation
+        const btnId = type === 'truth' ? 'btn-select-truth' : 'btn-select-dare';
+        const btn = document.getElementById(btnId);
+        
+        if (btn) {
+            // Highlight effect
+            const originalBoxShadow = btn.style.boxShadow;
+            btn.style.boxShadow = `0 0 15px 5px ${type === 'truth' ? '#5AC8FA' : '#FF2D55'}`;
+            btn.style.transform = 'scale(1.05)';
+            
+            // Only generate reply if intent is null (AI deciding)
+            // If intent exists (user asked), chat.js handles the reply generation via generateAiReply
+            if (!intent && window.generateAiReply) {
+                const text = type === 'truth' ? "我选真心话！" : "来个大冒险吧！";
+                window.generateAiReply(text);
+            }
+
+            setTimeout(() => {
+                btn.style.boxShadow = originalBoxShadow;
+                btn.style.transform = 'scale(1)';
+                initTodWheel(type);
+                
+                // Auto spin if it was a selection action
+                setTimeout(() => {
+                    if (!tdState.isSpinning) {
+                        spinTodWheel();
+                    }
+                }, 1500);
+            }, 800);
+        }
+    } else {
+        // We are in wheel mode
+        const wheelCenter = document.getElementById('wheel-center');
+        if (wheelCenter && !tdState.isSpinning) {
+            if (!intent && window.generateAiReply) {
+                window.generateAiReply("转转转！命运的齿轮开始转动~");
+            }
+            spinTodWheel();
+        }
+    }
+};
+
+let witchState = {
+    phase: 'setup', // 'setup', 'playing', 'finished'
+    turn: 'user', // 'user', 'ai'
+    userGrid: [], // { isPoison, isRevealed }
+    aiGrid: [],
+    userPoisons: 0,
+    userPoisonedCount: 0, // AI hit user's poison (User lose point)
+    aiPoisonedCount: 0,   // User hit AI's poison (AI lose point)
+    gameOver: false
+};
+
+function startWitchGame() {
+    witchState = {
+        phase: 'setup',
+        turn: 'user',
+        userGrid: Array(25).fill(null).map(() => ({ isPoison: false, isRevealed: false })),
+        aiGrid: Array(25).fill(null).map(() => ({ isPoison: false, isRevealed: false })),
+        userPoisons: 0,
+        userPoisonedCount: 0,
+        aiPoisonedCount: 0,
+        gameOver: false
+    };
+
+    // AI Setup (Randomly place 3 poisons)
+    let aiPoisonsPlaced = 0;
+    while (aiPoisonsPlaced < 3) {
+        const idx = Math.floor(Math.random() * 25);
+        if (!witchState.aiGrid[idx].isPoison) {
+            witchState.aiGrid[idx].isPoison = true;
+            aiPoisonsPlaced++;
+        }
+    }
+
+    renderWitchBoard();
+    updateWitchStatus("请在右侧（你的区域）点击格子，藏入3瓶毒药 🧪");
+    
+    // Auto send invite
+    if (window.sendMessage) {
+        const contactName = getContactName();
+        window.sendMessage(`[系统消息]: 游戏“女巫的毒药”开始\n规则：双方各藏3瓶毒药，轮流猜测对方格子。\n请先进行布阵。`, true, 'text');
+    }
+}
+
+function renderWitchBoard() {
+    const oppGridEl = document.getElementById('witch-grid-opponent');
+    const userGridEl = document.getElementById('witch-grid-user');
+    const actionBtn = document.getElementById('witch-action-btn');
+    
+    if (!oppGridEl || !userGridEl) return;
+
+    // Render AI Grid (Opponent - Left)
+    oppGridEl.innerHTML = '';
+    witchState.aiGrid.forEach((cell, idx) => {
+        const div = document.createElement('div');
+        div.style.backgroundColor = '#fff';
+        div.style.borderRadius = '2px';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'center';
+        div.style.fontSize = '14px';
+        div.style.aspectRatio = '1/1'; // Force square
+        div.style.overflow = 'hidden';
+        div.style.cursor = (witchState.phase === 'playing' && witchState.turn === 'user' && !cell.isRevealed) ? 'pointer' : 'default';
+        
+        if (cell.isRevealed) {
+            if (cell.isPoison) {
+                div.textContent = '☠️';
+                div.style.backgroundColor = '#ffcccc';
+            } else {
+                div.textContent = '⭕';
+                div.style.color = '#ccc';
+            }
+        }
+
+        if (witchState.phase === 'playing' && witchState.turn === 'user' && !cell.isRevealed) {
+            div.onclick = () => handleWitchMove('opponent', idx);
+        }
+        
+        oppGridEl.appendChild(div);
+    });
+
+    // Render User Grid (Right)
+    userGridEl.innerHTML = '';
+    witchState.userGrid.forEach((cell, idx) => {
+        const div = document.createElement('div');
+        div.style.backgroundColor = '#fff';
+        div.style.borderRadius = '2px';
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'center';
+        div.style.fontSize = '14px';
+        div.style.aspectRatio = '1/1'; // Force square
+        div.style.overflow = 'hidden';
+        div.style.cursor = (witchState.phase === 'setup' && !cell.isRevealed) ? 'pointer' : 'default';
+
+        if (witchState.phase === 'setup') {
+            if (cell.isPoison) {
+                div.textContent = '🧪';
+                div.style.backgroundColor = '#e6e6fa';
+            }
+            div.onclick = () => handleWitchSetup(idx);
+        } else {
+            if (cell.isRevealed) {
+                if (cell.isPoison) {
+                    div.textContent = '☠️'; // Hit by AI
+                    div.style.backgroundColor = '#ffcccc';
+                } else {
+                    div.textContent = '⭕';
+                    div.style.color = '#ccc';
+                }
+            } else {
+                if (cell.isPoison) {
+                    div.textContent = '🧪'; // My poison (hidden from AI, visible to me)
+                    div.style.color = '#9b59b6';
+                }
+            }
+        }
+        
+        userGridEl.appendChild(div);
+    });
+
+    // Update Action Button
+    if (witchState.phase === 'setup') {
+        if (witchState.userPoisons === 3) {
+            actionBtn.style.display = 'block';
+            actionBtn.textContent = '确认布阵';
+            actionBtn.onclick = finishWitchSetup;
+        } else {
+            actionBtn.style.display = 'none';
+        }
+    } else {
+        actionBtn.style.display = 'none';
+    }
+
+    // Update Score
+    const oppScoreEl = document.getElementById('witch-score-opp');
+    const userScoreEl = document.getElementById('witch-score-user');
+    if (oppScoreEl) oppScoreEl.textContent = witchState.aiPoisonedCount > 0 ? `中毒${witchState.aiPoisonedCount}` : '';
+    if (userScoreEl) userScoreEl.textContent = witchState.userPoisonedCount > 0 ? `中毒${witchState.userPoisonedCount}` : '';
+}
+
+function handleWitchSetup(idx) {
+    if (witchState.phase !== 'setup') return;
+    
+    const cell = witchState.userGrid[idx];
+    if (cell.isPoison) {
+        cell.isPoison = false;
+        witchState.userPoisons--;
+    } else {
+        if (witchState.userPoisons < 3) {
+            cell.isPoison = true;
+            witchState.userPoisons++;
+        }
+    }
+    renderWitchBoard();
+}
+
+function finishWitchSetup() {
+    if (witchState.userPoisons !== 3) return;
+    witchState.phase = 'playing';
+    renderWitchBoard();
+    updateWitchStatus("布阵完成！请点击左侧（TA的区域）选择一个格子。");
+    
+    if (window.sendMessage) {
+        window.sendMessage(`[系统消息]: 我已完成布阵，游戏开始！\n轮到我方行动。`, true, 'text');
+    }
+}
+
+function handleWitchMove(target, idx) {
+    if (witchState.gameOver) return;
+    if (witchState.phase !== 'playing') return;
+    if (witchState.turn !== 'user') return; // AI turn
+    if (target !== 'opponent') return; // User clicks opponent grid
+
+    const cell = witchState.aiGrid[idx];
+    if (cell.isRevealed) return;
+
+    // User reveals AI cell
+    cell.isRevealed = true;
+    let msg = '';
+    
+    if (cell.isPoison) {
+        witchState.aiPoisonedCount++; // AI got hit
+        msg = `用户选择了 (行${Math.floor(idx/5)+1}, 列${idx%5+1})，那是【毒药】☠️！\n对方中毒次数：${witchState.aiPoisonedCount}`;
+        // Animation/Sound effect?
+    } else {
+        msg = `用户选择了 (行${Math.floor(idx/5)+1}, 列${idx%5+1})，是安全的。`;
+    }
+
+    if (window.sendMessage) {
+        window.sendMessage(`[系统消息]: ${msg}`, true, 'text');
+    }
+
+    checkWitchGameOver();
+
+    if (!witchState.gameOver) {
+        witchState.turn = 'ai';
+        updateWitchStatus("等待对方行动...");
+    }
+    renderWitchBoard();
+}
+
+window.handleAiWitchGuess = function(r, c) {
+    if (witchState.gameOver) return;
+    if (witchState.turn !== 'ai') return;
+
+    r = parseInt(r);
+    c = parseInt(c);
+    const idx = (r - 1) * 5 + (c - 1);
+    
+    if (idx < 0 || idx >= 25) return;
+
+    const cell = witchState.userGrid[idx];
+    if (cell.isRevealed) return; // Already revealed
+
+    cell.isRevealed = true;
+    let msg = '';
+    const contactName = getContactName();
+
+    if (cell.isPoison) {
+        witchState.userPoisonedCount++;
+        msg = `${contactName} 选择了 (行${r}, 列${c})，那是【毒药】☠️！\n我方中毒次数：${witchState.userPoisonedCount}`;
+    } else {
+        msg = `${contactName} 选择了 (行${r}, 列${c})，是安全的。`;
+    }
+
+    if (window.sendMessage) {
+        window.sendMessage(`[系统消息]: ${msg}`, true, 'text'); 
+    }
+
+    checkWitchGameOver();
+
+    if (!witchState.gameOver) {
+        witchState.turn = 'user';
+        updateWitchStatus("轮到你了，请选择左侧格子。");
+    }
+    renderWitchBoard();
+};
+
+window.getWitchGameState = function() {
+    if (!witchState || witchState.phase === 'setup') return null;
+    
+    let board = `【女巫的毒药局势】\n`;
+    board += `对方中毒: ${witchState.aiPoisonedCount}/3\n我方中毒: ${witchState.userPoisonedCount}/3\n`;
+    board += `轮到谁: ${witchState.turn === 'user' ? '用户' : '你(AI)'}\n`;
+    
+    board += `\n【你的视角（右侧格子）】\n`;
+    for(let r=0; r<5; r++) {
+        for(let c=0; c<5; c++) {
+            const idx = r*5 + c;
+            const cell = witchState.userGrid[idx];
+            if (cell.isRevealed) {
+                board += cell.isPoison ? '☠️ ' : '⭕ ';
+            } else {
+                board += '❓ '; // Unknown to AI
+            }
+        }
+        board += '\n';
+    }
+    
+    // Also hint about opponent grid (left) progress
+    board += `\n【对方的区域（左侧格子）】\n`;
+    for(let r=0; r<5; r++) {
+        for(let c=0; c<5; c++) {
+            const idx = r*5 + c;
+            const cell = witchState.aiGrid[idx];
+            if (cell.isRevealed) {
+                board += cell.isPoison ? '☠️ ' : '⭕ ';
+            } else {
+                board += '⬜ '; // Unrevealed
+            }
+        }
+        board += '\n';
+    }
+    
+    return board;
+};
+
+function checkWitchGameOver() {
+    const contactName = getContactName();
+    if (witchState.aiPoisonedCount >= 3) {
+        witchState.gameOver = true;
+        updateWitchStatus("游戏结束！你赢了！🎉");
+        if (window.sendMessage) {
+            window.sendMessage(`[系统消息]: 游戏结束\n${contactName} 所有的毒药都被找出来了（或中毒3次）。\n🏆 用户胜利！`, true, 'text');
+        }
+    } else if (witchState.userPoisonedCount >= 3) {
+        witchState.gameOver = true;
+        updateWitchStatus("游戏结束！你输了！😵");
+        if (window.sendMessage) {
+            window.sendMessage(`[系统消息]: 游戏结束\n用户 所有的毒药都被找出来了（或中毒3次）。\n🏆 ${contactName} 胜利！`, true, 'text');
+        }
+    }
+}
+
+function updateWitchStatus(text) {
+    const el = document.getElementById('witch-status');
+    if (el) el.textContent = text;
+}
+
+function playRPS(userChoice) {
+    const choices = ['rock', 'scissors', 'paper'];
+    const emojis = { 'rock': '✊', 'scissors': '✌️', 'paper': '✋' };
+    
+    // Disable buttons
+    document.querySelectorAll('.rps-btn').forEach(btn => btn.disabled = true);
+    
+    // Highlight user choice
+    const userBtn = document.querySelector(`.rps-btn[data-choice="${userChoice}"]`);
+    userBtn.style.transform = 'scale(1.2)';
+    userBtn.style.background = '#007AFF';
+    userBtn.style.color = '#fff';
+    
+    // Simulate opponent thinking
+    const opponentDiv = document.getElementById('rps-opponent');
+    let count = 0;
+    const interval = setInterval(() => {
+        opponentDiv.textContent = emojis[choices[count % 3]];
+        count++;
+    }, 100);
+    
+    setTimeout(() => {
+        clearInterval(interval);
+        const opponentChoice = choices[Math.floor(Math.random() * 3)];
+        opponentDiv.textContent = emojis[opponentChoice];
+        
+        let result = '';
+        if (userChoice === opponentChoice) {
+            result = '平局！';
+        } else if (
+            (userChoice === 'rock' && opponentChoice === 'scissors') ||
+            (userChoice === 'scissors' && opponentChoice === 'paper') ||
+            (userChoice === 'paper' && opponentChoice === 'rock')
+        ) {
+            result = '你赢了！🎉';
+        } else {
+            result = '你输了！😵';
+        }
+        
+        document.getElementById('mini-game-result').textContent = result;
+        
+        // Notify Chat
+        if (window.sendMessage) {
+            const contactName = getContactName();
+            let winnerText = '';
+            if (result.includes('你赢了')) winnerText = '用户胜';
+            else if (result.includes('你输了')) winnerText = `${contactName}胜`;
+            else winnerText = '平局';
+
+            window.sendMessage(`[系统消息]: 猜拳对决\n用户出了 ${emojis[userChoice]}\n${contactName}出了 ${emojis[opponentChoice]}\n结果：${winnerText}`, true, 'text');
+        }
+        
+        // Re-enable after delay
+        setTimeout(() => {
+            document.querySelectorAll('.rps-btn').forEach(btn => {
+                btn.disabled = false;
+                btn.style.transform = 'scale(1)';
+                btn.style.background = '#eee';
+                btn.style.color = '#000';
+            });
+            document.getElementById('rps-opponent').textContent = '❓';
+            document.getElementById('mini-game-result').textContent = '';
+        }, 3000);
+        
+    }, 1000);
+}
+
+function playDice() {
+    const btn = document.getElementById('roll-dice-btn');
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    
+    const userDice = document.getElementById('dice-user');
+    const oppDice = document.getElementById('dice-opponent');
+    
+    let count = 0;
+    const interval = setInterval(() => {
+        userDice.textContent = Math.floor(Math.random() * 6) + 1;
+        oppDice.textContent = Math.floor(Math.random() * 6) + 1;
+        count++;
+    }, 50);
+    
+    setTimeout(() => {
+        clearInterval(interval);
+        const userVal = Math.floor(Math.random() * 6) + 1;
+        const oppVal = Math.floor(Math.random() * 6) + 1;
+        
+        userDice.textContent = userVal;
+        oppDice.textContent = oppVal;
+        
+        let result = '';
+        if (userVal > oppVal) result = '你赢了！🎉';
+        else if (userVal < oppVal) result = '你输了！😵';
+        else result = '平局！';
+        
+        document.getElementById('mini-game-result').textContent = result;
+        
+        // Notify Chat
+        if (window.sendMessage) {
+            const contactName = getContactName();
+            let winnerText = '';
+            if (result.includes('你赢了')) winnerText = '用户胜';
+            else if (result.includes('你输了')) winnerText = `${contactName}胜`;
+            else winnerText = '平局';
+
+            window.sendMessage(`[系统消息]: 投骰子比大小\n用户：${userVal}点\n${contactName}：${oppVal}点\n结果：${winnerText}`, true, 'text');
+        }
+        
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }, 2000);
+        
+    }, 1000);
+}
+
+
+function getContactName() {
+    if (window.iphoneSimState && window.iphoneSimState.currentChatContactId) {
+        const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
+        return contact ? (contact.remark || contact.name) : '对方';
+    }
+    return '对方';
 }
 
 // 注册初始化

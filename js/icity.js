@@ -1346,22 +1346,41 @@ async function callAiForContactComments(diary, contacts) {
         // Use custom iCity name if available
         const displayName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
         
+        // Chat History
         const history = window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id] ? window.iphoneSimState.chatHistory[contact.id].slice(-10) : [];
         const chatContext = history.map(m => `${m.role === 'user' ? '用户' : '我'}: ${m.content}`).join('\n');
+        
+        // Memories
+        const memories = window.iphoneSimState.memories ? window.iphoneSimState.memories.filter(m => m.contactId === contact.id).slice(-5) : [];
+        const memoryContext = memories.map(m => m.content).join('\n');
+        
+        // Worldbook
+        let wbContext = '';
+        if (contact.linkedWbCategories && contact.linkedWbCategories.length > 0) {
+             const entries = window.iphoneSimState.worldbook ? window.iphoneSimState.worldbook.filter(e => contact.linkedWbCategories.includes(e.categoryId) && e.enabled) : [];
+             const contactWb = entries.map(e => e.content).join('\n').slice(0, 500);
+             if (contactWb) wbContext += '\n' + contactWb;
+        }
         
         contextData.push({
             name: displayName,
             originalName: contact.name,
             persona: contact.persona || '无',
-            chat: chatContext
+            chat: chatContext,
+            memory: memoryContext,
+            wb: wbContext
         });
     }
 
     const contextStr = contextData.map(d => `
 【角色: ${d.name}】
 人设: ${d.persona}
-最近聊天:
+最近聊天片段:
 ${d.chat}
+重要记忆:
+${d.memory}
+世界观背景:
+${d.wb}
 `).join('\n--------------------------------\n');
 
     const prompt = `用户在朋友圈/iCity发布了一条动态：
@@ -1372,7 +1391,7 @@ ${contextStr}
 
 要求：
 1. 为每个角色生成一条评论。
-2. 评论内容要符合角色人设和最近的聊天上下文。
+2. 评论内容要符合角色人设，**必须结合最近的聊天上下文、重要记忆和世界观背景**。不要出现与记忆相悖的内容。
 3. 语气要像在社交媒体上互动，口语化。
 4. **严禁**输出 "BAKA"、"baka" 等词汇。
 5. 严格返回 JSON 数组格式。
@@ -3559,6 +3578,106 @@ ${contextStr}
 window.renderIcityFriends = renderIcityFriends;
 window.handleGenerateIcityFriends = handleGenerateIcityFriends;
 
+window.addIcityPost = function(contactId, content, visibility = 'friends') {
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    const displayName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+    const handle = (contact.icityData && contact.icityData.handle) ? contact.icityData.handle : `@User_${contact.id.toString().substring(0, 4)}`;
+    const avatar = (contact.icityData && contact.icityData.avatar) ? contact.icityData.avatar : contact.avatar;
+
+    const newPost = {
+        id: Date.now(),
+        contactId: contact.id,
+        name: displayName,
+        handle: handle,
+        avatar: avatar,
+        content: content,
+        time: Date.now(),
+        visibility: visibility,
+        likes: 0,
+        comments: 0
+    };
+
+    if (!window.iphoneSimState.icityFriendsPosts) window.iphoneSimState.icityFriendsPosts = [];
+    window.iphoneSimState.icityFriendsPosts.unshift(newPost);
+    saveConfig();
+    
+    // Refresh if visible
+    const friendsTab = document.getElementById('icity-tab-content-world');
+    const headerFriends = document.getElementById('icity-header-friends');
+    if (friendsTab && friendsTab.style.display !== 'none' && headerFriends && headerFriends.dataset.active === 'true') {
+        renderIcityFriends();
+    }
+
+    // Inject into chat history
+    if (!window.iphoneSimState.chatHistory) window.iphoneSimState.chatHistory = {};
+    if (!window.iphoneSimState.chatHistory[contactId]) window.iphoneSimState.chatHistory[contactId] = [];
+    
+    window.iphoneSimState.chatHistory[contactId].push({
+        id: Date.now() + Math.random(),
+        role: 'system',
+        type: 'system_event',
+        content: `(你在iCity发布了动态: "${content}")`,
+        time: Date.now()
+    });
+};
+
+window.writeToIcityBook = function(contactId, content) {
+    const books = window.iphoneSimState.icityBooks || [];
+    // Find book linked to contact
+    const linkedBook = books.find(b => b.linkedContactIds && b.linkedContactIds.includes(contactId));
+    
+    if (!linkedBook) return false;
+
+    if (!linkedBook.pages) linkedBook.pages = [];
+    
+    let processedContent = content.trim();
+    processedContent = processedContent.replace(/\n/g, '<br>');
+    
+    if (window.iphoneSimState.stickerCategories) {
+         processedContent = processedContent.replace(/\[\[STICKER:(.*?)\]\]/g, (match, name) => {
+            for (const cat of window.iphoneSimState.stickerCategories) {
+                const sticker = cat.list.find(s => s.desc === name.trim());
+                if (sticker) {
+                    return `<img src="${sticker.url}" class="icity-sticker" style="max-width: 30%; float: right; margin: 5px 0 5px 10px;">`;
+                }
+            }
+            return '';
+        });
+    }
+
+    linkedBook.pages.push({
+        content: processedContent,
+        author: 'ai',
+        lastModified: Date.now()
+    });
+    
+    saveConfig();
+    
+    if (window.currentReadingBook && window.currentReadingBook.id === linkedBook.id) {
+        renderBookPages(linkedBook);
+    }
+    
+    if (window.showChatNotification) {
+        window.showChatNotification(contactId, `[iCity] ${linkedBook.name} 更新了新内容`);
+    }
+
+    // Inject into chat history
+    if (!window.iphoneSimState.chatHistory) window.iphoneSimState.chatHistory = {};
+    if (!window.iphoneSimState.chatHistory[contactId]) window.iphoneSimState.chatHistory[contactId] = [];
+    
+    window.iphoneSimState.chatHistory[contactId].push({
+        id: Date.now() + Math.random(),
+        role: 'system',
+        type: 'system_event',
+        content: `(你在共读手账《${linkedBook.name}》中写了新内容: "${content}")`,
+        time: Date.now()
+    });
+    
+    return true;
+};
+
 // Scheduled Diary Generation
 window.generateScheduledContactDiary = async function(contact) {
     console.log('Generating scheduled diary for:', contact.name);
@@ -4563,6 +4682,18 @@ ${stickerContext}
                 page.content = cleanContent;
                 page.lastAnnotated = Date.now();
                 changed = true;
+
+                // Inject into chat history
+                if (!window.iphoneSimState.chatHistory) window.iphoneSimState.chatHistory = {};
+                if (!window.iphoneSimState.chatHistory[contact.id]) window.iphoneSimState.chatHistory[contact.id] = [];
+                
+                window.iphoneSimState.chatHistory[contact.id].push({
+                    id: Date.now() + Math.random(),
+                    role: 'system',
+                    type: 'system_event',
+                    content: `(你批注了用户的手账页面: "${cleanContent.replace(/<[^>]+>/g, '').substring(0, 50)}...")`,
+                    time: Date.now()
+                });
             }
         }
     }
@@ -5150,6 +5281,28 @@ async function generateIcityCommentReply(post, userContent) {
             // Refresh if still on same page
             if (window.currentOpenIcityDiaryId === post.id) {
                 openIcityDiaryDetail(post.id, window.currentOpenIcitySource);
+            }
+
+            // Inject into chat history
+            // We need contact ID.
+            let contact = null;
+            if (post.contactId) {
+                contact = window.iphoneSimState.contacts.find(c => c.id === post.contactId);
+            } else {
+                contact = window.iphoneSimState.contacts.find(c => c.name === post.name);
+            }
+
+            if (contact) {
+                if (!window.iphoneSimState.chatHistory) window.iphoneSimState.chatHistory = {};
+                if (!window.iphoneSimState.chatHistory[contact.id]) window.iphoneSimState.chatHistory[contact.id] = [];
+                
+                window.iphoneSimState.chatHistory[contact.id].push({
+                    id: Date.now() + Math.random(),
+                    role: 'system',
+                    type: 'system_event',
+                    content: `(你在iCity回复了用户的评论: "${reply}")`,
+                    time: Date.now()
+                });
             }
         }
     } catch (e) {
