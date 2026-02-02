@@ -2442,6 +2442,8 @@ async function generateAiReply(instruction = null) {
         }
     }
 
+    let icityBookContext = getLinkedIcityBooksContext(contact.id);
+
     let systemPrompt = `你现在扮演 ${contact.name}。
 人设：${contact.persona || '无'}
 聊天风格：${contact.style || '正常'}
@@ -2450,6 +2452,7 @@ ${momentContext}
 ${icityContext}
 ${memoryContext}
 ${meetingContext}
+${icityBookContext}
 ${timeContext}
 ${itineraryContext}
 
@@ -7306,6 +7309,97 @@ function handleSelectGroup(groupName) {
     window.iphoneSimState.tempSelectedGroup = groupName;
     document.getElementById('chat-setting-group-value').textContent = groupName || '未分组';
     document.getElementById('group-select-modal').classList.add('hidden');
+}
+
+function getLinkedIcityBooksContext(contactId) {
+    if (!window.iphoneSimState.icityBooks || window.iphoneSimState.icityBooks.length === 0) return '';
+    
+    const linkedBooks = window.iphoneSimState.icityBooks.filter(b => 
+        b.linkedContactIds && b.linkedContactIds.includes(contactId)
+    );
+    
+    if (linkedBooks.length === 0) return '';
+    
+    let context = '\n【共读的书籍/手账】\n你们正在共同编辑以下书籍，你可以看到用户写的内容以及你之前的批注：\n';
+    
+    linkedBooks.forEach(book => {
+        context += `\n《${book.name}》:\n`;
+        if (!book.pages || book.pages.length === 0) {
+            context += "(空白)\n";
+            return;
+        }
+        
+        book.pages.forEach((page, index) => {
+            let content = page.content || '';
+            // Temporary DOM element for parsing
+            const div = document.createElement('div');
+            div.innerHTML = content;
+            
+            // Process Ruby (Comments)
+            div.querySelectorAll('ruby').forEach(el => {
+                let text = '';
+                if (el.childNodes.length > 0 && el.childNodes[0].nodeType === 3) {
+                    text = el.childNodes[0].textContent;
+                } else {
+                    text = el.textContent.replace(el.querySelector('rt')?.textContent || '', '');
+                }
+                const rt = el.querySelector('rt');
+                const annotation = rt ? rt.textContent : '';
+                const replaceText = `${text} (你的批注: ${annotation})`;
+                el.replaceWith(document.createTextNode(replaceText));
+            });
+            
+            // Process Strikethrough
+            div.querySelectorAll('s').forEach(el => {
+                const text = el.textContent;
+                const replaceText = `${text} (已划掉)`;
+                el.replaceWith(document.createTextNode(replaceText));
+            });
+            
+            // Process Highlight
+            div.querySelectorAll('.highlight-marker').forEach(el => {
+                const text = el.textContent;
+                const replaceText = `${text} (高亮)`;
+                el.replaceWith(document.createTextNode(replaceText));
+            });
+            
+            // Process Handwritten (AI added text)
+            div.querySelectorAll('.handwritten-text').forEach(el => {
+                const text = el.textContent;
+                const replaceText = `(你的手写: ${text})`;
+                el.replaceWith(document.createTextNode(replaceText));
+            });
+            
+            // Process Stickers
+            div.querySelectorAll('img.icity-sticker').forEach(el => {
+                const src = el.src;
+                let name = '未知贴纸';
+                if (window.iphoneSimState.stickerCategories) {
+                    for (const cat of window.iphoneSimState.stickerCategories) {
+                        const found = cat.list.find(s => src.includes(s.url) || s.url === src);
+                        if (found) {
+                            name = found.desc;
+                            break;
+                        }
+                    }
+                }
+                const replaceText = `[贴纸: ${name}]`;
+                el.replaceWith(document.createTextNode(replaceText));
+            });
+            
+            // Process other images
+            div.querySelectorAll('img').forEach(el => {
+                 el.replaceWith(document.createTextNode('[图片]'));
+            });
+
+            const textContent = div.textContent.trim();
+            if (textContent) {
+                context += `第 ${index + 1} 页: ${textContent}\n`;
+            }
+        });
+    });
+    
+    return context;
 }
 
 // 注册初始化函数

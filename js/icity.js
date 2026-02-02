@@ -91,7 +91,11 @@ function setupIcityListeners() {
         if (btns[2]) {
             btns[2].style.cursor = 'pointer';
             btns[2].addEventListener('click', () => {
-                if (icityComposeModal) icityComposeModal.classList.remove('hidden');
+                if (icityComposeModal) {
+                    icityComposeModal.classList.remove('hidden');
+                    const textInput = document.getElementById('icity-compose-text');
+                    if (textInput) textInput.focus();
+                }
             });
         }
     }
@@ -3749,44 +3753,26 @@ function injectBookStyles() {
             perspective: 1500px; overflow: hidden; position: relative;
         }
         .book-3d {
-            width: 90vw; max-width: 800px;
-            aspect-ratio: 3/2; /* Spread ratio */
+            width: 80vw; max-width: 400px;
+            aspect-ratio: 3/4;
             position: relative;
             transform-style: preserve-3d;
             transition: transform 0.5s;
         }
-        .book-3d.centered-cover {
-            transform: translateX(-25%);
-        }
         .book-page {
-            position: absolute; top: 0; left: 50%;
-            width: 50%; height: 100%;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #fff;
+            border-radius: 2px 6px 6px 2px;
+            box-shadow: inset 5px 0 10px rgba(0,0,0,0.05), 0 2px 5px rgba(0,0,0,0.1);
             transform-origin: left center;
-            transform-style: preserve-3d;
             transition: transform 0.8s cubic-bezier(0.645, 0.045, 0.355, 1);
+            backface-visibility: hidden;
             display: flex; flex-direction: column;
-            backface-visibility: visible;
+            overflow: hidden;
         }
         .book-page.flipped {
             transform: rotateY(-180deg);
-        }
-        .page-side {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            backface-visibility: hidden;
-            background: #fff;
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
-            border-radius: 2px 6px 6px 2px;
-        }
-        .page-front {
-            z-index: 2;
-        }
-        .page-back {
-            transform: rotateY(180deg);
-            z-index: 1;
-            border-radius: 6px 2px 2px 6px; /* Mirror radius */
-            box-shadow: inset -5px 0 10px rgba(0,0,0,0.05); /* Mirror shadow */
         }
         .book-page-content {
             flex: 1; padding: 30px; font-size: 16px; line-height: 1.8;
@@ -3808,10 +3794,60 @@ function injectBookStyles() {
             background: rgba(0,0,0,0.5); color: #fff; border: none;
             padding: 10px 20px; border-radius: 20px; cursor: pointer;
         }
+        /* Animation helper for opening */
         .book-fly-anim {
             position: fixed; z-index: 3000;
             transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
             transform-origin: center center;
+        }
+        
+        /* Annotation Styles */
+        rt.handwritten {
+            font-family: "Comic Sans MS", "Chalkboard SE", sans-serif;
+            font-size: 0.6em;
+            /* transform: rotate(-5deg); Removed rotation to make text flat */
+            display: inline-block;
+            text-align: center;
+            opacity: 0.9;
+        }
+        /* Pen Colors for Ruby/Handwritten */
+        .pen-blue { color: #007AFF; }
+        .pen-red { color: #FF3B30; }
+        .pen-purple { color: #5856D6; }
+        .pen-pink { color: #FF2D55; }
+        .pen-teal { color: #30B0C7; }
+        .pen-black { color: #333; }
+
+        .highlight-marker {
+            border-radius: 4px;
+            padding: 0 2px;
+        }
+        /* Highlighter Colors */
+        .highlight-yellow { background: linear-gradient(120deg, rgba(255, 235, 59, 0.4) 0%, rgba(255, 235, 59, 0.1) 100%); }
+        .highlight-green { background: linear-gradient(120deg, rgba(52, 199, 89, 0.3) 0%, rgba(52, 199, 89, 0.1) 100%); }
+        .highlight-pink { background: linear-gradient(120deg, rgba(255, 45, 85, 0.2) 0%, rgba(255, 45, 85, 0.1) 100%); }
+        .highlight-blue { background: linear-gradient(120deg, rgba(0, 122, 255, 0.2) 0%, rgba(0, 122, 255, 0.1) 100%); }
+        .highlight-purple { background: linear-gradient(120deg, rgba(88, 86, 214, 0.2) 0%, rgba(88, 86, 214, 0.1) 100%); }
+
+        .strikethrough-hand {
+            text-decoration: line-through;
+            text-decoration-color: #FF3B30; /* Default red strike */
+            text-decoration-style: wavy;
+            text-decoration-thickness: 2px;
+            color: #999;
+        }
+        .handwritten-text {
+            font-family: "Comic Sans MS", "Chalkboard SE", sans-serif;
+        }
+        
+        /* Reset helper */
+        .reset-style {
+            color: #333 !important;
+            background: transparent !important;
+            font-weight: normal !important;
+            font-style: normal !important;
+            text-decoration: none !important;
+            font-family: inherit !important;
         }
     `;
     document.head.appendChild(style);
@@ -3823,10 +3859,12 @@ function openIcityBook(id, startEl) {
     const book = window.iphoneSimState.icityBooks.find(b => b.id === id);
     if (!book) return;
     
+    // Ensure pages exist
     if (!book.pages || !Array.isArray(book.pages) || book.pages.length === 0) {
-        book.pages = [{ content: '' }];
+        book.pages = [{ content: '' }]; // Start with one empty page
     }
 
+    // Create Reader DOM
     let reader = document.getElementById('icity-book-reader');
     if (!reader) {
         reader = document.createElement('div');
@@ -3837,7 +3875,9 @@ function openIcityBook(id, startEl) {
                 <button class="back-btn" onclick="closeIcityBook()"><i class="fas fa-chevron-left"></i> 关闭</button>
                 <div style="font-weight: bold;" id="book-reader-title"></div>
                 <div style="display: flex; gap: 10px;">
-                    <button class="icon-btn" onclick="openIcityBookSettings()"><i class="fas fa-cog"></i></button>
+                    <button class="icon-btn" onclick="toggleIcityFormatToolbar()"><i class="fas fa-highlighter"></i></button>
+                    <button class="icon-btn" onclick="openIcityStickerPicker()"><i class="far fa-smile"></i></button>
+                    <button class="icon-btn" id="book-reader-settings-btn"><i class="fas fa-cog"></i></button>
                     <button class="icon-btn" onclick="addIcityBookPage()"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
@@ -3845,50 +3885,26 @@ function openIcityBook(id, startEl) {
                 <div class="book-3d" id="book-3d-container"></div>
             </div>
             <div class="book-controls">
-                <button class="book-control-btn" onclick="prevIcityBookSheet()"><i class="fas fa-arrow-left"></i></button>
-                <button class="book-control-btn" onclick="nextIcityBookSheet()"><i class="fas fa-arrow-right"></i></button>
+                <button class="book-control-btn" onclick="prevIcityBookPage()"><i class="fas fa-arrow-left"></i></button>
+                <button class="book-control-btn" onclick="nextIcityBookPage()"><i class="fas fa-arrow-right"></i></button>
             </div>
         `;
         document.body.appendChild(reader);
-    } else {
-        // Ensure settings button exists if reader already exists (hot patch)
-        const header = reader.querySelector('.book-reader-header');
-        if (header && !header.querySelector('.fa-cog')) {
-            const rightDiv = document.createElement('div');
-            rightDiv.style.cssText = 'display: flex; gap: 10px;';
-            
-            // Move existing plus button
-            const plusBtn = header.querySelector('.icon-btn');
-            if (plusBtn) {
-                // Create settings button
-                const settingsBtn = document.createElement('button');
-                settingsBtn.className = 'icon-btn';
-                settingsBtn.onclick = () => openIcityBookSettings();
-                settingsBtn.innerHTML = '<i class="fas fa-cog"></i>';
-                
-                rightDiv.appendChild(settingsBtn);
-                rightDiv.appendChild(plusBtn.cloneNode(true)); // Clone to avoid reference issues
-                
-                // Re-attach listener to new plus button
-                rightDiv.lastChild.onclick = () => addIcityBookPage();
-                
-                // Replace old plus button with container
-                header.replaceChild(rightDiv, plusBtn);
-            }
-        }
     }
     
     document.getElementById('book-reader-title').textContent = book.name;
+    // Update settings button handler
+    const settingsBtn = document.getElementById('book-reader-settings-btn');
+    if (settingsBtn) {
+        settingsBtn.onclick = () => openIcityBookSettings(book.id);
+    }
+
     window.currentReadingBook = book;
+    window.currentBookPage = 0; // 0 is cover? No, let's say 0 is cover, 1 is first page.
     
     renderBookPages(book);
     
-    // Initial state: Sheet 0 (Cover) is visible on right. All sheets are stacked on right.
-    window.currentSheetIndex = 0; 
-    
-    // Center the cover initially
-    document.getElementById('book-3d-container').classList.add('centered-cover');
-    
+    // Opening Animation
     if (startEl) {
         const rect = startEl.getBoundingClientRect();
         const clone = startEl.cloneNode(true);
@@ -3900,12 +3916,16 @@ function openIcityBook(id, startEl) {
         clone.style.margin = '0';
         document.body.appendChild(clone);
         
+        // Target position (center of screen, approx book size)
+        // Book size defined in CSS is 80vw max 400px, aspect 3/4.
+        // We need to calculate roughly where it ends up.
+        // Simplified: just fade in reader and fade out clone.
+        
         requestAnimationFrame(() => {
             reader.classList.add('visible');
-            clone.style.top = '20%'; 
-            clone.style.left = '50%';
-            clone.style.transform = 'translate(-50%, 0)';
-            clone.style.width = '40vw'; // Half of book width
+            clone.style.top = '15%'; // Approx
+            clone.style.left = '10%';
+            clone.style.width = '80%';
             clone.style.height = 'auto'; 
             clone.style.opacity = '0';
             
@@ -3922,129 +3942,64 @@ function renderBookPages(book) {
     const container = document.getElementById('book-3d-container');
     container.innerHTML = '';
     
-    // Sheet 0: Front = Cover, Back = Inner Cover (Page 0?? Let's say Inner is blank/dedication)
-    // Actually mapping:
-    // Sheet 0: Front=Cover, Back=Empty/TitlePage
-    // Sheet 1: Front=Page 1, Back=Page 2
-    // Sheet 2: Front=Page 3, Back=Page 4
-    
-    const sheets = [];
-    
-    // Cover Sheet
-    const coverSheet = document.createElement('div');
-    coverSheet.className = 'book-page';
-    coverSheet.style.zIndex = 100;
-    
-    const coverFront = document.createElement('div');
-    coverFront.className = 'page-side page-front book-cover-page';
+    // Cover Page (Index 0)
+    const coverDiv = document.createElement('div');
+    coverDiv.className = 'book-page book-cover-page';
+    coverDiv.style.zIndex = 100;
     if (book.cover) {
-        coverFront.style.backgroundImage = `url('${book.cover}')`;
+        coverDiv.style.backgroundImage = `url('${book.cover}')`;
     } else {
-        coverFront.style.backgroundColor = '#8e8e93';
-        coverFront.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:bold; font-family:'Times New Roman'; padding:20px; text-align:center;">${book.name}</div>`;
+        coverDiv.style.backgroundColor = '#8e8e93';
+        coverDiv.innerHTML = `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:bold; font-family:'Times New Roman'; padding:20px; text-align:center;">${book.name}</div>`;
     }
+    container.appendChild(coverDiv);
     
-    const coverBack = document.createElement('div');
-    coverBack.className = 'page-side page-back';
-    coverBack.style.background = '#f5f5f5'; // Inner cover
-    
-    coverSheet.appendChild(coverFront);
-    coverSheet.appendChild(coverBack);
-    container.appendChild(coverSheet);
-    sheets.push(coverSheet);
-    
-    // Content Sheets
-    // Iterate pages by 2
-    const totalPages = book.pages.length;
-    const totalSheets = Math.ceil(totalPages / 2);
-    
-    for (let i = 0; i < totalSheets; i++) {
-        const pageIdx1 = i * 2;
-        const pageIdx2 = i * 2 + 1;
-        
-        const sheetDiv = document.createElement('div');
-        sheetDiv.className = 'book-page';
-        sheetDiv.style.zIndex = 99 - i;
-        
-        // Front (Right side when open) -> Page 1, 3, 5...
-        const frontDiv = document.createElement('div');
-        frontDiv.className = 'page-side page-front';
-        frontDiv.innerHTML = `
-            <div class="book-page-content" contenteditable="true" oninput="updateBookPageContent(${pageIdx1}, this)">${book.pages[pageIdx1].content}</div>
-            <div class="book-page-footer">${pageIdx1 + 1}</div>
+    // Content Pages
+    book.pages.forEach((page, index) => {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'book-page';
+        pageDiv.style.zIndex = 99 - index; // Stack order
+        pageDiv.innerHTML = `
+            <div class="book-page-content" contenteditable="true" oninput="updateBookPageContent(${index}, this)">${page.content}</div>
+            <div class="book-page-footer">- ${index + 1} -</div>
         `;
-        // Stop prop
-        frontDiv.querySelector('.book-page-content').addEventListener('click', e => e.stopPropagation());
-        frontDiv.onclick = () => nextIcityBookSheet();
+        // Prevent click propagation to avoid flipping when editing
+        const contentDiv = pageDiv.querySelector('.book-page-content');
+        contentDiv.addEventListener('click', (e) => {
+            e.stopPropagation(); // Don't flip when clicking text
+            contentDiv.focus();
+        });
         
-        // Back (Left side when turned) -> Page 2, 4, 6...
-        const backDiv = document.createElement('div');
-        backDiv.className = 'page-side page-back';
+        // Click on page margin to flip?
+        pageDiv.onclick = () => nextIcityBookPage();
         
-        if (pageIdx2 < totalPages) {
-            backDiv.innerHTML = `
-                <div class="book-page-content" contenteditable="true" oninput="updateBookPageContent(${pageIdx2}, this)">${book.pages[pageIdx2].content}</div>
-                <div class="book-page-footer">${pageIdx2 + 1}</div>
-            `;
-            backDiv.querySelector('.book-page-content').addEventListener('click', e => e.stopPropagation());
-        } else {
-            // Empty back page
-            backDiv.innerHTML = '<div class="book-page-content"></div>';
-        }
-        backDiv.onclick = () => prevIcityBookSheet();
-        
-        sheetDiv.appendChild(frontDiv);
-        sheetDiv.appendChild(backDiv);
-        container.appendChild(sheetDiv);
-        sheets.push(sheetDiv);
-    }
-    
-    window.bookSheets = sheets;
-    updateBookZIndexes();
-}
-
-function updateBookZIndexes() {
-    if (!window.bookSheets) return;
-    window.bookSheets.forEach((sheet, index) => {
-        if (sheet.classList.contains('flipped')) {
-            sheet.style.zIndex = 100 + index; // Left stack: Higher index on top
-        } else {
-            sheet.style.zIndex = 1000 - index; // Right stack: Lower index on top
-        }
+        container.appendChild(pageDiv);
     });
 }
 
 function updateBookPageContent(index, el) {
-    if (window.currentReadingBook && window.currentReadingBook.pages[index]) {
-        // Save as HTML to preserve annotations
+    if (window.currentReadingBook) {
         window.currentReadingBook.pages[index].content = el.innerHTML;
-        // Do not save on every input, will be saved on close
-        // saveConfig(); 
+        window.currentReadingBook.pages[index].lastModified = Date.now();
+        // Debounce save?
+        saveConfig();
     }
 }
 
-function nextIcityBookSheet() {
-    if (window.currentSheetIndex < window.bookSheets.length) {
-        // If flipping cover (0), move book to center
-        if (window.currentSheetIndex === 0) {
-            document.getElementById('book-3d-container').classList.remove('centered-cover');
-        }
-        window.bookSheets[window.currentSheetIndex].classList.add('flipped');
-        window.currentSheetIndex++;
-        updateBookZIndexes();
+function nextIcityBookPage() {
+    const total = window.currentReadingBook.pages.length + 1; // +1 for cover
+    if (window.currentBookPage < total - 1) {
+        const pages = document.querySelectorAll('.book-page');
+        pages[window.currentBookPage].classList.add('flipped');
+        window.currentBookPage++;
     }
 }
 
-function prevIcityBookSheet() {
-    if (window.currentSheetIndex > 0) {
-        window.currentSheetIndex--;
-        window.bookSheets[window.currentSheetIndex].classList.remove('flipped');
-        
-        // If flipping back to cover (0), center cover
-        if (window.currentSheetIndex === 0) {
-            document.getElementById('book-3d-container').classList.add('centered-cover');
-        }
-        updateBookZIndexes();
+function prevIcityBookPage() {
+    if (window.currentBookPage > 0) {
+        window.currentBookPage--;
+        const pages = document.querySelectorAll('.book-page');
+        pages[window.currentBookPage].classList.remove('flipped');
     }
 }
 
@@ -4053,264 +4008,765 @@ function addIcityBookPage() {
         window.currentReadingBook.pages.push({ content: '' });
         saveConfig();
         renderBookPages(window.currentReadingBook);
-        
-        // Restore flip state
-        window.bookSheets.forEach((sheet, idx) => {
-            if (idx < window.currentSheetIndex) {
-                sheet.classList.add('flipped');
-            }
-        });
-        
-        // If we added a page that started a new sheet, we might want to flip to it?
-        // Logic: if pages length changed from even to odd, new sheet created.
-        // Simplest: just stay where we are, user can flip.
+        // Go to new page (last one)
+        // We need to re-apply flipped states
+        const pages = document.querySelectorAll('.book-page');
+        // Flip all previous
+        for (let i = 0; i < pages.length - 1; i++) {
+            pages[i].classList.add('flipped');
+        }
+        window.currentBookPage = pages.length - 1;
     }
 }
 
 function closeIcityBook() {
+    const book = window.currentReadingBook;
+    
+    // Check for linked contact + content
+    if (book && book.linkedContactIds && book.linkedContactIds.length > 0) {
+        const hasContent = book.pages.some(p => p.content && p.content.trim().length > 0);
+        if (hasContent) {
+            showIcityCloseOptions(book);
+            return;
+        }
+    }
+    
+    // Default close
+    forceCloseIcityBook();
+}
+
+function forceCloseIcityBook() {
     const reader = document.getElementById('icity-book-reader');
     if (reader) {
         reader.classList.remove('visible');
-    }
-    
-    // Trigger AI annotation process after closing
-    if (window.currentReadingBook) {
-        // Save final content before annotating
-        saveConfig(); 
-        startBookAnnotation(window.currentReadingBook);
         window.currentReadingBook = null;
     }
 }
 
-async function startBookAnnotation(book) {
-    const linkedContactIds = book.linkedContactIds || [];
-    if (linkedContactIds.length === 0) return;
-
-    const contacts = window.iphoneSimState.contacts.filter(c => linkedContactIds.includes(c.id));
-    if (contacts.length === 0) return;
+function showIcityCloseOptions(book) {
+    const overlay = document.createElement('div');
+    overlay.id = 'icity-close-options-sheet';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.4); z-index: 3000;
+        display: flex; flex-direction: column; justify-content: flex-end;
+    `;
     
-    const notification = document.getElementById('summary-notification');
-    const notificationText = document.getElementById('summary-notification-text');
-    if (notification && notificationText) {
-        notificationText.textContent = 'AI 正在批注中...';
-        notification.classList.remove('hidden');
-    }
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    };
+
+    const sheet = document.createElement('div');
+    sheet.style.cssText = `
+        background: #f2f2f7; border-radius: 12px 12px 0 0; padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom));
+        animation: slideUp 0.3s ease;
+    `;
+    
+    const title = document.createElement('div');
+    title.textContent = '关闭后，你希望 AI 做什么？';
+    title.style.cssText = 'text-align: center; color: #8e8e93; font-size: 13px; margin-bottom: 15px;';
+    sheet.appendChild(title);
+
+    const group = document.createElement('div');
+    group.style.cssText = 'background: #fff; border-radius: 12px; overflow: hidden; margin-bottom: 10px;';
+
+    const options = [
+        { text: '只进行批注', action: () => { forceCloseIcityBook(); triggerBookAnnotation(book, 'annotate_only'); } },
+        { text: '只写新内容', action: () => { forceCloseIcityBook(); triggerBookAnnotation(book, 'write_only'); } },
+        { text: '批注并写新内容', action: () => { forceCloseIcityBook(); triggerBookAnnotation(book, 'both'); } },
+    ];
+
+    options.forEach((opt, index) => {
+        const btn = document.createElement('div');
+        btn.textContent = opt.text;
+        btn.style.cssText = `
+            padding: 15px; text-align: center; font-size: 16px; color: #007AFF;
+            background: #fff; cursor: pointer;
+            ${index < options.length - 1 ? 'border-bottom: 1px solid #eee;' : ''}
+        `;
+        btn.onclick = () => {
+            overlay.remove();
+            opt.action();
+        };
+        group.appendChild(btn);
+    });
+
+    const closeBtn = document.createElement('div');
+    closeBtn.textContent = '什么都不写直接关闭';
+    closeBtn.style.cssText = `
+        padding: 15px; text-align: center; font-size: 16px; color: #FF3B30;
+        background: #fff; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 10px;
+    `;
+    closeBtn.onclick = () => {
+        overlay.remove();
+        forceCloseIcityBook();
+    };
+    
+    const cancelBtn = document.createElement('div');
+    cancelBtn.textContent = '取消 (保持打开)';
+    cancelBtn.style.cssText = `
+        padding: 15px; text-align: center; font-size: 16px; color: #007AFF;
+        background: #fff; border-radius: 12px; cursor: pointer; font-weight: bold;
+    `;
+    cancelBtn.onclick = () => overlay.remove();
+
+    sheet.appendChild(group);
+    sheet.appendChild(closeBtn);
+    sheet.appendChild(cancelBtn);
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+}
+
+async function triggerBookAnnotation(book, mode = 'both') {
+    // Find the contact
+    const contactId = book.linkedContactIds[0];
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (!contact) return;
+
+    // Show a subtle notification
+    const notification = document.createElement('div');
+    notification.style.cssText = 'position: fixed; top: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 20px; z-index: 3000; font-size: 14px; transition: opacity 0.5s;';
+    notification.innerHTML = `<i class="fas fa-magic fa-spin"></i> ${contact.name} 正在思考...`;
+    document.body.appendChild(notification);
 
     try {
-        for (const contact of contacts) {
-            for (let i = 0; i < book.pages.length; i++) {
-                const page = book.pages[i];
-                // Ensure content is not empty and is not just placeholder HTML
-                if (page.content && page.content.trim() !== '' && page.content.trim() !== '<br>') {
-                    const annotatedHtml = await callAiForBookAnnotation(page.content, contact);
-                    if (annotatedHtml) {
-                        book.pages[i].content = annotatedHtml;
+        await generateBookAnnotations(book, contact, mode);
+        notification.innerHTML = `<i class="fas fa-check"></i> ${contact.name} 完成了`;
+        setTimeout(() => notification.remove(), 3000);
+    } catch (e) {
+        console.error(e);
+        notification.innerHTML = `<i class="fas fa-times"></i> 操作失败`;
+        setTimeout(() => notification.remove(), 3000);
+    }
+}
+
+function protectAnnotations(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const placeholders = [];
+    
+    // Select selectors for elements to protect:
+    // ruby (Comment)
+    // s with class strikethrough-hand (Strike)
+    // span with class highlight-marker (Highlight)
+    // span with class handwritten-text (Handwritten)
+    // span with class starting with pen- (Colored text)
+    
+    const selector = 'ruby, s.strikethrough-hand, span.highlight-marker, span.handwritten-text, span[class*="pen-"], img.icity-sticker';
+    const nodes = div.querySelectorAll(selector);
+    
+    nodes.forEach((node, index) => {
+        // Check if node is still part of the tree (it might have been removed if a parent was replaced)
+        if (!div.contains(node)) return;
+        
+        const id = `[[LOCKED_ANNOTATION_${index}]]`;
+        placeholders.push({ id, content: node.outerHTML });
+        
+        const textNode = document.createTextNode(id);
+        node.replaceWith(textNode);
+    });
+    
+    return { protectedHtml: div.innerHTML, placeholders };
+}
+
+function restoreAnnotations(html, placeholders) {
+    let restored = html;
+    // Iterate and replace back
+    placeholders.forEach(p => {
+        // Use split/join to replace all occurrences
+        restored = restored.split(p.id).join(p.content);
+    });
+    return restored;
+}
+
+async function generateBookAnnotations(book, contact, mode = 'both') {
+    let changed = false;
+    let newPageContent = null;
+
+    // 1. 批注现有页面
+    if (mode === 'annotate_only' || mode === 'both') {
+        for (let i = 0; i < book.pages.length; i++) {
+            const page = book.pages[i];
+            
+            // 标记为 AI 创建的页面，跳过
+            if (page.author === 'ai') continue;
+
+            // 如果已经批注过且用户没有修改，则跳过（避免重复批注）
+            if (page.lastAnnotated && page.lastAnnotated > (page.lastModified || 0)) continue;
+
+            let content = page.content;
+            
+            // Skip empty pages
+            if (!content || content.trim().length === 0) continue;
+            
+            // Protect existing annotations (including stickers)
+            const { protectedHtml, placeholders } = protectAnnotations(content);
+            
+            // Prepare context
+            const history = window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id] ? window.iphoneSimState.chatHistory[contact.id].slice(-10) : [];
+            const chatContext = history.map(m => `${m.role === 'user' ? '用户' : '我'}: ${m.content}`).join('\n');
+            
+            // Prepare Stickers
+            let availableStickers = [];
+            let stickerContext = '';
+            if (window.iphoneSimState.stickerCategories) {
+                window.iphoneSimState.stickerCategories.forEach(cat => {
+                    // If linkedStickerCategories is undefined/null, allow all. If array, filter by ID.
+                    if (!contact.linkedStickerCategories || (Array.isArray(contact.linkedStickerCategories) && contact.linkedStickerCategories.includes(cat.id))) {
+                        availableStickers = availableStickers.concat(cat.list);
                     }
-                }
+                });
+            }
+            
+            if (availableStickers.length > 0) {
+                const names = availableStickers.map(s => s.desc).join(', ');
+                stickerContext = `\n【可用贴纸】\n你可以插入贴纸来表达心情。请使用格式 [[STICKER:贴纸名称]]。\n可用列表：${names}\n\n⚠️ **严格警告**：你只能使用上述列表中的贴纸名称。绝对不要编造不存在的贴纸名称。如果找不到合适的，就不要插入贴纸。\n`;
+            } else {
+                stickerContext = `\n【可用贴纸】\n当前没有可用的贴纸，请不要使用 [[STICKER:...]] 格式。\n`;
+            }
+            
+            // Contact Name in iCity
+            const contactName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+
+            const prompt = `你现在扮演 ${contactName}。
+人设: ${contact.persona || '无'}
+最近聊天:
+${chatContext}
+
+用户在你们共同的手账本上写了以下内容（HTML格式）：
+${protectedHtml}
+
+【任务】
+请阅读用户的内容，并以你的角色身份进行“批注”和“互动”。
+这是一个增量批注的过程。
+
+【严格限制 - 保护已有批注】
+1. 内容中出现的 **[[LOCKED_ANNOTATION_数字]]** 标记代表之前已经生成的批注。
+2. **绝对禁止**修改、删除、拆分或移动这些标记。
+3. **绝对禁止**在这些标记内部或针对这些标记的内容进行再次批注。
+4. 你只能对**没有被标记覆盖的纯文本**进行新的批注。
+
+【批注样式与颜色】
+请**随机**使用以下颜色类名，不要总是用同一种颜色，让页面看起来丰富多彩：
+- 笔迹颜色类名 (用于评论/补充): "pen-blue", "pen-red", "pen-purple", "pen-pink", "pen-teal", "pen-black"
+- 高亮颜色类名 (用于划重点): "highlight-yellow", "highlight-green", "highlight-pink", "highlight-blue", "highlight-purple"
+${stickerContext}
+
+【批注规则 - 请严格遵守HTML格式】
+请返回一段HTML代码，包含用户的原文（含LOCKED标记）和你新添加的批注。
+1. **吐槽/评论 (使用 Ruby)**：
+   <ruby>用户文字<rt class="handwritten pen-red">你的评论</rt></ruby> (请随机替换 pen-red 为其他笔迹颜色)
+2. **划重点 (高亮)**：
+   <span class="highlight-marker highlight-yellow">重点文字</span> (请随机替换 highlight-yellow 为其他高亮颜色)
+3. **划掉 (删除线)**：
+   <s class="strikethrough-hand">想划掉的文字</s>
+4. **手写补充**：
+   <span class="handwritten-text pen-blue">你的补充文字</span> (请随机替换 pen-blue 为其他笔迹颜色)
+5. **改变文字颜色**：
+   <span class="pen-purple">变色文字</span> (请随机替换颜色类名)
+6. **插入贴纸**：
+   在合适的位置插入 [[STICKER:名称]]。
+
+【返回要求】
+1. 直接返回完整的HTML字符串。
+2. 不要包含 \`\`\`html \`\`\` 标记。
+3. 再次强调：**保留 [[LOCKED_ANNOTATION_...]] 标记不动**。`;
+
+            const messages = [{ role: 'user', content: prompt }];
+            const annotatedContent = await safeCallAiApi(messages);
+            
+            if (annotatedContent && annotatedContent.length > 0) {
+                // Basic cleanup
+                let cleanContent = annotatedContent.replace(/```html/g, '').replace(/```/g, '').trim();
+                
+                // Process Stickers (Always run to clean up even if availableStickers is empty but AI hallucinated)
+                cleanContent = cleanContent.replace(/\[\[STICKER:(.*?)\]\]/g, (match, name) => {
+                    if (availableStickers.length > 0) {
+                        const sticker = availableStickers.find(s => s.desc === name.trim());
+                        if (sticker) {
+                            return `<img src="${sticker.url}" class="icity-sticker" style="max-width: 30%; float: right; margin: 5px 0 5px 10px;">`;
+                        }
+                    }
+                    return ''; // Remove if invalid or none available
+                });
+                
+                // Restore annotations
+                cleanContent = restoreAnnotations(cleanContent, placeholders);
+                
+                // Append a reset span to ensure subsequent typing is default style
+                cleanContent += '&nbsp;<span class="reset-style">&#8203;</span>';
+                
+                page.content = cleanContent;
+                page.lastAnnotated = Date.now();
+                changed = true;
             }
         }
+    }
+
+    // 2. AI 生成新页面内容
+    if (mode === 'write_only' || mode === 'both') {
+        const lastPage = book.pages[book.pages.length - 1];
         
-        saveConfig();
-        
-        if (notification && notificationText) {
-            notificationText.textContent = '批注完成!';
-            setTimeout(() => {
-                notification.classList.add('hidden');
-            }, 2000);
+        // 决定是否写新内容：
+        // 1. 如果是 write_only 模式，强制写（用户主动请求）
+        // 2. 如果是 both 模式，需满足轮流规则（最后一页是用户写的且不为空）
+        let shouldWrite = false;
+        if (mode === 'write_only') {
+            shouldWrite = true;
+        } else {
+            if (lastPage && lastPage.author !== 'ai' && lastPage.content && lastPage.content.trim().length > 0) {
+                shouldWrite = true;
+            }
         }
 
-    } catch(e) {
-        console.error("Book annotation failed:", e);
-        if (notification) {
-            notification.classList.add('hidden');
+        if (shouldWrite) {
+            
+            const contactName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
+            
+            // Prepare Stickers for new page
+            let availableStickers = [];
+            let stickerContext = '';
+            if (window.iphoneSimState.stickerCategories) {
+                window.iphoneSimState.stickerCategories.forEach(cat => {
+                    if (!contact.linkedStickerCategories || (Array.isArray(contact.linkedStickerCategories) && contact.linkedStickerCategories.includes(cat.id))) {
+                        availableStickers = availableStickers.concat(cat.list);
+                    }
+                });
+            }
+            if (availableStickers.length > 0) {
+                const names = availableStickers.map(s => s.desc).join(', ');
+                stickerContext = `\n【可用贴纸】\n你可以插入贴纸来表达心情。请使用格式 [[STICKER:贴纸名称]]。\n可用列表：${names}\n\n⚠️ **严格警告**：你只能使用上述列表中的贴纸名称。绝对不要编造不存在的贴纸名称。如果找不到合适的，就不要插入贴纸。\n`;
+            } else {
+                stickerContext = `\n【可用贴纸】\n当前没有可用的贴纸，请不要使用 [[STICKER:...]] 格式。\n`;
+            }
+
+            const prompt = `你现在扮演 ${contactName}。
+人设: ${contact.persona || '无'}
+
+【任务】
+作为手账本的共创者，请在用户写完一页后，另起一页写下你的回应、感悟或日记。
+内容要是自然的、生活化的，符合你的人设。
+
+【要求】
+1. **纯文本**：只写文字内容，不需要HTML标签。
+2. **黑色字体**：使用默认黑色字体（不需要任何颜色类名）。
+3. **表情包**：可以在合适的地方插入表情包，格式：[[STICKER:名称]]。
+4. **长度**：适中，写满一页手账的感觉（约50-150字）。
+${stickerContext}
+
+请直接返回内容文本。`;
+
+            const messages = [{ role: 'user', content: prompt }];
+            const newPageText = await safeCallAiApi(messages);
+
+            if (newPageText && newPageText.length > 0) {
+                let processedContent = newPageText.replace(/```html/g, '').replace(/```/g, '').trim();
+                
+                // Process Stickers (Always run cleanup)
+                processedContent = processedContent.replace(/\[\[STICKER:(.*?)\]\]/g, (match, name) => {
+                    if (availableStickers.length > 0) {
+                        const sticker = availableStickers.find(s => s.desc === name.trim());
+                        if (sticker) {
+                            return `<img src="${sticker.url}" class="icity-sticker" style="max-width: 30%; float: right; margin: 5px 0 5px 10px;">`;
+                        }
+                    }
+                    return ''; // Remove if invalid
+                });
+                
+                // Convert newlines to <br> for HTML display
+                processedContent = processedContent.replace(/\n/g, '<br>');
+                
+                newPageContent = processedContent;
+            }
+        }
+    }
+
+    if (newPageContent) {
+        book.pages.push({
+            content: newPageContent,
+            author: 'ai' // Mark as AI page
+        });
+        changed = true;
+    }
+
+    if (changed) {
+        saveConfig();
+        // If the book is currently open, refresh the view
+        if (window.currentReadingBook && window.currentReadingBook.id === book.id) {
+            renderBookPages(book);
         }
     }
 }
 
-async function callAiForBookAnnotation(pageHTML, contact) {
-    const contactName = (contact.icityData && contact.icityData.name) ? contact.icityData.name : contact.name;
-    const userName = (window.iphoneSimState.userPersonas && window.iphoneSimState.userPersonas[contact.activePersonaId])
-        ? window.iphoneSimState.userPersonas[contact.activePersonaId].name
-        : '我';
-
-    const history = (window.iphoneSimState.chatHistory && window.iphoneSimState.chatHistory[contact.id])
-        ? window.iphoneSimState.chatHistory[contact.id].slice(-10).map(m => `${m.role === 'user' ? userName : contactName}: ${m.content}`).join('\n')
-        : '无';
-
-    const userPersonaPrompt = (window.iphoneSimState.userPersonas && window.iphoneSimState.userPersonas[contact.activePersonaId])
-        ? window.iphoneSimState.userPersonas[contact.activePersonaId].aiPrompt
-        : '普通人';
-
-    const prompt = `
-你正在扮演 ${contactName}。你的详细人设是：
-<contact_persona>
-${contact.persona || '一个普通朋友'}
-</contact_persona>
-
-你正在和你的朋友 ${userName} 一起制作一本数字手账。TA的人设是：
-<user_persona>
-${userPersonaPrompt}
-</user_persona>
-
-最近你们的聊天记录摘要如下：
-<chat_history>
-${history}
-</chat_history>
-
-现在，${userName} 写了一页手账，内容如下 (HTML格式):
-<page_content>
-${pageHTML}
-</page_content>
-
-【你的任务】
-以 ${contactName} 的身份，阅读上面的内容并进行“批注”。这不是批改作文，而是像朋友间的互动，可以吐槽、划重点、或者写点俏皮话，就像在共同完成一个手账。
-
-【批注规则】
-你必须返回完整的HTML代码，并在其中嵌入你的批注。你可以使用以下HTML标签：
-
-1.  **添加评论**: 在你想要评论的那一行文字的 **正上方**，插入一个包含你评论的div。**你的评论必须是独立的、没有背景的、单独成行的文字**。
-    格式: \`<div class="contact-note">你的吐槽或评论</div>\`
-    示例:
-    原始HTML:
-    \`\`\`html
-    <div>这是用户写的第一行。</div>
-    <div>这是用户写的第二行。</div>
-    \`\`\`
-    如果你想评论第二行，应修改为:
-    \`\`\`html
-    <div>这是用户写的第一行。</div>
-    <div class="contact-note">哈哈，这行写得真有意思。</div>
-    <div>这是用户写的第二行。</div>
-    \`\`\`
-
-2.  **划重点 (荧光笔)**: 将你感兴趣的文字用 \`<span class="highlight">\` 包裹。
-    示例: \`<div>这是... <span class="highlight">你觉得重要的部分</span> ...</div>\`
-
-3.  **划掉文字**: 如果你想开玩笑地划掉某些内容，使用 \`<del>\` 标签。
-    示例: \`<div>我今天吃了 <del>五个</del> 一个苹果。</div>\`
-
-4.  **改变样式**: 你可以小范围地使用 \`<strong>\` (加粗), \`<em>\` (斜体), 或 \`<span style="color: red;">\` (改颜色)。
-
-【输出要求】
--   **必须** 返回修改后的 **完整HTML** 内容，包括所有原始文本和你的批注标签。
--   **不要** 删除或修改用户的原文，只通过添加标签来装饰它。
--   你的批注要自然、有趣、符合你的人设和聊天上下文。
--   如果内容没什么可批注的，可以不加任何标签，直接返回原始HTML。
--   **不要** 在最终输出中包含任何解释、代码块标记(\`\`\`)或除了HTML内容之外的任何东西。
-
-请现在开始你的批注，并返回修改后的完整HTML：
-`;
-
-    try {
-        const messages = [{ role: 'user', content: prompt }];
-        const response = await safeCallAiApi(messages);
-        // Clean the response to ensure it's valid HTML
-        const cleanResponse = response.replace(/^```html\s*|```\s*$/g, '').trim();
-        return cleanResponse;
-    } catch (e) {
-        console.error('AI call for book annotation failed', e);
-        return null;
+function openIcityStickerPicker() {
+    let modal = document.getElementById('icity-sticker-picker-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        return;
     }
+
+    modal = document.createElement('div');
+    modal.id = 'icity-sticker-picker-modal';
+    modal.className = 'modal';
+    modal.style.cssText = 'display: flex; opacity: 1; pointer-events: auto; z-index: 2200;'; 
+    
+    const content = document.createElement('div');
+    content.className = 'modal-content';
+    content.style.height = '60%';
+    
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    header.innerHTML = `
+        <h3>选择贴纸</h3>
+        <button class="close-btn" onclick="document.getElementById('icity-sticker-picker-modal').classList.add('hidden')"><i class="fas fa-times"></i></button>
+    `;
+    content.appendChild(header);
+    
+    const body = document.createElement('div');
+    body.className = 'modal-body';
+    body.style.display = 'flex';
+    body.style.flexDirection = 'column';
+    body.style.padding = '0';
+    
+    const tabs = document.createElement('div');
+    tabs.style.cssText = 'display: flex; overflow-x: auto; border-bottom: 1px solid #eee; padding: 10px; gap: 10px; flex-shrink: 0;';
+    
+    const stickerGrid = document.createElement('div');
+    stickerGrid.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-content: start;';
+    
+    const categories = window.iphoneSimState.stickerCategories || [];
+    
+    if (categories.length === 0) {
+        stickerGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #999; margin-top: 20px;">暂无表情包，请先在聊天设置中导入</div>';
+    } else {
+        categories.forEach((cat, index) => {
+            const tab = document.createElement('div');
+            tab.textContent = cat.name;
+            tab.style.cssText = `padding: 5px 12px; background: #f0f0f0; border-radius: 15px; font-size: 12px; cursor: pointer; white-space: nowrap; ${index === 0 ? 'background: #007AFF; color: #fff;' : ''}`;
+            
+            tab.onclick = () => {
+                Array.from(tabs.children).forEach(t => {
+                    t.style.background = '#f0f0f0';
+                    t.style.color = '#333';
+                });
+                tab.style.background = '#007AFF';
+                tab.style.color = '#fff';
+                renderStickers(cat.list);
+            };
+            
+            tabs.appendChild(tab);
+        });
+        
+        renderStickers(categories[0].list);
+    }
+    
+    function renderStickers(list) {
+        stickerGrid.innerHTML = '';
+        list.forEach(s => {
+            const img = document.createElement('img');
+            img.src = s.url;
+            img.style.cssText = 'width: 100%; aspect-ratio: 1/1; object-fit: contain; cursor: pointer; border-radius: 4px; padding: 2px; border: 1px solid transparent; transition: all 0.2s;';
+            img.onclick = () => {
+                insertIcitySticker(s.url);
+                modal.classList.add('hidden');
+            };
+            img.onmouseover = () => img.style.background = '#f0f0f0';
+            img.onmouseout = () => img.style.background = 'transparent';
+            stickerGrid.appendChild(img);
+        });
+    }
+    
+    body.appendChild(tabs);
+    body.appendChild(stickerGrid);
+    content.appendChild(body);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+}
+
+function insertIcitySticker(url) {
+    if (!window.currentReadingBook) return;
+    
+    const pageIndex = window.currentBookPage || 0;
+    
+    if (pageIndex === 0) {
+        alert('封面无法添加贴纸，请翻开书本');
+        return;
+    }
+    
+    const contentPageIndex = pageIndex - 1;
+    if (contentPageIndex < 0 || contentPageIndex >= window.currentReadingBook.pages.length) return;
+    
+    const page = window.currentReadingBook.pages[contentPageIndex];
+    const pages = document.querySelectorAll('.book-page');
+    
+    if (pages[pageIndex]) {
+        const contentDiv = pages[pageIndex].querySelector('.book-page-content');
+        if (contentDiv) {
+            const imgHtml = `<img src="${url}" class="icity-sticker" style="max-width: 30%; float: right; margin: 5px 0 5px 10px;">`;
+            contentDiv.insertAdjacentHTML('beforeend', imgHtml);
+            page.content = contentDiv.innerHTML;
+            saveConfig();
+        }
+    }
+}
+
+window.openIcityStickerPicker = openIcityStickerPicker;
+window.insertIcitySticker = insertIcitySticker;
+
+function toggleIcityFormatToolbar() {
+    let toolbar = document.getElementById('icity-format-toolbar');
+    if (toolbar) {
+        toolbar.classList.toggle('hidden');
+        return;
+    }
+    
+    toolbar = document.createElement('div');
+    toolbar.id = 'icity-format-toolbar';
+    toolbar.style.cssText = `
+        position: absolute; top: 60px; right: 60px; 
+        background: #fff; padding: 10px; border-radius: 8px; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2100;
+        display: flex; flex-direction: column; gap: 8px; width: 200px;
+    `;
+    
+    // Row 1: Basic
+    const row1 = document.createElement('div');
+    row1.style.cssText = 'display: flex; gap: 10px; justify-content: space-around;';
+    
+    const createBtn = (icon, cmd, arg) => {
+        const btn = document.createElement('div');
+        btn.innerHTML = icon;
+        btn.style.cssText = 'width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; background: #f0f0f0;';
+        btn.onmousedown = (e) => {
+            e.preventDefault(); 
+            if (cmd === 'custom-strike') {
+                applyCustomFormat('strike');
+            } else {
+                document.execCommand(cmd, false, arg);
+            }
+        };
+        return btn;
+    };
+    
+    row1.appendChild(createBtn('<i class="fas fa-bold"></i>', 'bold'));
+    row1.appendChild(createBtn('<i class="fas fa-italic"></i>', 'italic'));
+    row1.appendChild(createBtn('<i class="fas fa-strikethrough"></i>', 'custom-strike')); 
+    
+    // Row 2: Text Color
+    const row2 = document.createElement('div');
+    row2.style.cssText = 'display: flex; gap: 5px; flex-wrap: wrap; border-top: 1px solid #eee; padding-top: 5px;';
+    const textColors = ['#000000', '#FF3B30', '#007AFF', '#5856D6', '#4CD964'];
+    textColors.forEach(c => {
+        const dot = document.createElement('div');
+        dot.style.cssText = `width: 20px; height: 20px; border-radius: 50%; background: ${c}; cursor: pointer; border: 1px solid #ddd;`;
+        dot.onmousedown = (e) => {
+            e.preventDefault();
+            document.execCommand('foreColor', false, c);
+        };
+        row2.appendChild(dot);
+    });
+    
+    // Row 3: Highlight
+    const row3 = document.createElement('div');
+    row3.style.cssText = 'display: flex; gap: 5px; flex-wrap: wrap; border-top: 1px solid #eee; padding-top: 5px;';
+    
+    const highlights = [
+        { color: '#FFEB3B', class: 'highlight-yellow' }, 
+        { color: '#4CD964', class: 'highlight-green' },  
+        { color: '#FF2D55', class: 'highlight-pink' },   
+        { color: '#007AFF', class: 'highlight-blue' },   
+        { color: '#5856D6', class: 'highlight-purple' }  
+    ];
+    
+    highlights.forEach(h => {
+        const dot = document.createElement('div');
+        dot.style.cssText = `width: 20px; height: 20px; border-radius: 4px; background: ${h.color}; cursor: pointer; opacity: 0.6;`;
+        dot.onmousedown = (e) => {
+            e.preventDefault();
+            applyCustomFormat('highlight', h.class);
+        };
+        row3.appendChild(dot);
+    });
+    
+    toolbar.appendChild(row1);
+    toolbar.appendChild(row2);
+    toolbar.appendChild(row3);
+    
+    const reader = document.getElementById('icity-book-reader');
+    if (reader) reader.appendChild(toolbar);
+}
+
+function applyCustomFormat(type, className) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return; 
+    
+    let wrapper;
+    if (type === 'strike') {
+        wrapper = document.createElement('s');
+        wrapper.className = 'strikethrough-hand';
+    } else if (type === 'highlight') {
+        wrapper = document.createElement('span');
+        wrapper.className = `highlight-marker ${className}`;
+    }
+    
+    if (wrapper) {
+        try {
+            range.surroundContents(wrapper);
+            saveCurrentBookPage(); 
+        } catch(e) {
+            console.error(e);
+            alert('无法应用样式：请确保选择的文本在同一段落内');
+        }
+    }
+}
+
+function saveCurrentBookPage() {
+    const pageIndex = window.currentBookPage || 0;
+    if (pageIndex === 0) return;
+    const contentIndex = pageIndex - 1;
+    
+    const pages = document.querySelectorAll('.book-page');
+    if (pages[pageIndex]) {
+        const contentDiv = pages[pageIndex].querySelector('.book-page-content');
+        if (contentDiv && window.currentReadingBook) {
+            window.currentReadingBook.pages[contentIndex].content = contentDiv.innerHTML;
+            saveConfig();
+        }
+    }
+}
+
+window.toggleIcityFormatToolbar = toggleIcityFormatToolbar;
+
+function openIcityBookSettings(bookId) {
+    const book = window.iphoneSimState.icityBooks.find(b => b.id === bookId);
+    if (!book) return;
+
+    // Remove existing modal if any
+    const existing = document.getElementById('icity-book-settings-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'icity-book-settings-modal';
+    overlay.className = 'modal';
+    overlay.classList.remove('hidden'); // Show immediately
+    // Increase z-index to be above the book reader (which is 2000)
+    overlay.style.cssText = 'display: flex; opacity: 1; pointer-events: auto; z-index: 2100;'; 
+
+    const content = document.createElement('div');
+    content.className = 'modal-content';
+    content.style.height = '60%'; // Set height
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    header.innerHTML = `
+        <h3>书籍设置</h3>
+        <button class="close-btn" onclick="document.getElementById('icity-book-settings-modal').remove()"><i class="fas fa-times"></i></button>
+    `;
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'modal-body';
+    body.style.display = 'flex';
+    body.style.flexDirection = 'column';
+    body.style.gap = '15px';
+
+    const title = document.createElement('div');
+    title.textContent = '关联联系人';
+    title.style.cssText = 'font-size: 14px; color: #8e8e93; text-transform: uppercase; margin-bottom: 5px;';
+    body.appendChild(title);
+
+    const list = document.createElement('div');
+    // Removed background color as requested
+    list.style.cssText = 'flex: 1; overflow-y: auto; border-radius: 10px; padding: 10px;';
+
+    const contacts = window.iphoneSimState.contacts || [];
+    if (contacts.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无联系人</div>';
+    } else {
+        // Only one linked ID allowed now
+        const linkedId = (book.linkedContactIds && book.linkedContactIds.length > 0) ? book.linkedContactIds[0] : null;
+        
+        contacts.forEach(c => {
+            const item = document.createElement('div');
+            // Simplified item style without white background card look, or maybe just cleaner list
+            // Keeping white background for item itself is good for readability, but user asked to remove "grey background behind choice place"
+            // The grey background was on the list container.
+            item.style.cssText = 'display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #e5e5ea; background: #fff; border-radius: 8px; margin-bottom: 8px; cursor: pointer;';
+            
+            const radio = document.createElement('input');
+            radio.type = 'radio'; // Changed to radio for single selection
+            radio.name = 'icity-book-contact-select'; // Name group for radio behavior
+            radio.value = c.id;
+            radio.checked = (linkedId === c.id);
+            radio.style.cssText = 'margin-right: 15px; transform: scale(1.2);';
+            
+            const avatar = document.createElement('div');
+            avatar.style.cssText = `width: 40px; height: 40px; border-radius: 50%; background: #ccc; margin-right: 10px; background-image: url('${c.avatar || ''}'); background-size: cover; background-position: center;`;
+            
+            const name = document.createElement('div');
+            name.textContent = c.name;
+            name.style.fontWeight = 'bold';
+
+            item.appendChild(radio);
+            item.appendChild(avatar);
+            item.appendChild(name);
+            
+            item.onclick = (e) => {
+                // If clicking item (not radio), select radio
+                if (e.target !== radio) {
+                    radio.checked = true;
+                }
+            };
+
+            list.appendChild(item);
+        });
+    }
+    body.appendChild(list);
+
+    // Save Button
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'ios-btn-block';
+    saveBtn.textContent = '保存';
+    saveBtn.onclick = () => saveIcityBookSettings(bookId);
+    body.appendChild(saveBtn);
+
+    content.appendChild(header);
+    content.appendChild(body);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+}
+
+function saveIcityBookSettings(bookId) {
+    const modal = document.getElementById('icity-book-settings-modal');
+    if (!modal) return;
+
+    const book = window.iphoneSimState.icityBooks.find(b => b.id === bookId);
+    if (!book) return;
+
+    // Use radio selector
+    const radio = modal.querySelector('input[name="icity-book-contact-select"]:checked');
+    const selectedIds = radio ? [Number(radio.value)] : [];
+
+    book.linkedContactIds = selectedIds;
+    saveConfig();
+    
+    modal.remove();
+    alert('设置已保存');
 }
 
 window.openIcityBook = openIcityBook;
 window.closeIcityBook = closeIcityBook;
+window.openIcityBookSettings = openIcityBookSettings;
+window.saveIcityBookSettings = saveIcityBookSettings;
 window.addIcityBookPage = addIcityBookPage;
 window.nextIcityBookPage = nextIcityBookPage;
 window.prevIcityBookPage = prevIcityBookPage;
 window.updateBookPageContent = updateBookPageContent;
-
-function openIcityBookSettings() {
-    if (!window.currentReadingBook) return;
-    
-    // Create modal if not exists
-    let modal = document.getElementById('icity-book-contact-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'icity-book-contact-modal';
-        modal.className = 'modal hidden';
-        modal.style.zIndex = 3000; // Above book reader (2000)
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>关联联系人</h3>
-                    <button class="close-btn" onclick="closeIcityBookSettings()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div id="icity-book-contact-list" class="ios-list-group" style="margin: 0; max-height: 300px; overflow-y: auto; background: transparent;">
-                        <!-- Contacts -->
-                    </div>
-                    <div style="padding: 15px;">
-                        <button onclick="saveIcityBookSettings()" class="ios-btn-block">保存</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-    
-    // Render list
-    const list = document.getElementById('icity-book-contact-list');
-    list.innerHTML = '';
-    const contacts = window.iphoneSimState.contacts || [];
-    const linkedIds = window.currentReadingBook.linkedContactIds || [];
-    
-    if (contacts.length === 0) {
-        list.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无联系人</div>';
-    } else {
-        contacts.forEach(c => {
-            const item = document.createElement('div');
-            item.style.display = 'flex';
-            item.style.alignItems = 'center';
-            item.style.padding = '10px 15px';
-            item.style.borderBottom = '1px solid #f0f0f0';
-            item.style.cursor = 'pointer';
-            
-            const isChecked = linkedIds.includes(c.id);
-            
-            // Find appropriate avatar
-            let avatar = c.avatar;
-            if (c.icityData && c.icityData.avatar) avatar = c.icityData.avatar;
-            
-            item.innerHTML = `
-                <input type="checkbox" class="book-contact-checkbox" value="${c.id}" ${isChecked ? 'checked' : ''} style="margin-right: 15px; transform: scale(1.2);">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: #ccc; margin-right: 10px; background-image: url('${avatar}'); background-size: cover; background-position: center;"></div>
-                <div style="font-weight: bold; color: #333;">${c.remark || c.name}</div>
-            `;
-             item.onclick = (e) => {
-                if (e.target.type !== 'checkbox') {
-                    const cb = item.querySelector('input[type="checkbox"]');
-                    cb.checked = !cb.checked;
-                }
-            };
-            list.appendChild(item);
-        });
-    }
-    
-    modal.classList.remove('hidden');
-}
-
-function closeIcityBookSettings() {
-    const modal = document.getElementById('icity-book-contact-modal');
-    if (modal) modal.classList.add('hidden');
-}
-
-function saveIcityBookSettings() {
-    if (!window.currentReadingBook) return;
-    
-    const checkboxes = document.querySelectorAll('.book-contact-checkbox:checked');
-    const selectedIds = Array.from(checkboxes).map(cb => Number(cb.value));
-    
-    window.currentReadingBook.linkedContactIds = selectedIds;
-    saveConfig();
-    
-    closeIcityBookSettings();
-    alert('已关联');
-}
-
-window.openIcityBookSettings = openIcityBookSettings;
-window.closeIcityBookSettings = closeIcityBookSettings;
-window.saveIcityBookSettings = saveIcityBookSettings;
 
 async function handleIcityCommentSend() {
     const input = document.getElementById('icity-comment-input');

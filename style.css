@@ -5311,19 +5311,3 @@ html body .chat-message.user .voice-icon-box i { transform: rotate(-90deg); }
     border: none; /* 去掉边框 */
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
-
-/* Book Annotation Styles */
-.book-page-content .highlight {
-    background-color: rgba(255, 229, 59, 0.5); /* Yellow highlighter */
-    border-radius: 2px;
-    padding: 0 2px;
-}
-.book-page-content .contact-note {
-    font-size: 14px; /* Make it a bit more readable */
-    color: #576b95;  /* A softer, bluish-gray color, like a pen annotation */
-    display: block;  /* Ensure it takes its own line */
-    margin-bottom: 2px; /* Space between note and user text */
-    font-family: 'Kaiti', 'STKaiti', serif; /* Use a handwriting-style font */
-    padding-left: 10px; /* Indent slightly */
-    font-style: italic;
-}

@@ -2615,8 +2615,8 @@
     </div>
 
     <!-- icity Compose Modal -->
-    <div id="icity-compose-modal" class="app-screen hidden" style="z-index: 200; background-color: #fff;">
-        <div style="padding: 47px 15px 10px; padding-top: max(47px, env(safe-area-inset-top)); display: flex; align-items: center; border-bottom: 1px solid #f0f0f0;">
+    <div id="icity-compose-modal" class="app-screen hidden" style="z-index: 200; background-color: #fff; display: flex; flex-direction: column;">
+        <div style="padding: 47px 15px 10px; padding-top: max(47px, env(safe-area-inset-top)); display: flex; align-items: center; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;">
             <div id="icity-compose-avatar" style="width: 36px; height: 36px; background: #000; border-radius: 50%; margin-right: 10px; background-size: cover; background-position: center;"></div>
             <input type="text" placeholder="标题 (可选)" style="flex: 1; border: none; font-size: 16px; outline: none; background: transparent; color: #000;">
             <button id="close-icity-compose" style="background: none; border: none; font-size: 24px; color: #ccc; cursor: pointer;">&times;</button>
@@ -2624,7 +2624,7 @@
         <textarea id="icity-compose-text" style="width: 100%; flex: 1; border: none; padding: 15px; font-size: 16px; resize: none; outline: none; background: transparent; color: #000;" placeholder="写点什么吧"></textarea>
         
         <!-- Footer -->
-        <div style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-top: 1px solid #f0f0f0; padding-bottom: max(10px, env(safe-area-inset-bottom));">
+        <div style="width: 100%; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; background: #fff; border-top: 1px solid #f0f0f0; padding-bottom: max(10px, env(safe-area-inset-bottom)); flex-shrink: 0;">
             <div style="display: flex; gap: 20px; color: #007AFF; font-size: 22px;">
                 <i class="fas fa-camera"></i>
                 <i class="fas fa-map-marker-alt"></i>
