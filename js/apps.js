@@ -2487,6 +2487,13 @@ function initStickerSystem() {
                 newOptionsModal.classList.add('hidden');
                 document.getElementById('sticker-category-name').value = '';
                 document.getElementById('sticker-import-text').value = '';
+                
+                // Clear stale JSON data
+                window.iphoneSimState.tempStickerJson = null;
+                document.getElementById('sticker-import-json').value = '';
+                const status = document.getElementById('sticker-json-status');
+                if (status) status.textContent = '未选择文件';
+
                 document.getElementById('import-sticker-modal').classList.remove('hidden');
             });
         }
@@ -2516,6 +2523,13 @@ function initStickerSystem() {
         newImportBtn.addEventListener('click', () => {
             document.getElementById('sticker-category-name').value = '';
             document.getElementById('sticker-import-text').value = '';
+            
+            // Clear stale JSON data
+            window.iphoneSimState.tempStickerJson = null;
+            document.getElementById('sticker-import-json').value = '';
+            const status = document.getElementById('sticker-json-status');
+            if (status) status.textContent = '未选择文件';
+
             document.getElementById('import-sticker-modal').classList.remove('hidden');
         });
     }

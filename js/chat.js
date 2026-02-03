@@ -2344,18 +2344,24 @@ function forceSplitMixedContent(content) {
     // 预处理：统一符号
     let processed = content.replace(/【/g, '[').replace(/】/g, ']').replace(/：/g, ':');
     
-    // 正则匹配 [类型:内容]
+    // 正则匹配 [类型:内容] 或 [类型] (无冒号兼容)
     // 改进正则：允许内容中包含换行符，且支持 "发送了表情包" 这种 AI 常见错误格式
-    const regex = /\[(消息|表情包|发送了表情包|发送了一个表情包|语音|图片|旁白)\s*:\s*([\s\S]*?)\]/g;
+    const regex = /\[(消息|表情包|发送了表情包|发送了一个表情包|语音|图片|旁白)(?:\s*[:：]\s*([\s\S]*?))?\]/g;
     
     let lastIndex = 0;
     let match;
 
     while ((match = regex.exec(processed)) !== null) {
         // 1. 捕获当前匹配项之前的文本
-        const preText = processed.substring(lastIndex, match.index).trim();
-        if (preText) {
-            results.push({ type: '消息', content: preText });
+        const preText = processed.substring(lastIndex, match.index); // 不trim以保留格式
+        if (preText) { // 只要不是空字符串
+             // 如果是纯空白，可能需要保留（如换行），但通常 trim 后判断
+             if (preText.trim()) {
+                 results.push({ type: '消息', content: preText });
+             } else if (preText.includes('\n')) {
+                 // 保留换行
+                 results.push({ type: '消息', content: preText });
+             }
         }
 
         // 2. 添加当前匹配项
@@ -2366,17 +2372,20 @@ function forceSplitMixedContent(content) {
         else if (type === '旁白') type = '旁白';
         else type = '消息';
 
+        let content = match[2] ? match[2].trim() : '';
+        if (type === '表情包' && !content) content = '未知表情'; // 默认值
+
         results.push({
             type: type, 
-            content: match[2].trim()
+            content: content
         });
 
         lastIndex = regex.lastIndex;
     }
 
     // 3. 捕获剩余的文本
-    const postText = processed.substring(lastIndex).trim();
-    if (postText) {
+    const postText = processed.substring(lastIndex);
+    if (postText && postText.trim()) {
         results.push({ type: '消息', content: postText });
     }
 
@@ -2844,14 +2853,16 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                     ]
                 };
             } else if (h.type === 'virtual_image') {
+                const desc = h.description ? `: ${h.description}` : '';
                 return {
                     role: h.role,
-                    content: `[图片]`
+                    content: `[图片${desc}]`
                 };
             } else if (h.type === 'sticker') {
+                const desc = h.description ? `: ${h.description}` : '';
                 return {
                     role: h.role,
-                    content: `[表情包]`
+                    content: `[表情包${desc}]`
                 };
             } else if (h.type === 'voice') {
                 let voiceText = '语音消息';
@@ -2998,7 +3009,13 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                 actions.push(actionStr);
             } else {
                 // 消息, 表情包, 图片, 语音 等
-                messagesList.push(item);
+                if (item.type === '消息' || item.type === 'text') {
+                    // 二次解析文本中的混合内容（防止 AI 输出纯文本的表情包标签）
+                    const subItems = forceSplitMixedContent(item.content);
+                    messagesList.push(...subItems);
+                } else {
+                    messagesList.push(item);
+                }
             }
         }
 
@@ -3019,7 +3036,9 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                 
                 for (let line of lines) {
                     let trimmedLine = line.trim();
-                    if (!trimmedLine) continue;
+                    
+                    // Optimization: Do not skip empty lines to preserve formatting (paragraph breaks)
+                    // if (!trimmedLine) continue; 
 
                     let actionMatch = trimmedLine.match(actionRegex);
                     let thoughtMatch = trimmedLine.match(thoughtRegex);
@@ -6120,11 +6139,11 @@ ${worldbookContext}
         
         const actionRegex = /^[\s\*\-\>]*ACTION\s*[:：]\s*(.*)$/i;
 
-        for (let line of lines) {
-            let trimmedLine = line.trim();
-            if (!trimmedLine) continue;
+                for (let line of lines) {
+                    let trimmedLine = line.trim();
+                    // if (!trimmedLine) continue; // 优化：保留空行以维持段落格式
 
-            let actionMatch = trimmedLine.match(actionRegex);
+                    let actionMatch = trimmedLine.match(actionRegex);
             if (actionMatch) {
                 actions.push('ACTION: ' + actionMatch[1].trim());
             } else {
@@ -6682,12 +6701,347 @@ window.openEditChatMessageModal = function(msgId, currentContent) {
     document.getElementById('edit-chat-msg-modal').classList.remove('hidden');
 };
 
+window.openEditBlockModal = function(jsonContent) {
+    const list = document.getElementById('edit-block-list');
+    list.innerHTML = '';
+    
+    let items = [];
+    try {
+        items = typeof jsonContent === 'string' ? JSON.parse(jsonContent) : jsonContent;
+    } catch(e) {
+        console.error(e);
+        items = [];
+    }
+    
+    items.forEach((item, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'edit-block-item';
+        wrapper.style.marginBottom = '10px';
+        
+        const label = document.createElement('div');
+        label.textContent = `消息 ${index + 1}`;
+        label.style.fontSize = '12px';
+        label.style.color = '#888';
+        label.style.marginBottom = '4px';
+        
+        const textarea = document.createElement('textarea');
+        textarea.className = 'block-item-json';
+        textarea.style.width = '100%';
+        textarea.style.height = '100px';
+        textarea.style.fontFamily = 'monospace';
+        textarea.style.fontSize = '12px';
+        textarea.style.border = '1px solid #ddd';
+        textarea.style.borderRadius = '8px';
+        textarea.style.padding = '8px';
+        textarea.style.resize = 'vertical';
+        textarea.value = JSON.stringify(item, null, 2);
+        
+        const toolbar = document.createElement('div');
+        toolbar.className = 'edit-block-toolbar';
+        toolbar.style.display = 'flex';
+        toolbar.style.gap = '8px';
+        toolbar.style.marginTop = '5px';
+        toolbar.style.flexWrap = 'wrap';
+
+        const types = [
+            { label: '文本', template: {"type": "text", "content": "消息内容"} },
+            { label: '图片', template: {"type": "image", "content": "图片描述"} },
+            { label: '转账', template: {"type": "action", "command": "TRANSFER", "payload": "88.88 备注"} },
+            { label: '表情包', template: {"type": "sticker", "content": "表情包名称"} },
+            { label: '语音', template: {"type": "voice", "duration": 5, "content": "语音文本"} }
+        ];
+
+        types.forEach(t => {
+            const btn = document.createElement('button');
+            btn.textContent = t.label;
+            btn.style.padding = '4px 8px';
+            btn.style.fontSize = '12px';
+            btn.style.border = '1px solid #ddd';
+            btn.style.borderRadius = '4px';
+            btn.style.background = '#f5f5f5';
+            btn.style.cursor = 'pointer';
+            
+            btn.onclick = () => {
+                textarea.value = JSON.stringify(t.template, null, 2);
+            };
+            toolbar.appendChild(btn);
+        });
+        
+        wrapper.appendChild(label);
+        wrapper.appendChild(textarea);
+        wrapper.appendChild(toolbar);
+        list.appendChild(wrapper);
+    });
+    
+    document.getElementById('edit-block-modal').classList.remove('hidden');
+};
+
+function handleSaveEditBlock() {
+    const list = document.getElementById('edit-block-list');
+    const textareas = list.querySelectorAll('.block-item-json');
+    const newItems = [];
+    
+    try {
+        textareas.forEach(ta => {
+            const item = JSON.parse(ta.value);
+            newItems.push(item);
+        });
+    } catch(e) {
+        alert('JSON格式错误，请检查');
+        return;
+    }
+    
+    if (newItems.length === 0) {
+        if (!confirm('没有消息内容，确定要清空该轮回复吗？')) return;
+    }
+    
+    const contactId = window.iphoneSimState.currentChatContactId;
+    if (!contactId) return;
+    
+    const history = window.iphoneSimState.chatHistory[contactId];
+    
+    // Find indices of last AI block
+    let indices = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'assistant') {
+            indices.unshift(i);
+        } else {
+            break;
+        }
+    }
+    
+    if (indices.length > 0) {
+        history.splice(indices[0], indices.length);
+    }
+    
+    // Reconstruct new messages
+    let pendingThought = null;
+    const newHistoryItems = [];
+    
+    for (const item of newItems) {
+        if (item.type === 'thought') {
+            pendingThought = item.content;
+            continue;
+        }
+        
+        let contentToSave = item.content;
+        let typeToSave = 'text';
+        let description = null;
+        
+        if (item.type === 'text' || item.type === '消息') {
+            typeToSave = 'text';
+        } else if (item.type === 'sticker' || item.type === '表情包') {
+            let stickerUrl = null;
+            if (window.iphoneSimState.stickerCategories) {
+                for (const cat of window.iphoneSimState.stickerCategories) {
+                    const found = cat.list.find(s => s.desc === item.content || s.desc.includes(item.content));
+                    if (found) {
+                        stickerUrl = found.url;
+                        break;
+                    }
+                }
+            }
+            if (stickerUrl) {
+                contentToSave = stickerUrl;
+                typeToSave = 'sticker';
+                description = item.content;
+            } else {
+                contentToSave = `[表情包: ${item.content}]`;
+                typeToSave = 'text';
+            }
+        } else if (item.type === 'image' || item.type === 'virtual_image') {
+            contentToSave = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
+            typeToSave = 'virtual_image';
+            description = item.content;
+        } else if (item.type === 'voice') {
+            const voiceData = {
+                duration: item.duration || 3,
+                text: item.content || '语音',
+                isReal: false
+            };
+            contentToSave = JSON.stringify(voiceData);
+            typeToSave = 'voice';
+        } else if (item.type === 'action') {
+            if (item.command === 'TRANSFER') {
+                const parts = (item.payload || '').split(' ');
+                const amount = parts[0] || '0';
+                const remark = parts.slice(1).join(' ') || '转账';
+                contentToSave = JSON.stringify({
+                    id: Date.now(),
+                    amount: amount,
+                    remark: remark,
+                    status: 'pending'
+                });
+                typeToSave = 'transfer';
+            } else {
+                continue;
+            }
+        }
+        
+        const msg = {
+            id: Date.now() + Math.random().toString(36).substr(2, 9),
+            time: Date.now(),
+            role: 'assistant',
+            content: contentToSave,
+            type: typeToSave
+        };
+        
+        if (description) msg.description = description;
+        if (pendingThought) {
+            msg.thought = pendingThought;
+            pendingThought = null;
+        }
+        
+        newHistoryItems.push(msg);
+    }
+    
+    if (pendingThought && newHistoryItems.length > 0) {
+        if (newHistoryItems[newHistoryItems.length - 1].thought) {
+            newHistoryItems[newHistoryItems.length - 1].thought += '\n' + pendingThought;
+        } else {
+            newHistoryItems[newHistoryItems.length - 1].thought = pendingThought;
+        }
+    }
+    
+    history.push(...newHistoryItems);
+    
+    saveConfig();
+    renderChatHistory(contactId);
+    document.getElementById('edit-block-modal').classList.add('hidden');
+}
+
 function handleSaveEditedChatMessage() {
     if (!currentEditingChatMsgId || !window.iphoneSimState.currentChatContactId) return;
 
     const newContent = document.getElementById('edit-chat-msg-content').value.trim();
     if (!newContent) {
         alert('消息内容不能为空');
+        return;
+    }
+
+    if (currentEditingChatMsgId === 'LAST_AI_BLOCK') {
+        try {
+            const newItems = JSON.parse(newContent);
+            if (!Array.isArray(newItems)) {
+                alert('必须是JSON数组格式');
+                return;
+            }
+            
+            const contactId = window.iphoneSimState.currentChatContactId;
+            const history = window.iphoneSimState.chatHistory[contactId];
+            
+            let indices = [];
+            for (let i = history.length - 1; i >= 0; i--) {
+                if (history[i].role === 'assistant') {
+                    indices.unshift(i);
+                } else {
+                    break;
+                }
+            }
+            
+            if (indices.length > 0) {
+                history.splice(indices[0], indices.length);
+            }
+            
+            let pendingThought = null;
+            const newHistoryItems = [];
+            
+            for (const item of newItems) {
+                if (item.type === 'thought') {
+                    pendingThought = item.content;
+                    continue;
+                }
+                
+                let contentToSave = item.content;
+                let typeToSave = 'text';
+                let description = null;
+                
+                if (item.type === 'text' || item.type === '消息') {
+                    typeToSave = 'text';
+                } else if (item.type === 'sticker' || item.type === '表情包') {
+                    let stickerUrl = null;
+                    if (window.iphoneSimState.stickerCategories) {
+                        for (const cat of window.iphoneSimState.stickerCategories) {
+                            const found = cat.list.find(s => s.desc === item.content || s.desc.includes(item.content));
+                            if (found) {
+                                stickerUrl = found.url;
+                                break;
+                            }
+                        }
+                    }
+                    if (stickerUrl) {
+                        contentToSave = stickerUrl;
+                        typeToSave = 'sticker';
+                        description = item.content;
+                    } else {
+                        contentToSave = `[表情包: ${item.content}]`;
+                        typeToSave = 'text';
+                    }
+                } else if (item.type === 'image' || item.type === 'virtual_image') {
+                    contentToSave = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
+                    typeToSave = 'virtual_image';
+                    description = item.content;
+                } else if (item.type === 'voice') {
+                    const voiceData = {
+                        duration: item.duration || 3,
+                        text: item.content || '语音',
+                        isReal: false
+                    };
+                    contentToSave = JSON.stringify(voiceData);
+                    typeToSave = 'voice';
+                } else if (item.type === 'action') {
+                    if (item.command === 'TRANSFER') {
+                        const parts = (item.payload || '').split(' ');
+                        const amount = parts[0] || '0';
+                        const remark = parts.slice(1).join(' ') || '转账';
+                        contentToSave = JSON.stringify({
+                            id: Date.now(),
+                            amount: amount,
+                            remark: remark,
+                            status: 'pending'
+                        });
+                        typeToSave = 'transfer';
+                    } else {
+                        continue;
+                    }
+                }
+                
+                const msg = {
+                    id: Date.now() + Math.random().toString(36).substr(2, 9),
+                    time: Date.now(),
+                    role: 'assistant',
+                    content: contentToSave,
+                    type: typeToSave
+                };
+                
+                if (description) msg.description = description;
+                if (pendingThought) {
+                    msg.thought = pendingThought;
+                    pendingThought = null;
+                }
+                
+                newHistoryItems.push(msg);
+            }
+            
+            if (pendingThought && newHistoryItems.length > 0) {
+                if (newHistoryItems[newHistoryItems.length - 1].thought) {
+                    newHistoryItems[newHistoryItems.length - 1].thought += '\n' + pendingThought;
+                } else {
+                    newHistoryItems[newHistoryItems.length - 1].thought = pendingThought;
+                }
+            }
+            
+            history.push(...newHistoryItems);
+            
+            saveConfig();
+            renderChatHistory(contactId);
+            document.getElementById('edit-chat-msg-modal').classList.add('hidden');
+            currentEditingChatMsgId = null;
+            
+        } catch (e) {
+            console.error(e);
+            alert('JSON解析失败，请检查格式');
+        }
         return;
     }
 
@@ -7060,6 +7414,22 @@ function setupChatListeners() {
                     return;
                 }
 
+                if (item.id === 'chat-more-edit-msg-btn') {
+                    e.stopPropagation();
+                    closeAllPanels();
+                    
+                    if (!window.iphoneSimState.currentChatContactId) return;
+                    
+                    const jsonContent = getLastAiBlockJson(window.iphoneSimState.currentChatContactId);
+                    
+                    if (jsonContent) {
+                        openEditBlockModal(jsonContent);
+                    } else {
+                        alert('没有找到AI发送的消息');
+                    }
+                    return;
+                }
+
                 if (item.id === 'chat-more-photo-btn' || item.id === 'chat-more-camera-btn' || item.id === 'chat-more-transfer-btn' || item.id === 'chat-more-memory-btn' || item.id === 'chat-more-location-btn' || item.id === 'chat-more-regenerate-btn' || item.id === 'chat-more-voice-btn' || item.id === 'chat-more-video-call-btn') return;
                 
                 e.stopPropagation();
@@ -7342,6 +7712,19 @@ function setupChatListeners() {
 
     if (saveAutoSnapshotBtn) {
         saveAutoSnapshotBtn.addEventListener('click', handleSaveAutoSnapshotSettings);
+    }
+
+    const closeEditBlockBtn = document.getElementById('close-edit-block');
+    const saveEditBlockBtn = document.getElementById('save-edit-block-btn');
+
+    if (closeEditBlockBtn) {
+        closeEditBlockBtn.addEventListener('click', () => {
+            document.getElementById('edit-block-modal').classList.add('hidden');
+        });
+    }
+
+    if (saveEditBlockBtn) {
+        saveEditBlockBtn.addEventListener('click', handleSaveEditBlock);
     }
 }
 
@@ -7636,6 +8019,58 @@ function getLinkedIcityBooksContext(contactId) {
     });
     
     return context;
+}
+
+function getLastAiBlockJson(contactId) {
+    const history = window.iphoneSimState.chatHistory[contactId];
+    if (!history || history.length === 0) return null;
+
+    let indices = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'assistant') {
+            indices.unshift(i);
+        } else {
+            break;
+        }
+    }
+
+    if (indices.length === 0) return null;
+
+    let jsonOutput = [];
+    
+    for (let i = 0; i < indices.length; i++) {
+        const msg = history[indices[i]];
+        
+        if (msg.thought) {
+            jsonOutput.push({ type: "thought", content: msg.thought });
+        }
+
+        if (msg.type === 'text') {
+            jsonOutput.push({ type: "text", content: msg.content });
+        } else if (msg.type === 'sticker') {
+            jsonOutput.push({ type: "sticker", content: msg.description || msg.content });
+        } else if (msg.type === 'virtual_image') {
+            jsonOutput.push({ type: "image", content: msg.description || "未知图片" });
+        } else if (msg.type === 'voice') {
+            let content = "语音";
+            let duration = 3;
+            try {
+                const data = JSON.parse(msg.content);
+                content = data.text;
+                duration = data.duration;
+            } catch(e) {}
+            jsonOutput.push({ type: "voice", duration: duration, content: content });
+        } else if (msg.type === 'description') {
+             jsonOutput.push({ type: "text", content: msg.content }); 
+        } else if (msg.type === 'transfer') {
+             try {
+                 const data = JSON.parse(msg.content);
+                 jsonOutput.push({ type: "action", command: "TRANSFER", payload: `${data.amount} ${data.remark}` });
+             } catch(e) {}
+        }
+    }
+
+    return JSON.stringify(jsonOutput, null, 2);
 }
 
 // 注册初始化函数

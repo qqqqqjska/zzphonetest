@@ -764,6 +764,81 @@ window.startMiniGame = function(gameType) {
     const oldAiBtn = document.getElementById('mini-game-ai-btn');
     if(oldAiBtn) oldAiBtn.remove();
 
+    // Clear any previous Import buttons
+    const oldImportBtn = document.getElementById('mini-game-import-btn');
+    if (oldImportBtn) oldImportBtn.remove();
+    const oldImportInput = document.getElementById('tod-import-input');
+    if (oldImportInput) oldImportInput.remove();
+
+    if (gameType === 'truth_dare') {
+        const headerControls = document.querySelector('#mini-game-header > div:last-child');
+        const minimizeBtn = document.getElementById('minimize-mini-game');
+        
+        if (headerControls && minimizeBtn) {
+            // Remove old buttons if exists (cleanup)
+            const oldPresetBtn = document.getElementById('mini-game-preset-btn');
+            if(oldPresetBtn) oldPresetBtn.remove();
+
+            // 1. Preset Button
+            const presetBtn = document.createElement('button');
+            presetBtn.id = 'mini-game-preset-btn';
+            presetBtn.innerHTML = '<i class="fas fa-list"></i>';
+            presetBtn.style.cssText = 'background: transparent; border: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #8e8e93; cursor: pointer; transition: all 0.2s; margin-right: 5px;';
+            presetBtn.title = "题库预设";
+            
+            presetBtn.onmouseenter = () => presetBtn.style.backgroundColor = '#f2f2f7';
+            presetBtn.onmouseleave = () => presetBtn.style.backgroundColor = 'transparent';
+            presetBtn.onclick = showTodPresets;
+
+            // 2. Import Button
+            const importBtn = document.createElement('button');
+            importBtn.id = 'mini-game-import-btn';
+            importBtn.innerHTML = '<i class="fas fa-file-import"></i>';
+            importBtn.style.cssText = 'background: transparent; border: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #8e8e93; cursor: pointer; transition: all 0.2s;';
+            importBtn.title = "导入题目";
+            
+            importBtn.onmouseenter = () => importBtn.style.backgroundColor = '#f2f2f7';
+            importBtn.onmouseleave = () => importBtn.style.backgroundColor = 'transparent';
+
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'tod-import-input';
+            input.accept = '.json';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+
+            importBtn.onclick = () => input.click();
+
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (data.truth && Array.isArray(data.truth) && data.dare && Array.isArray(data.dare)) {
+                            tdState.pools.truth = data.truth;
+                            tdState.pools.dare = data.dare;
+                            saveTodData();
+                            alert('真心话大冒险题库导入成功！');
+                        } else {
+                            alert('导入格式错误：JSON文件必须包含 truth 和 dare 两个数组字段');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('JSON 解析失败，请检查文件格式');
+                    }
+                };
+                reader.readAsText(file);
+                input.value = '';
+            };
+
+            // Insert in order: Preset -> Import -> Minimize
+            headerControls.insertBefore(presetBtn, minimizeBtn);
+            headerControls.insertBefore(importBtn, minimizeBtn);
+        }
+    }
+
     if (gameType === 'rps') {
         title.textContent = '猜拳';
         content.innerHTML = `
@@ -835,12 +910,16 @@ window.startMiniGame = function(gameType) {
     }
 };
 
+// Initialize from LocalStorage
+const savedTodPools = localStorage.getItem('tod_current_pools');
+const savedTodPresets = localStorage.getItem('tod_presets');
+
 let tdState = {
     isSpinning: false,
     currentRotation: 0,
     currentType: null, // 'truth' or 'dare'
     currentOptions: [], // Array of strings (questions)
-    pools: {
+    pools: savedTodPools ? JSON.parse(savedTodPools) : {
         'truth': [
             "最大的恐惧？",
             "最丢脸的事？",
@@ -865,7 +944,8 @@ let tdState = {
             "深情朗读一段话",
             "唱一首歌"
         ]
-    }
+    },
+    presets: savedTodPresets ? JSON.parse(savedTodPresets) : []
 };
 
 function startTruthDareGame() {
@@ -952,17 +1032,28 @@ function initTodWheel(type) {
 function drawWheel() {
     const canvas = document.getElementById('wheel-canvas');
     if (!canvas) return;
+    
     const ctx = canvas.getContext('2d');
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = canvas.width / 2;
+    const dpr = window.devicePixelRatio || 1;
+    const logicalSize = 250;
+    
+    // High DPI scaling
+    canvas.width = logicalSize * dpr;
+    canvas.height = logicalSize * dpr;
+    canvas.style.width = logicalSize + 'px';
+    canvas.style.height = logicalSize + 'px';
+    
+    ctx.scale(dpr, dpr);
+    
+    const centerX = logicalSize / 2;
+    const centerY = logicalSize / 2;
+    const radius = logicalSize / 2;
     const arc = Math.PI * 2 / 6;
     
     const colors = tdState.currentType === 'truth' 
         ? ['#5AC8FA', '#4CD964', '#FF9500', '#FF2D55', '#5856D6', '#FFCC00']
         : ['#FF2D55', '#FF9500', '#FFCC00', '#4CD964', '#5AC8FA', '#5856D6'];
     
-    // Or alternating colors for better look
     const altColors = tdState.currentType === 'truth'
         ? ['#5AC8FA', '#007AFF']
         : ['#FF2D55', '#FF9500'];
@@ -979,11 +1070,11 @@ function drawWheel() {
         ctx.rotate(i * arc + arc / 2);
         ctx.textAlign = "right";
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, sans-serif"; // Slightly larger font
         // Truncate text if too long
         let displayText = text;
         if (text.length > 6) displayText = text.substring(0, 5) + '..';
-        ctx.fillText(displayText, radius - 20, 5);
+        ctx.fillText(displayText, radius - 10, 5); // Move text outwards
         ctx.restore();
     });
 }
@@ -1361,15 +1452,15 @@ function checkWitchGameOver() {
     const contactName = getContactName();
     if (witchState.aiPoisonedCount >= 3) {
         witchState.gameOver = true;
-        updateWitchStatus("游戏结束！你赢了！🎉");
+        updateWitchStatus("游戏结束！你点到了3瓶毒药，你输了！😵");
         if (window.sendMessage) {
-            window.sendMessage(`[系统消息]: 游戏结束\n${contactName} 所有的毒药都被找出来了（或中毒3次）。\n🏆 用户胜利！`, true, 'text');
+            window.sendMessage(`[系统消息]: 游戏结束\n用户不幸点到了3瓶毒药。\n🏆 ${contactName} 胜利！`, true, 'text');
         }
     } else if (witchState.userPoisonedCount >= 3) {
         witchState.gameOver = true;
-        updateWitchStatus("游戏结束！你输了！😵");
+        updateWitchStatus("游戏结束！对方点到了3瓶毒药，你赢了！🎉");
         if (window.sendMessage) {
-            window.sendMessage(`[系统消息]: 游戏结束\n用户 所有的毒药都被找出来了（或中毒3次）。\n🏆 ${contactName} 胜利！`, true, 'text');
+            window.sendMessage(`[系统消息]: 游戏结束\n${contactName} 不幸点到了3瓶毒药。\n🏆 用户胜利！`, true, 'text');
         }
     }
 }
@@ -1502,6 +1593,131 @@ function getContactName() {
         return contact ? (contact.remark || contact.name) : '对方';
     }
     return '对方';
+}
+
+// --- Truth or Dare Presets Logic ---
+
+function showTodPresets() {
+    const content = document.getElementById('mini-game-content');
+    content.innerHTML = `
+        <div style="padding: 10px; height: 100%; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-size: 16px;">题库预设</h3>
+                <button id="tod-preset-back" style="border: none; background: none; color: #007AFF; cursor: pointer; font-size: 14px;">返回</button>
+            </div>
+            
+            <div id="tod-preset-list" style="flex: 1; overflow-y: auto; margin-bottom: 15px;">
+                <!-- List items will go here -->
+            </div>
+            
+            <button id="tod-save-preset-btn" style="width: 100%; padding: 12px; background: #007AFF; color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 14px;">
+                保存当前题库为预设
+            </button>
+        </div>
+    `;
+
+    renderTodPresetsList();
+    
+    document.getElementById('tod-preset-back').addEventListener('click', startTruthDareGame);
+    document.getElementById('tod-save-preset-btn').addEventListener('click', saveCurrentTodAsPreset);
+}
+
+function renderTodPresetsList() {
+    const list = document.getElementById('tod-preset-list');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    if (!tdState.presets || tdState.presets.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: #999; margin-top: 40px;">暂无预设</div>';
+        return;
+    }
+    
+    tdState.presets.forEach((preset, index) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+        
+        item.innerHTML = `
+            <div style="flex: 1; overflow: hidden; margin-right: 10px;">
+                <div style="font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px;">${preset.name}</div>
+                <div style="font-size: 12px; color: #8e8e93;">真心话: ${preset.truth.length} / 大冒险: ${preset.dare.length}</div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                <button class="tod-load-btn" data-index="${index}" style="padding: 6px 12px; background: #34C759; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">使用</button>
+                <button class="tod-del-btn" data-index="${index}" style="padding: 6px 12px; background: #FF3B30; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">删除</button>
+            </div>
+        `;
+        list.appendChild(item);
+    });
+    
+    document.querySelectorAll('.tod-load-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => loadTodPreset(parseInt(e.target.dataset.index)));
+    });
+    
+    document.querySelectorAll('.tod-del-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => deleteTodPreset(parseInt(e.target.dataset.index)));
+    });
+}
+
+function saveCurrentTodAsPreset() {
+    const defaultName = "我的题库 " + (tdState.presets.length + 1);
+    // Use window.prompt or implement a custom modal if preferred, prompt is simple for now
+    // Since we are in an app simulation, prompt might break immersion but it's effective.
+    // Let's use prompt for simplicity as requested "simplest solution".
+    const name = prompt("请输入预设名称：", defaultName);
+    
+    if (name) {
+        if (!tdState.presets) tdState.presets = [];
+        tdState.presets.push({
+            name: name,
+            truth: [...tdState.pools.truth],
+            dare: [...tdState.pools.dare]
+        });
+        saveTodData();
+        renderTodPresetsList();
+        // Feedback
+        const saveBtn = document.getElementById('tod-save-preset-btn');
+        if (saveBtn) {
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = "已保存！";
+            saveBtn.style.backgroundColor = "#34C759";
+            setTimeout(() => {
+                saveBtn.textContent = originalText;
+                saveBtn.style.backgroundColor = "#007AFF";
+            }, 1000);
+        }
+    }
+}
+
+function loadTodPreset(index) {
+    const preset = tdState.presets[index];
+    if (preset) {
+        tdState.pools.truth = [...preset.truth];
+        tdState.pools.dare = [...preset.dare];
+        saveTodData();
+        // alert(`已加载预设：${preset.name}`);
+        // Instead of alert, show feedback and switch back
+        const list = document.getElementById('tod-preset-list');
+        list.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #34C759;">
+            <i class="fas fa-check-circle" style="font-size: 40px; margin-bottom: 10px;"></i>
+            <div>已加载：${preset.name}</div>
+        </div>`;
+        setTimeout(() => {
+            startTruthDareGame();
+        }, 800);
+    }
+}
+
+function deleteTodPreset(index) {
+    if (confirm("确定要删除这个预设吗？")) {
+        tdState.presets.splice(index, 1);
+        saveTodData();
+        renderTodPresetsList();
+    }
+}
+
+function saveTodData() {
+    localStorage.setItem('tod_presets', JSON.stringify(tdState.presets));
+    localStorage.setItem('tod_current_pools', JSON.stringify(tdState.pools));
 }
 
 // 注册初始化

@@ -14,7 +14,7 @@
     //    - isUsed (Boolean): 是否已使用 (默认 false)
     // 5. 将获取到的信息填入下方：
     
-    const BMOB_SECRET_KEY = "a1f9ce5ded47f683"; // 替换为您的 Secret Key
+    const BMOB_SECRET_KEY = "47555583581ac060"; // 替换为您的 Secret Key
     const BMOB_API_KEY = "2382745495111111"; // 替换为您的 API 安全码 (API Safety Code)
     
     // 如果您还没有配置 Bmob，可以暂时使用此【备用】本地验证码 (Base64编码)
