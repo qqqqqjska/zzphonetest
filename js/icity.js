@@ -3032,16 +3032,14 @@ function renderIcityNotifications() {
         item.style.cursor = 'pointer';
         item.onclick = () => handleNotificationClick(notif);
         
+        // Force default gray avatar for NPCs
         let avatarStyle = 'background: #ccc;';
-        if (notif.avatar) {
-            avatarStyle = `background-image: url('${notif.avatar}'); background-size: cover; background-position: center;`;
-        }
         
         const timeStr = formatIcityTime(notif.time);
         
         item.innerHTML = `
             <div style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; ${avatarStyle} display: flex; align-items: center; justify-content: center;">
-                ${!notif.avatar ? '<i class="fas fa-user" style="color: #fff;"></i>' : ''}
+                <i class="fas fa-user" style="color: #fff;"></i>
             </div>
             <div style="flex: 1;">
                 <div style="font-size: 14px; margin-bottom: 4px;">
@@ -3079,16 +3077,14 @@ function renderIcityLikes() {
         item.style.display = 'flex';
         item.style.alignItems = 'center';
         
+        // Force default gray avatar for Likes
         let avatarStyle = 'background: #ccc;';
-        if (like.avatar) {
-            avatarStyle = `background-image: url('${like.avatar}'); background-size: cover; background-position: center;`;
-        }
         
         const timeStr = formatIcityTime(like.time);
         
         item.innerHTML = `
             <div style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; ${avatarStyle} display: flex; align-items: center; justify-content: center;">
-                ${!like.avatar ? '<i class="fas fa-user" style="color: #fff;"></i>' : ''}
+                <i class="fas fa-user" style="color: #fff;"></i>
             </div>
             <div style="flex: 1;">
                 <div style="font-size: 14px;">

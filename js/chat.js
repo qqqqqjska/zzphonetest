@@ -3623,7 +3623,10 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
 
     } catch (error) {
         console.error('AI生成失败:', error);
-        alert('AI生成失败，请检查配置');
+        // 显示具体的错误信息
+        alert(`AI生成失败: ${error.message}\n请检查配置和API状态`);
+        // 同时在聊天界面显示系统消息
+        appendMessageToUI(`[系统错误]: AI生成失败 - ${error.message}`, false, 'text', null, null, null, null, false);
     } finally {
         const currentContact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
         if (currentContact) {
@@ -6237,8 +6240,10 @@ ${worldbookContext}
 
     } catch (error) {
         console.error('语音通话AI生成失败:', error);
-        addVoiceCallMessage('[生成失败]', 'ai');
+        addVoiceCallMessage(`[生成失败: ${error.message}]`, 'ai');
         if (statusEl) statusEl.textContent = '生成失败';
+        // 在控制台输出更多细节以便调试
+        if (window.showChatToast) window.showChatToast(`语音通话AI错误: ${error.message}`);
         isProcessingResponse = false; // 发生错误，恢复VAD
     } finally {
         // 移除这里的状态重置，交由 playVoiceCallAudio 或上面的逻辑控制

@@ -1110,6 +1110,123 @@ function setupThemeListeners() {
             alert('美化配置已保存');
         });
     }
+
+    // 还原按钮事件绑定
+    const restoreGlobalBtn = document.getElementById('restore-global-css-btn');
+    if (restoreGlobalBtn) restoreGlobalBtn.addEventListener('click', restoreGlobalCSS);
+
+    const restoreMeetingBtn = document.getElementById('restore-meeting-css-btn');
+    if (restoreMeetingBtn) restoreMeetingBtn.addEventListener('click', restoreMeetingCSS);
+
+    const restoreChatBtn = document.getElementById('restore-chat-css-btn');
+    if (restoreChatBtn) restoreChatBtn.addEventListener('click', openContactSelectorForRestore);
+}
+
+// --- 还原功能 ---
+
+function restoreGlobalCSS() {
+    if (confirm('确定要还原全局CSS为默认状态吗？这将清空所有自定义的全局CSS代码。')) {
+        window.iphoneSimState.css = '';
+        applyCSS('');
+        const cssEditor = document.getElementById('css-editor');
+        if (cssEditor) cssEditor.value = '';
+        saveConfig();
+        alert('全局CSS已还原');
+    }
+}
+
+function restoreMeetingCSS() {
+    if (confirm('确定要还原见面页CSS为默认状态吗？这将清空所有自定义的见面页CSS代码。')) {
+        window.iphoneSimState.meetingCss = '';
+        applyMeetingCss('');
+        const meetingEditor = document.getElementById('meeting-css-editor');
+        if (meetingEditor) meetingEditor.value = '';
+        saveConfig();
+        alert('见面页CSS已还原');
+    }
+}
+
+function openContactSelectorForRestore() {
+    const modal = document.getElementById('contact-picker-modal');
+    const list = document.getElementById('contact-picker-list');
+    const sendBtn = document.getElementById('contact-picker-send-btn');
+    const closeBtn = document.getElementById('close-contact-picker');
+    
+    if (!modal || !list) return;
+    
+    const headerTitle = modal.querySelector('h3');
+    const originalTitle = headerTitle ? headerTitle.textContent : '选择联系人';
+    if (headerTitle) headerTitle.textContent = '选择要还原CSS的联系人';
+    
+    if (sendBtn) sendBtn.style.display = 'none';
+    
+    list.innerHTML = '';
+    
+    if (window.iphoneSimState.contacts.length === 0) {
+        list.innerHTML = '<div class="list-item center-content" style="color:#999;">暂无联系人</div>';
+    } else {
+        window.iphoneSimState.contacts.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            // 添加点击反馈样式
+            item.style.cursor = 'pointer';
+            item.innerHTML = `
+                <div class="list-content" style="display:flex; align-items:center; width:100%; padding: 10px;">
+                    <img src="${c.avatar}" style="width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; object-fit: cover;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold;">${c.remark || c.name}</div>
+                        <div style="font-size: 12px; color: #888;">${c.customCss ? '已设置自定义CSS' : '默认CSS'}</div>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #ccc;"></i>
+                </div>
+            `;
+            item.onclick = () => {
+                restoreChatCSS(c.id);
+                // 关闭弹窗
+                modal.classList.add('hidden');
+                // 恢复原始状态
+                if (sendBtn) sendBtn.style.display = '';
+                if (headerTitle) headerTitle.textContent = originalTitle;
+            };
+            list.appendChild(item);
+        });
+    }
+    
+    modal.classList.remove('hidden');
+    
+    const closeHandler = () => {
+        modal.classList.add('hidden');
+        if (sendBtn) sendBtn.style.display = '';
+        if (headerTitle) headerTitle.textContent = originalTitle;
+        closeBtn.removeEventListener('click', closeHandler);
+    };
+    closeBtn.addEventListener('click', closeHandler);
+}
+
+function restoreChatCSS(contactId) {
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    if (contact) {
+        if (!contact.customCss) {
+            alert('该联系人当前没有设置自定义CSS。');
+            return;
+        }
+        
+        if (confirm(`确定要还原 "${contact.remark || contact.name}" 的聊天页面CSS吗？`)) {
+            contact.customCss = '';
+            saveConfig();
+            
+            // 如果当前正好在编辑这个联系人的设置，更新输入框
+            if (window.iphoneSimState.currentChatContactId === contactId) {
+                 const cssInput = document.getElementById('chat-setting-custom-css');
+                 if (cssInput) cssInput.value = '';
+                 
+                 // 如果聊天窗口开着，移除样式
+                 const styleEl = document.getElementById('chat-custom-css');
+                 if (styleEl) styleEl.remove();
+            }
+            alert('已还原该联系人的聊天页面CSS');
+        }
+    }
 }
 
 // --- 状态栏时间同步功能 ---

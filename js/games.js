@@ -494,17 +494,29 @@ function renderMinesweeperGrid() {
     const gridEl = document.getElementById('ms-grid');
     gridEl.innerHTML = '';
     
-    // 设置 CSS Grid
-    gridEl.style.gridTemplateColumns = `repeat(${minesweeperState.cols}, 1fr)`;
-    
-    // 动态调整格子大小以适应屏幕
-    const containerWidth = 320; 
+    // 固定格子大小，确保点击体验
+    const cellSize = 30; 
     const gap = 4;
-    const totalGap = (minesweeperState.cols - 1) * gap;
-    const cellSize = (containerWidth - totalGap) / minesweeperState.cols;
     
+    // 设置 CSS Grid
+    gridEl.style.display = 'grid';
+    gridEl.style.gridTemplateColumns = `repeat(${minesweeperState.cols}, ${cellSize}px)`;
+    gridEl.style.gap = `${gap}px`;
+    
+    // 启用滚动容器
     gridEl.style.width = '100%';
-    gridEl.style.justifyContent = 'center';
+    gridEl.style.maxWidth = '100%';
+    gridEl.style.overflowX = 'auto'; // 横向滚动
+    gridEl.style.padding = '5px 0';  // 避免阴影被切
+    
+    // 根据宽度决定对齐方式
+    const estimatedWidth = minesweeperState.cols * (cellSize + gap);
+    // 容器内宽约 280px (320 - padding)
+    if (estimatedWidth > 280) {
+        gridEl.style.justifyContent = 'start';
+    } else {
+        gridEl.style.justifyContent = 'center';
+    }
     
     for (let r = 0; r < minesweeperState.rows; r++) {
         for (let c = 0; c < minesweeperState.cols; c++) {
@@ -513,8 +525,9 @@ function renderMinesweeperGrid() {
             cell.dataset.row = r;
             cell.dataset.col = c;
             
-            cell.style.width = '100%';
-            cell.style.aspectRatio = '1/1';
+            cell.style.width = `${cellSize}px`;
+            cell.style.height = `${cellSize}px`;
+            cell.style.flexShrink = '0'; // 防止压缩
             cell.style.borderRadius = '4px';
             cell.style.backgroundColor = '#E5E5EA'; 
             cell.style.display = 'flex';
