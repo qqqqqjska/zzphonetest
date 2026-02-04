@@ -112,7 +112,8 @@ const state = {
     selectedStickers: new Set(), // 存储选中的表情包标识 (catId-index)
     replyingToMsg: null, // 当前正在引用的消息 { content, name, type }
     isMultiSelectMode: false,
-    selectedMessages: new Set() // 存储选中的消息ID
+    selectedMessages: new Set(), // 存储选中的消息ID
+    enableSystemNotifications: false // 系统后台通知开关
 };
 
 // 暴露 state 给全局

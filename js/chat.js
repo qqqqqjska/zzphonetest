@@ -101,6 +101,25 @@ window.showChatNotification = function(contactId, content) {
         banner.classList.add('hidden');
         currentNotificationTimeout = null;
     }, 3000);
+
+    // 系统后台通知
+    if (window.iphoneSimState.enableSystemNotifications && "Notification" in window && Notification.permission === "granted") {
+        try {
+            const n = new Notification(title.textContent, {
+                body: message.textContent,
+                icon: avatar.src,
+                tag: 'chat-msg-' + contactId
+            });
+            n.onclick = function() {
+                window.focus();
+                this.close();
+                // 模拟点击应用内通知的行为
+                window.handleNotificationClick(); 
+            };
+        } catch(e) {
+            console.error('System notification failed', e);
+        }
+    }
 };
 
 window.handleNotificationClick = function(e) {
@@ -147,6 +166,8 @@ function handleSaveContact() {
         persona,
         style: '正常',
         avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + name,
+        activeReplyEnabled: false,
+        activeReplyInterval: 60,
         autoItineraryEnabled: false,
         autoItineraryInterval: 10,
         messagesSinceLastItinerary: 0,
@@ -674,6 +695,10 @@ function openChatSettings() {
     // 消息间隔设置
     document.getElementById('chat-setting-interval-min').value = contact.replyIntervalMin || '';
     document.getElementById('chat-setting-interval-max').value = contact.replyIntervalMax || '';
+
+    // 主动发消息设置
+    document.getElementById('chat-setting-active-reply').checked = contact.activeReplyEnabled || false;
+    document.getElementById('chat-setting-active-interval').value = contact.activeReplyInterval || '';
 
     // 字体大小设置
     const fontSizeSlider = document.getElementById('chat-font-size-slider');
@@ -1206,6 +1231,8 @@ function handleSaveChatSettings() {
     const fontSize = document.getElementById('chat-font-size-slider') ? parseInt(document.getElementById('chat-font-size-slider').value) : 16;
     const intervalMin = document.getElementById('chat-setting-interval-min').value;
     const intervalMax = document.getElementById('chat-setting-interval-max').value;
+    const activeReplyEnabled = document.getElementById('chat-setting-active-reply').checked;
+    const activeReplyInterval = document.getElementById('chat-setting-active-interval').value;
 
     const selectedWbCategories = [];
     document.querySelectorAll('.wb-category-checkbox').forEach(cb => {
@@ -1242,6 +1269,22 @@ function handleSaveChatSettings() {
     contact.chatFontSize = fontSize;
     contact.replyIntervalMin = intervalMin ? parseInt(intervalMin) : null;
     contact.replyIntervalMax = intervalMax ? parseInt(intervalMax) : null;
+    contact.activeReplyEnabled = activeReplyEnabled;
+    contact.activeReplyInterval = activeReplyInterval ? parseInt(activeReplyInterval) : 60;
+    
+    if (activeReplyEnabled) {
+        // Start timing from now (or keep existing start time if already enabled?)
+        // Requirement: "Change to timing from the last message sent AFTER enabling".
+        // To strictly enforce "after enabling", we set the start time now.
+        // If it was already enabled, maybe we shouldn't reset it? 
+        // But if the user enters settings and clicks save, they might expect a refresh.
+        // Let's set it if it wasn't enabled before, or if we want to reset.
+        // For simplicity and to ensure the "after enabling" rule holds even on re-save:
+        contact.activeReplyStartTime = Date.now();
+    } else {
+        contact.activeReplyStartTime = null;
+    }
+
     document.getElementById('chat-title').textContent = remark || contact.name;
     
     contact.chatBg = window.iphoneSimState.tempSelectedChatBg;
@@ -1458,11 +1501,12 @@ function updateThoughtBubble(text) {
     }
 }
 
-function sendMessage(text, isUser, type = 'text', description = null) {
-    if (!window.iphoneSimState.currentChatContactId) return;
+function sendMessage(text, isUser, type = 'text', description = null, targetContactId = null) {
+    const contactId = targetContactId || window.iphoneSimState.currentChatContactId;
+    if (!contactId) return;
     
-    if (!window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId]) {
-        window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId] = [];
+    if (!window.iphoneSimState.chatHistory[contactId]) {
+        window.iphoneSimState.chatHistory[contactId] = [];
     }
     
     const msg = {
@@ -1471,7 +1515,7 @@ function sendMessage(text, isUser, type = 'text', description = null) {
         role: isUser ? 'user' : 'assistant',
         content: text,
         type: type,
-        replyTo: window.iphoneSimState.replyingToMsg ? {
+        replyTo: (window.iphoneSimState.replyingToMsg && (!targetContactId || targetContactId === window.iphoneSimState.currentChatContactId)) ? {
             name: window.iphoneSimState.replyingToMsg.name,
             content: window.iphoneSimState.replyingToMsg.type === 'text' ? window.iphoneSimState.replyingToMsg.content : `[${window.iphoneSimState.replyingToMsg.type === 'sticker' ? '表情包' : '图片'}]`
         } : null
@@ -1481,11 +1525,11 @@ function sendMessage(text, isUser, type = 'text', description = null) {
         msg.description = description;
     }
     
-    window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId].push(msg);
+    window.iphoneSimState.chatHistory[contactId].push(msg);
     
-    if (window.iphoneSimState.replyingToMsg) cancelQuote();
+    if (window.iphoneSimState.replyingToMsg && (!targetContactId || targetContactId === window.iphoneSimState.currentChatContactId)) cancelQuote();
     
-    const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
     if (contact) {
         if (contact.autoItineraryEnabled) {
             if (typeof contact.messagesSinceLastItinerary !== 'number') {
@@ -1506,12 +1550,15 @@ function sendMessage(text, isUser, type = 'text', description = null) {
 
     saveConfig();
     
-    appendMessageToUI(text, isUser, type, description, msg.replyTo, msg.id, msg.time);
-    scrollToBottom();
+    // Only update UI if we are in the chat with this contact
+    if (window.iphoneSimState.currentChatContactId === contactId) {
+        appendMessageToUI(text, isUser, type, description, msg.replyTo, msg.id, msg.time);
+        scrollToBottom();
+    }
 
     if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
 
-    if (window.checkAndSummarize) window.checkAndSummarize(window.iphoneSimState.currentChatContactId);
+    if (window.checkAndSummarize) window.checkAndSummarize(contactId);
 }
 
 function appendMessageToUI(text, isUser, type = 'text', description = null, replyTo = null, msgId = null, timestamp = null, isHistory = false) {
@@ -2397,22 +2444,23 @@ function parseMixedContent(content) {
     return forceSplitMixedContent(content);
 }
 
-async function generateAiReply(instruction = null) {
-    if (!window.iphoneSimState.currentChatContactId) return;
+async function generateAiReply(instruction = null, targetContactId = null) {
+    const contactId = targetContactId || window.iphoneSimState.currentChatContactId;
+    if (!contactId) return;
     
-    const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
     if (!contact) return;
 
     const settings = window.iphoneSimState.aiSettings.url ? window.iphoneSimState.aiSettings : window.iphoneSimState.aiSettings2;
     if (!settings.url || !settings.key) {
-        alert('请先在设置中配置AI API');
+        if (!targetContactId) alert('请先在设置中配置AI API');
         return;
     }
 
-    const history = window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId] || [];
+    const history = window.iphoneSimState.chatHistory[contactId] || [];
     
     // Check for Truth or Dare triggers
-    if (window.currentMiniGame === 'truth_dare') {
+    if (!targetContactId && window.currentMiniGame === 'truth_dare') {
         const modal = document.getElementById('mini-game-modal');
         if (modal && !modal.classList.contains('hidden')) {
             const lastMsg = history[history.length - 1];
@@ -3450,7 +3498,7 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
             if (shouldShowInChat) {
                 // 用户在聊天界面，使用打字机效果或直接发送
                 if (msg.type === '消息') {
-                    await typewriterEffect(msg.content, contact.avatar, currentThought, currentReplyTo, 'text');
+                    await typewriterEffect(msg.content, contact.avatar, currentThought, currentReplyTo, 'text', contactId);
                 } else if (msg.type === '表情包') {
                     // 尝试查找表情包 URL
                     let stickerUrl = null;
@@ -3469,10 +3517,10 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
                         }
                     }
                     if (stickerUrl) {
-                        sendMessage(stickerUrl, false, 'sticker', msg.content);
+                        sendMessage(stickerUrl, false, 'sticker', msg.content, contactId);
                     } else {
                         // 找不到表情包，降级为文本
-                        await typewriterEffect(`[表情包: ${msg.content}]`, contact.avatar, currentThought, currentReplyTo, 'text');
+                        await typewriterEffect(`[表情包: ${msg.content}]`, contact.avatar, currentThought, currentReplyTo, 'text', contactId);
                     }
                 } else if (msg.type === '语音') {
                     const parts = msg.content.match(/(\d+)\s+(.*)/);
@@ -3487,12 +3535,12 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
                         text: text,
                         isReal: false
                     };
-                    sendMessage(JSON.stringify(voiceData), false, 'voice');
+                    sendMessage(JSON.stringify(voiceData), false, 'voice', null, contactId);
                 } else if (msg.type === '图片') {
                     const defaultImageUrl = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
-                    sendMessage(defaultImageUrl, false, 'virtual_image', msg.content);
+                    sendMessage(defaultImageUrl, false, 'virtual_image', msg.content, contactId);
                 } else if (msg.type === '旁白') {
-                    await typewriterEffect(msg.content, contact.avatar, null, null, 'description');
+                    await typewriterEffect(msg.content, contact.avatar, null, null, 'description', contactId);
                 }
             } else {
                 // 用户不在聊天界面，后台保存并弹窗
@@ -3606,18 +3654,9 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
         if (imageToSend) {
             if (imageToSend.type === 'virtual_image') {
                 const defaultImageUrl = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
-                sendMessage(defaultImageUrl, false, 'virtual_image', imageToSend.content);
+                sendMessage(defaultImageUrl, false, 'virtual_image', imageToSend.content, contactId);
             } else if (imageToSend.type === 'sticker') {
-                sendMessage(imageToSend.content, false, 'sticker', imageToSend.desc);
-            }
-        }
-
-        if (imageToSend) {
-            if (imageToSend.type === 'virtual_image') {
-                const defaultImageUrl = window.iphoneSimState.defaultVirtualImageUrl || 'https://placehold.co/600x400/png?text=Photo';
-                sendMessage(defaultImageUrl, false, 'virtual_image', imageToSend.content);
-            } else if (imageToSend.type === 'sticker') {
-                sendMessage(imageToSend.content, false, 'sticker', imageToSend.desc);
+                sendMessage(imageToSend.content, false, 'sticker', imageToSend.desc, contactId);
             }
         }
 
@@ -3637,10 +3676,16 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
     }
 }
 
-function typewriterEffect(text, avatarUrl, thought = null, replyTo = null, type = 'text') {
+function typewriterEffect(text, avatarUrl, thought = null, replyTo = null, type = 'text', targetContactId = null) {
     return new Promise(resolve => {
-        if (!window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId]) {
-            window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId] = [];
+        const contactId = targetContactId || window.iphoneSimState.currentChatContactId;
+        if (!contactId) {
+            resolve();
+            return;
+        }
+
+        if (!window.iphoneSimState.chatHistory[contactId]) {
+            window.iphoneSimState.chatHistory[contactId] = [];
         }
         
         const msgData = {
@@ -3656,9 +3701,9 @@ function typewriterEffect(text, avatarUrl, thought = null, replyTo = null, type 
             msgData.thought = thought;
         }
         
-        window.iphoneSimState.chatHistory[window.iphoneSimState.currentChatContactId].push(msgData);
+        window.iphoneSimState.chatHistory[contactId].push(msgData);
         
-        const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
+        const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
         if (contact) {
             if (contact.autoItineraryEnabled) {
                 if (typeof contact.messagesSinceLastItinerary !== 'number') {
@@ -3679,13 +3724,14 @@ function typewriterEffect(text, avatarUrl, thought = null, replyTo = null, type 
 
         saveConfig();
         
-        appendMessageToUI(text, false, type, null, replyTo, msgData.id, msgData.time);
-        
-        scrollToBottom();
+        if (window.iphoneSimState.currentChatContactId === contactId) {
+            appendMessageToUI(text, false, type, null, replyTo, msgData.id, msgData.time);
+            scrollToBottom();
+        }
 
         if (window.renderContactList) window.renderContactList(window.iphoneSimState.currentContactGroup || 'all');
         
-        if (window.checkAndSummarize) window.checkAndSummarize(window.iphoneSimState.currentChatContactId);
+        if (window.checkAndSummarize) window.checkAndSummarize(contactId);
 
         resolve();
     });
@@ -7731,6 +7777,44 @@ function setupChatListeners() {
     if (saveEditBlockBtn) {
         saveEditBlockBtn.addEventListener('click', handleSaveEditBlock);
     }
+
+    // 系统通知设置
+    const sysNotifToggle = document.getElementById('system-notification-toggle');
+    if (sysNotifToggle) {
+        sysNotifToggle.checked = window.iphoneSimState.enableSystemNotifications || false;
+        
+        sysNotifToggle.addEventListener('change', async (e) => {
+            if (e.target.checked) {
+                if (!("Notification" in window)) {
+                    alert("此浏览器不支持系统通知");
+                    e.target.checked = false;
+                    return;
+                }
+
+                if (Notification.permission === "granted") {
+                    window.iphoneSimState.enableSystemNotifications = true;
+                    saveConfig();
+                    new Notification("通知已开启", { body: "你现在可以接收后台消息通知了" });
+                } else if (Notification.permission !== "denied") {
+                    const permission = await Notification.requestPermission();
+                    if (permission === "granted") {
+                        window.iphoneSimState.enableSystemNotifications = true;
+                        saveConfig();
+                        new Notification("通知已开启", { body: "你现在可以接收后台消息通知了" });
+                    } else {
+                        e.target.checked = false;
+                        alert("需要通知权限才能开启此功能");
+                    }
+                } else {
+                    e.target.checked = false;
+                    alert("通知权限已被拒绝，请在浏览器设置中手动开启");
+                }
+            } else {
+                window.iphoneSimState.enableSystemNotifications = false;
+                saveConfig();
+            }
+        });
+    }
 }
 
 function updateWechatHeader(tab) {
@@ -8078,7 +8162,42 @@ function getLastAiBlockJson(contactId) {
     return JSON.stringify(jsonOutput, null, 2);
 }
 
+function checkActiveReplies() {
+    if (!window.iphoneSimState || !window.iphoneSimState.contacts) return;
+    
+    const now = Date.now();
+    
+    window.iphoneSimState.contacts.forEach(contact => {
+        if (!contact.activeReplyEnabled) return;
+        
+        const history = window.iphoneSimState.chatHistory[contact.id];
+        if (!history || history.length === 0) return;
+        
+        const lastMsg = history[history.length - 1];
+        const intervalMs = (contact.activeReplyInterval || 60) * 1000;
+        
+        // Ensure we only count messages sent AFTER the feature was enabled
+        if (contact.activeReplyStartTime && lastMsg.time <= contact.activeReplyStartTime) {
+            return;
+        }
+
+        if (contact.lastActiveReplyTriggeredMsgId === lastMsg.id) return;
+        
+        if (now - lastMsg.time > intervalMs) {
+            console.log(`[ActiveReply] Triggering for ${contact.name}`);
+            
+            contact.lastActiveReplyTriggeredMsgId = lastMsg.id;
+            saveConfig();
+            
+            generateAiReply("（系统提示：这是主动发消息模式触发。此前已经过了一段时间没有新消息。请主动发起一轮新的对话，或者询问对方在做什么，或者分享你的生活/心情。请保持自然，不要暴露你是AI。）", contact.id);
+        }
+    });
+}
+
 // 注册初始化函数
 if (window.appInitFunctions) {
     window.appInitFunctions.push(setupChatListeners);
+    window.appInitFunctions.push(() => {
+        setInterval(checkActiveReplies, 5000);
+    });
 }

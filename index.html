@@ -397,6 +397,20 @@
                     </div>
                 </div>
 
+                <!-- 系统设置 -->
+                <div class="section-title">系统设置</div>
+                <div class="ios-list-group">
+                    <div class="list-item">
+                        <div class="list-content">
+                            <label>后台消息通知</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="system-notification-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 数据管理 -->
                 <div class="section-title">数据管理</div>
                 <div class="ios-list-group">
@@ -569,6 +583,21 @@
                                 <div class="list-content column">
                                     <label>自动总结触发条数 (0为关闭)</label>
                                     <input type="number" id="chat-setting-summary-limit" placeholder="默认关闭" min="0">
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>主动发消息</label>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="chat-setting-active-reply">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="list-item">
+                                <div class="list-content column">
+                                    <label>主动发消息间隔 (秒)</label>
+                                    <input type="number" id="chat-setting-active-interval" placeholder="例如: 60" min="5">
                                 </div>
                             </div>
                             <div class="list-item">
