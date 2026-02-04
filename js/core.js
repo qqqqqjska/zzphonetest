@@ -842,6 +842,7 @@ async function init() {
     }
     if (window.updateWhisperUi) updateWhisperUi();
     if (window.updateMinimaxUi) updateMinimaxUi();
+    if (window.updateSystemSettingsUi) updateSystemSettingsUi();
     if (window.renderContactList) renderContactList();
     if (window.migrateWorldbookData) migrateWorldbookData();
     if (window.renderWorldbookCategoryList) renderWorldbookCategoryList();

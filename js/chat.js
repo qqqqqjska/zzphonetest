@@ -102,13 +102,18 @@ window.showChatNotification = function(contactId, content) {
         currentNotificationTimeout = null;
     }, 3000);
 
-    // 系统后台通知
+    // 尝试发送系统通知
+    sendSystemNotification(contact, previewText);
+};
+
+window.sendSystemNotification = function(contact, content) {
     if (window.iphoneSimState.enableSystemNotifications && "Notification" in window && Notification.permission === "granted") {
         try {
-            const n = new Notification(title.textContent, {
-                body: message.textContent,
-                icon: avatar.src,
-                tag: 'chat-msg-' + contactId
+            const displayName = contact.remark || contact.nickname || contact.name;
+            const n = new Notification(displayName, {
+                body: content,
+                icon: contact.avatar,
+                tag: 'chat-msg-' + contact.id
             });
             n.onclick = function() {
                 window.focus();
@@ -3496,6 +3501,18 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
             const shouldShowInChat = isChatOpen && isSameContact;
 
             if (shouldShowInChat) {
+                // 如果用户在聊天界面但页面被隐藏/最小化，仍然发送系统通知
+                if (document.hidden) {
+                    let notifContent = msg.content;
+                    if (msg.type === '表情包') notifContent = '[表情包]';
+                    else if (msg.type === '图片') notifContent = '[图片]';
+                    else if (msg.type === '语音') notifContent = '[语音]';
+                    else if (msg.type === 'virtual_image') notifContent = '[图片]';
+                    else if (msg.type === 'sticker') notifContent = '[表情包]';
+                    
+                    sendSystemNotification(contact, notifContent);
+                }
+
                 // 用户在聊天界面，使用打字机效果或直接发送
                 if (msg.type === '消息') {
                     await typewriterEffect(msg.content, contact.avatar, currentThought, currentReplyTo, 'text', contactId);
@@ -8193,6 +8210,13 @@ function checkActiveReplies() {
         }
     });
 }
+
+window.updateSystemSettingsUi = function() {
+    const sysNotifToggle = document.getElementById('system-notification-toggle');
+    if (sysNotifToggle) {
+        sysNotifToggle.checked = window.iphoneSimState.enableSystemNotifications || false;
+    }
+};
 
 // 注册初始化函数
 if (window.appInitFunctions) {
