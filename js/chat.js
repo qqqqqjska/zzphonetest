@@ -8206,7 +8206,19 @@ function checkActiveReplies() {
             contact.lastActiveReplyTriggeredMsgId = lastMsg.id;
             saveConfig();
             
-            generateAiReply("（系统提示：这是主动发消息模式触发。此前已经过了一段时间没有新消息。请主动发起一轮新的对话，或者询问对方在做什么，或者分享你的生活/心情。请保持自然，不要暴露你是AI。）", contact.id);
+            let activeInstruction = "";
+            const timeDiff = now - lastMsg.time;
+            const minutesPassed = Math.floor(timeDiff / 60000);
+            
+            if (lastMsg.role === 'user') {
+                // User sent last message, AI is replying late
+                activeInstruction = `（系统提示：主动发消息模式触发。距离用户上一条消息已过去 ${minutesPassed} 分钟。请回复用户的消息。你可以顺便解释一下为什么回复晚了，或者直接自然地继续话题。）`;
+            } else {
+                // AI sent last message, User didn't reply
+                activeInstruction = `（系统提示：主动发消息模式触发。距离你上一条消息已过去 ${minutesPassed} 分钟，用户一直没有回复。请主动发起一条新消息，可以是对上一条的补充，或者是开启新话题，或者是分享当下的心情/状态。请保持自然，不要暴露你是AI。）`;
+            }
+
+            generateAiReply(activeInstruction, contact.id);
         }
     });
 }
