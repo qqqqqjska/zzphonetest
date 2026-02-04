@@ -4820,7 +4820,7 @@ function initVoiceCallButtons() {
     
     const floatWindow = document.getElementById('voice-call-float');
     if (floatWindow) {
-        makeDraggable(floatWindow, restoreVoiceCallScreen);
+        makeVoiceCallDraggable(floatWindow, restoreVoiceCallScreen);
     }
 
     const micBtn = document.getElementById('voice-call-mic-btn');
@@ -5185,7 +5185,7 @@ function restoreVoiceCallScreen() {
     if (floatWindow) floatWindow.classList.add('hidden');
 }
 
-function makeDraggable(element, onClickCallback) {
+function makeVoiceCallDraggable(element, onClickCallback) {
     let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
     let isDragging = false;
     
@@ -5651,7 +5651,7 @@ function minimizeVideoCallScreen() {
     screen.classList.add('hidden');
     if (floatWindow) {
         floatWindow.classList.remove('hidden');
-        makeDraggable(floatWindow, restoreVideoCallScreen);
+        makeVoiceCallDraggable(floatWindow, restoreVideoCallScreen);
     }
 }
 
