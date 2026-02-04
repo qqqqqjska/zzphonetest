@@ -2554,16 +2554,78 @@ async function generateAiReply(instruction = null, targetContactId = null) {
         }
     }
 
+    let userPerceptionContext = '';
+    if (contact.userPerception && contact.userPerception.length > 0) {
+        userPerceptionContext = '\n【关于用户的认知】\n';
+        contact.userPerception.forEach(p => {
+            userPerceptionContext += `- ${p}\n`;
+        });
+    }
+
     let memoryContext = '';
-    if (contact.memorySendLimit && contact.memorySendLimit > 0) {
-        const contactMemories = window.iphoneSimState.memories.filter(m => m.contactId === contact.id);
-        if (contactMemories.length > 0) {
-            const recentMemories = contactMemories.sort((a, b) => b.time - a.time).slice(0, contact.memorySendLimit);
-            recentMemories.reverse();
+    // 增强记忆读取逻辑：结合最近记忆和相关性记忆 (Simple RAG)
+    const contactMemories = window.iphoneSimState.memories.filter(m => m.contactId === contact.id);
+    
+    if (contactMemories.length > 0) {
+        // 1. 获取限制，默认为 5 条
+        const limit = contact.memorySendLimit && contact.memorySendLimit > 0 ? contact.memorySendLimit : 5;
+        
+        // 2. 按时间倒序排序 (最新的在前)
+        const sortedMemories = contactMemories.sort((a, b) => b.time - a.time);
+        
+        // 3. 总是保留最新的几条记忆 (保持短期连贯性)
+        const recentCount = Math.min(3, limit);
+        const recentMemories = sortedMemories.slice(0, recentCount);
+        
+        // 4. 对剩余记忆进行关键词匹配 (Contextual Retrieval)
+        // 提取当前对话上下文中的关键词 (简单的基于最近20条消息的全文检索)
+        const remainingMemories = sortedMemories.slice(recentCount);
+        const relevantMemories = [];
+        
+        if (remainingMemories.length > 0) {
+            const contextText = history.slice(-20).map(m => m.content).join(' ').toLowerCase();
             
-            memoryContext += '\n【重要记忆】\n';
-            recentMemories.forEach(m => {
-                memoryContext += `- ${m.content}\n`;
+            if (contextText) {
+                const scored = remainingMemories.map(mem => {
+                    let score = 0;
+                    const content = mem.content.toLowerCase();
+                    
+                    // 简单的双字匹配评分 (Bigram matching score)
+                    // 对于中文环境，这比单词匹配更鲁棒
+                    if (content.length > 1 && contextText.length > 1) {
+                        for (let i = 0; i < content.length - 1; i++) {
+                            const bigram = content.substr(i, 2);
+                            // 排除常见标点
+                            if (/[，。！？、：；\s]/.test(bigram)) continue;
+                            if (contextText.includes(bigram)) score++;
+                        }
+                    }
+                    return { mem, score };
+                });
+                
+                // 按相关性排序
+                scored.sort((a, b) => b.score - a.score);
+                
+                // 取出前 N 条相关记忆 (填补 limit 的剩余空间)
+                const relevantCount = Math.max(0, limit - recentCount);
+                // 只有分数大于0的才算相关
+                const validRelevant = scored.filter(s => s.score > 0).slice(0, relevantCount).map(s => s.mem);
+                relevantMemories.push(...validRelevant);
+            }
+        }
+        
+        // 合并并去重 (理论上 slice 保证了不重复)
+        let finalMemories = [...recentMemories, ...relevantMemories];
+        
+        // 再次按时间正序排列，方便 AI 理解时间线
+        finalMemories.sort((a, b) => a.time - b.time); 
+        
+        if (finalMemories.length > 0) {
+            memoryContext += '\n【重要记忆 (按时间顺序)】\n';
+            finalMemories.forEach(m => {
+                const date = new Date(m.time);
+                const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+                memoryContext += `- [${dateStr}] ${m.content}\n`;
             });
         }
     }
@@ -2623,6 +2685,7 @@ async function generateAiReply(instruction = null, targetContactId = null) {
 人设：${contact.persona || '无'}
 聊天风格：${contact.style || '正常'}
 ${userPromptInfo}
+${userPerceptionContext}
 ${momentContext}
 ${icityContext}
 ${memoryContext}
@@ -5169,7 +5232,7 @@ async function summarizeVoiceCall(contactId, startIndex) {
             let text = m.content;
             try {
                 const data = JSON.parse(m.content);
-                if (data.text) text = data.text;
+                if (typeof data.text === 'string') text = data.text;
             } catch(e) {}
             return `${m.role === 'user' ? '用户' : contact.name}: ${text}`;
         })
@@ -6253,6 +6316,14 @@ ${worldbookContext}
         if (dialogue.includes('ACTION: HANGUP_CALL')) {
             shouldHangup = true;
             dialogue = dialogue.replace('ACTION: HANGUP_CALL', '').trim();
+        }
+
+        // 防止空回复
+        if (!desc && !dialogue) {
+            console.log('AI generated empty response for video call, skipping message');
+            isProcessingResponse = false;
+            if (statusEl) statusEl.textContent = '通话中';
+            return;
         }
 
         // 显示描述部分

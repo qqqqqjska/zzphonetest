@@ -115,7 +115,7 @@ function renderCallHistoryList() {
             let content = firstMsg.content;
             try {
                 const data = JSON.parse(content);
-                if (data.text) content = data.text;
+                if (typeof data.text === 'string') content = data.text;
             } catch(e) {}
             
             // 清理视频通话标签
@@ -168,8 +168,8 @@ function openCallDetailScreen(session) {
         
         try {
             const data = JSON.parse(rawContent);
-            if (data.text) rawContent = data.text;
-            if (data.description) descContent = data.description;
+            if (typeof data.text === 'string') rawContent = data.text;
+            if (typeof data.description === 'string') descContent = data.description;
             if (data.audio) audioUrl = data.audio;
         } catch(e) {}
         

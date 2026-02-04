@@ -3197,6 +3197,57 @@
         </div>
     </div>
 
+    <!-- 购物全屏App -->
+    <div id="shopping-app" class="app-screen hidden" style="background-color: #f2f2f7;">
+        <div class="app-header" style="background: #fff; border-bottom: 1px solid #e5e5e5;">
+            <button class="back-btn" id="close-shopping-app"><i class="fas fa-chevron-left"></i> 返回</button>
+            <h3>购物中心</h3>
+            <button id="shopping-generate-btn" class="icon-btn" style="color: #333; font-size: 18px;"><i class="fas fa-search"></i></button>
+        </div>
+
+        <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto;">
+            <!-- Tab Content: Shopping -->
+            <div id="shopping-tab-home" class="shopping-tab-content" style="display: block;">
+                <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
+                    <i class="fas fa-shopping-bag" style="font-size: 48px; margin-bottom: 15px; color: #FF9500;"></i>
+                    <p>精选好物，等你来购</p>
+                </div>
+            </div>
+
+            <!-- Tab Content: Delivery -->
+            <div id="shopping-tab-delivery" class="shopping-tab-content" style="display: none;">
+                <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
+                    <i class="fas fa-utensils" style="font-size: 48px; margin-bottom: 15px; color: #FF9500;"></i>
+                    <p>美食外卖，准时送达</p>
+                </div>
+            </div>
+
+            <!-- Tab Content: Orders -->
+            <div id="shopping-tab-orders" class="shopping-tab-content" style="display: none;">
+                <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
+                    <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; color: #FF9500;"></i>
+                    <p>暂无订单记录</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Tab Bar -->
+        <div class="wechat-tab-bar">
+            <div class="wechat-tab-item active" data-tab="home">
+                <i class="fas fa-shopping-bag"></i>
+                <span>购物</span>
+            </div>
+            <div class="wechat-tab-item" data-tab="delivery">
+                <i class="fas fa-utensils"></i>
+                <span>外卖</span>
+            </div>
+            <div class="wechat-tab-item" data-tab="orders">
+                <i class="fas fa-clipboard-list"></i>
+                <span>订单</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 查手机 - 闲鱼 -->
     <div id="phone-xianyu" class="sub-screen hidden" style="z-index: 200; background-color: #f6f6f6;">
         <!-- 子页面：我卖出的 -->
@@ -3569,6 +3620,7 @@
     <script src="js/home.js"></script>
     <script src="js/check_phone.js"></script>
     <script src="js/chat.js"></script>
+    <script src="js/shopping.js"></script>
     <script src="js/games.js"></script>
     <script src="js/call_history.js"></script>
 
