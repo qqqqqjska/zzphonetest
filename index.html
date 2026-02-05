@@ -2541,6 +2541,23 @@
         </div>
     </div>
 
+    <!-- 购物支付方式选择弹窗 -->
+    <div id="shopping-payment-choice-modal" class="modal hidden" style="z-index: 220;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择购买方式</h3>
+                <button class="close-btn" id="close-payment-choice">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center; margin-bottom: 20px; font-size: 18px; font-weight: bold;">
+                    总计: <span id="payment-choice-total" style="color: #FF5000;">¥0.00</span>
+                </div>
+                <button id="payment-choice-self" class="ios-btn-block" style="margin-bottom: 10px;">给自己买</button>
+                <button id="payment-choice-gift" class="ios-btn-block secondary">送给朋友</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 查手机 - 微信 -->
     <div id="phone-wechat" class="sub-screen hidden" style="z-index: 200;">
         <div class="app-header" id="phone-wechat-header" style="background: transparent; border: none; position: absolute; top: 0; left: 0; width: 100%; z-index: 10; padding-left: 20px; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; height: auto; padding-top: max(47px, env(safe-area-inset-top)); justify-content: space-between;">
@@ -3269,6 +3286,12 @@
 
     <!-- 购物全屏App -->
     <div id="shopping-app" class="app-screen hidden" style="background-color: #f2f2f7; position: fixed; height: 100dvh; height: 100vh; top: 0; left: 0; width: 100%; z-index: 100;">
+        <!-- 加入购物车成功反馈弹窗 -->
+        <div id="shopping-success-toast" class="hidden" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: #fff; padding: 20px 30px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; z-index: 200; pointer-events: none;">
+            <i class="fas fa-check" style="font-size: 36px; margin-bottom: 10px;"></i>
+            <span style="font-size: 16px; font-weight: 500;">已加入购物车</span>
+        </div>
+
         <div class="app-header" style="background: #fff; border-bottom: 1px solid #e5e5e5;">
             <button class="back-btn" id="close-shopping-app"><i class="fas fa-chevron-left"></i> 返回</button>
             <h3>购物中心</h3>
@@ -3288,7 +3311,7 @@
             <button id="delete-shopping-items-btn" class="icon-btn" style="color: #FF3B30; font-size: 16px; font-weight: bold;">删除(0)</button>
         </div>
 
-        <div class="app-body" style="padding: 0; padding-bottom: calc(80px + env(safe-area-inset-bottom)); overflow-y: auto;">
+        <div class="app-body" style="padding: 0; padding-bottom: calc(80px + env(safe-area-inset-bottom)); overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior-y: contain;">
             <!-- Tab Content: Shopping -->
             <div id="shopping-tab-home" class="shopping-tab-content" style="display: block;">
                 <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
@@ -3306,6 +3329,13 @@
             </div>
 
             <!-- Tab Content: Orders -->
+            <div id="shopping-tab-cart" class="shopping-tab-content" style="display: none;">
+                <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
+                    <i class="fas fa-shopping-cart" style="font-size: 48px; margin-bottom: 15px; color: #FF9500;"></i>
+                    <p>购物车空空如也</p>
+                </div>
+            </div>
+
             <div id="shopping-tab-orders" class="shopping-tab-content" style="display: none;">
                 <div style="padding: 20px; text-align: center; color: #999; margin-top: 50px;">
                     <i class="fas fa-clipboard-list" style="font-size: 48px; margin-bottom: 15px; color: #FF9500;"></i>
@@ -3319,6 +3349,10 @@
             <div class="wechat-tab-item active" data-tab="home">
                 <i class="fas fa-shopping-bag"></i>
                 <span>购物</span>
+            </div>
+            <div class="wechat-tab-item" data-tab="cart">
+                <i class="fas fa-shopping-cart"></i>
+                <span>购物车</span>
             </div>
             <div class="wechat-tab-item" data-tab="delivery">
                 <i class="fas fa-utensils"></i>
@@ -3375,8 +3409,8 @@
                     <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666; gap: 2px;"><i class="far fa-star" style="font-size: 20px;"></i>收藏</div>
                 </div>
                 <div style="flex: 1.6; display: flex; margin-right: 15px; height: 44px;">
-                    <button style="flex: 1; background: linear-gradient(90deg, #FFCB00, #FF9402); color: #fff; border: none; border-top-left-radius: 22px; border-bottom-left-radius: 22px; font-size: 15px; font-weight: bold;">加入购物车</button>
-                    <button style="flex: 1; background: linear-gradient(90deg, #FF5E00, #FF2A00); color: #fff; border: none; border-top-right-radius: 22px; border-bottom-right-radius: 22px; font-size: 15px; font-weight: bold;">立即购买</button>
+                    <button id="detail-add-to-cart-btn" style="flex: 1; background: linear-gradient(90deg, #FFCB00, #FF9402); color: #fff; border: none; border-top-left-radius: 22px; border-bottom-left-radius: 22px; font-size: 15px; font-weight: bold;">加入购物车</button>
+                    <button id="detail-buy-now-btn" style="flex: 1; background: linear-gradient(90deg, #FF5E00, #FF2A00); color: #fff; border: none; border-top-right-radius: 22px; border-bottom-right-radius: 22px; font-size: 15px; font-weight: bold;">立即购买</button>
                 </div>
             </div>
         </div>

@@ -79,6 +79,9 @@ window.showChatNotification = function(contactId, content) {
     else if (content.startsWith('[表情包]') || content.startsWith('<img') && content.includes('sticker')) previewText = '[表情包]';
     else if (content.startsWith('[语音]')) previewText = '[语音]';
     else if (content.startsWith('[转账]')) previewText = '[转账]';
+    else if (content.includes('pay_request')) previewText = '[代付请求]';
+    else if (content.includes('shopping_gift')) previewText = '[礼物]';
+    else if (content.includes('delivery_share')) previewText = '[外卖]';
     
     // 如果内容包含HTML标签（如图片），尝试提取文本或显示类型
     if (previewText.includes('<') && previewText.includes('>')) {
@@ -302,7 +305,7 @@ function renderContactList(filterGroup = 'all') {
             const history = window.iphoneSimState.chatHistory[contact.id];
             if (history && history.length > 0) {
                 const lastMsg = history[history.length - 1];
-                if (lastMsg.type === 'text') {
+            if (lastMsg.type === 'text') {
                     lastMsgText = lastMsg.content;
                 } else if (lastMsg.type === 'image') {
                     lastMsgText = '[图片]';
@@ -314,6 +317,10 @@ function renderContactList(filterGroup = 'all') {
                     lastMsgText = '[语音]';
                 } else if (lastMsg.type === 'gift_card') {
                     lastMsgText = '[礼物]';
+                } else if (lastMsg.type === 'shopping_gift') {
+                    lastMsgText = '[礼物]';
+                } else if (lastMsg.type === 'pay_request') {
+                    lastMsgText = '[代付请求]';
                 } else if (lastMsg.type === 'voice_call_text') {
                     lastMsgText = '[通话]';
                 }
@@ -1801,6 +1808,102 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                 </div>
             </div>
         `;
+    } else if (type === 'shopping_gift') {
+        extraClass = 'shopping-gift-msg';
+        let giftData = {};
+        try {
+            giftData = typeof text === 'string' ? JSON.parse(text) : text;
+        } catch(e) {}
+        
+        const itemCount = giftData.items ? giftData.items.length : 0;
+        const firstItem = itemCount > 0 ? giftData.items[0] : { title: '礼物', image: '' };
+        const total = giftData.total || '0.00';
+        
+        contentHtml = `
+            <div class="shopping-gift-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
+                <div style="background: #333333; padding: 8px 12px; color: #fff; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fas fa-gift" style="margin-right: 6px;"></i>送你的礼物</span>
+                    <span style="font-size: 16px;">¥${total}</span>
+                </div>
+                <div style="padding: 5px 10px 2px 10px; display: flex; gap: 10px;">
+                    <div style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background-color: #f0f0f0;">
+                        <img src="${firstItem.image || ''}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件商品</div>` : ''}
+                    </div>
+                </div>
+                <div style="padding: 2px 12px; border-top: 1px solid #f5f5f5; text-align: right; line-height: 1;">
+                     <span style="font-size: 12px; color: #999;">已发送</span>
+                </div>
+            </div>
+        `;
+    } else if (type === 'delivery_share') {
+        extraClass = 'delivery-share-msg';
+        let deliveryData = {};
+        try {
+            deliveryData = typeof text === 'string' ? JSON.parse(text) : text;
+        } catch(e) {}
+        
+        const itemCount = deliveryData.items ? deliveryData.items.length : 0;
+        const firstItem = itemCount > 0 ? deliveryData.items[0] : { title: '美食', image: '' };
+        const total = deliveryData.total || '0.00';
+        
+        contentHtml = `
+            <div class="delivery-share-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
+                <div style="background: #333333; padding: 8px 12px; color: #fff; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fas fa-utensils" style="margin-right: 6px;"></i>请你吃外卖</span>
+                    <span style="font-size: 16px;">¥${total}</span>
+                </div>
+                <div style="padding: 5px 10px 2px 10px; display: flex; gap: 10px;">
+                    <div style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background-color: #f0f0f0;">
+                        <img src="${firstItem.image || ''}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件美食</div>` : ''}
+                    </div>
+                </div>
+                <div style="padding: 2px 12px; border-top: 1px solid #f5f5f5; text-align: right; line-height: 1;">
+                     <span style="font-size: 12px; color: #999;">正在配送中</span>
+                </div>
+            </div>
+        `;
+    } else if (type === 'pay_request') {
+        extraClass = 'pay-request-msg';
+        let payData = {};
+        try {
+            payData = typeof text === 'string' ? JSON.parse(text) : text;
+        } catch(e) {}
+        
+        const itemCount = payData.items ? payData.items.length : 0;
+        const firstItem = itemCount > 0 ? payData.items[0] : { title: '商品', image: '' };
+        const total = payData.total || '0.00';
+        const isPaid = payData.status === 'paid';
+        
+        contentHtml = `
+            <div class="pay-request-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
+                <div style="background: #333333; padding: 8px 12px; color: #fff; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fas fa-hand-holding-usd" style="margin-right: 6px;"></i>代付请求</span>
+                    <span style="font-size: 16px;">¥${total}</span>
+                </div>
+                <div style="padding: 5px 10px 2px 10px; display: flex; gap: 10px;">
+                    <div style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background-color: #f0f0f0;">
+                        <img src="${firstItem.image || ''}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件商品</div>` : ''}
+                    </div>
+                </div>
+                <div style="padding: 2px 12px; border-top: 1px solid #f5f5f5; text-align: right; line-height: 1;">
+                     ${isPaid ? 
+                       '<span style="font-size: 12px; color: #999; border: 1px solid #ddd; padding: 2px 8px; border-radius: 10px; background: #f5f5f5;">已付款</span>' : 
+                       '<span style="font-size: 12px; color: #FF5000; border: 1px solid #FF5000; padding: 2px 8px; border-radius: 10px;">去支付</span>'}
+                </div>
+            </div>
+        `;
     } else if (type === 'product_share') {
         extraClass = 'product-share-msg';
         let productData = {};
@@ -2253,6 +2356,7 @@ function handleQuote(msgData) {
     if (msgData.type === 'image') previewText = '[图片]';
     else if (msgData.type === 'sticker') previewText = '[表情包]';
     else if (msgData.type === 'transfer') previewText = '[转账]';
+    else if (msgData.type === 'pay_request') previewText = '[代付请求]';
     
     document.getElementById('reply-text').textContent = previewText;
     replyBar.classList.remove('hidden');
@@ -2784,6 +2888,7 @@ ${itineraryContext}
 - 转账 -> command: "TRANSFER", payload: "金额 备注" (例如 "88.88 节日快乐")
 - 接收转账 -> command: "ACCEPT_TRANSFER", payload: "ID"
 - 退回转账 -> command: "RETURN_TRANSFER", payload: "ID"
+- 支付代付请求 -> command: "PAY_FOR_REQUEST", payload: "requestId" (当用户发送了代付请求时，你可以选择帮他支付。requestId在代付消息的JSON中)
 - 引用回复 -> command: "QUOTE_MESSAGE", payload: "消息内容摘要"
 - 更改资料 -> 
   - command: "UPDATE_NAME", payload: "新网名"
@@ -3045,6 +3150,13 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
                     giftData = { title: '礼物', price: '0' };
                 }
                 return { role: h.role, content: `[送出礼物：${giftData.title}，价值：${giftData.price}元] (这是我在闲鱼上看到你收藏的商品，特意买来送给你的)` };
+            } else if (h.type === 'shopping_gift') {
+                let giftData = {};
+                try {
+                    giftData = typeof content === 'string' ? JSON.parse(content) : content;
+                } catch(e) {}
+                const items = giftData.items ? giftData.items.map(i => i.title).join(', ') : '礼物';
+                return { role: h.role, content: `[送出礼物：${items}，总价值：${giftData.total}元] (这是我在购物APP购买并送给你的)` };
             } else if (h.type === 'icity_card') {
                 let cardData = {};
                 try {
@@ -3228,6 +3340,7 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
         const transferRegex = /ACTION:\s*TRANSFER:\s*(\d+(?:\.\d{1,2})?)\s*(.*?)(?:\n|$)/;
         const acceptTransferRegex = /ACTION:\s*ACCEPT_TRANSFER:\s*(\d+)(?:\n|$)/;
         const returnTransferRegex = /ACTION:\s*RETURN_TRANSFER:\s*(\d+)(?:\n|$)/;
+        const payForRequestRegex = /ACTION:\s*PAY_FOR_REQUEST:\s*(.*?)(?:\n|$)/;
         const updateNameRegex = /ACTION:\s*UPDATE_NAME:\s*(.*?)(?:\n|$)/;
         const updateWxidRegex = /ACTION:\s*UPDATE_WXID:\s*(.*?)(?:\n|$)/;
         const updateSignatureRegex = /ACTION:\s*UPDATE_SIGNATURE:\s*(.*?)(?:\n|$)/;
@@ -3575,6 +3688,43 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
                     }, 1000);
                 }
                 processedSegment = processedSegment.replace(returnTransferMatch[0], '');
+            }
+
+            let payForRequestMatch;
+            while ((payForRequestMatch = processedSegment.match(payForRequestRegex)) !== null) {
+                const requestId = payForRequestMatch[1].trim();
+                if (requestId) {
+                    const history = window.iphoneSimState.chatHistory[contact.id] || [];
+                    let targetMsg = null;
+                    for (let j = history.length - 1; j >= 0; j--) {
+                        const msg = history[j];
+                        if (msg.type === 'pay_request') {
+                            let data = null;
+                            try { data = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content; } catch(e){}
+                            if (data && data.id === requestId) {
+                                targetMsg = msg;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetMsg) {
+                        setTimeout(() => {
+                            let data = typeof targetMsg.content === 'string' ? JSON.parse(targetMsg.content) : targetMsg.content;
+                            if (data.status !== 'paid') {
+                                data.status = 'paid';
+                                targetMsg.content = JSON.stringify(data);
+                                if (window.handlePayForRequest) {
+                                    window.handlePayForRequest(requestId, contact.name, data);
+                                }
+                                saveConfig();
+                                renderChatHistory(contact.id, true);
+                                sendMessage('[系统消息]: 对方已帮你付款', false, 'text');
+                            }
+                        }, 1500);
+                    }
+                }
+                processedSegment = processedSegment.replace(payForRequestMatch[0], '');
             }
         }
 
