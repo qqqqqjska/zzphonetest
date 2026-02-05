@@ -113,7 +113,8 @@ const state = {
     replyingToMsg: null, // 当前正在引用的消息 { content, name, type }
     isMultiSelectMode: false,
     selectedMessages: new Set(), // 存储选中的消息ID
-    enableSystemNotifications: false // 系统后台通知开关
+    enableSystemNotifications: false, // 系统后台通知开关
+    shoppingProducts: [] // 购物商品列表
 };
 
 // 暴露 state 给全局
@@ -799,6 +800,9 @@ async function init() {
     } catch (e) {
         console.error('加载配置失败:', e);
     }
+
+    // 初始化购物UI
+    if (window.initShoppingUI) window.initShoppingUI();
 
     // 更新 icity 资料卡
     if (window.renderIcityProfile) window.renderIcityProfile();

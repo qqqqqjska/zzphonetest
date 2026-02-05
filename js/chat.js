@@ -1801,6 +1801,33 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                 </div>
             </div>
         `;
+    } else if (type === 'product_share') {
+        extraClass = 'product-share-msg';
+        let productData = {};
+        try {
+            productData = typeof text === 'string' ? JSON.parse(text) : text;
+        } catch(e) {}
+        
+        contentHtml = `
+            <div class="product-share-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; height: 115px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
+                <div style="display: flex; padding: 10px; gap: 8px; flex: 1; overflow: hidden;">
+                    <div style="width: 60px; height: 60px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background-color: #f0f0f0;">
+                        <img src="${productData.image || ''}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">
+                        <div style="font-size: 13px; color: #333; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">${productData.title || '商品'}</div>
+                        <div style="font-size: 14px; color: #FF5000; font-weight: bold;">¥${productData.price || '0.00'}</div>
+                    </div>
+                </div>
+                <div style="padding: 0 10px 0 10px; height: 26px; font-size: 10px; color: #999; border-top: 1px solid #f5f5f5; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center;">
+                        <i class="fas fa-shopping-bag" style="color: #FF5000; margin-right: 4px;"></i>
+                        <span>${productData.shop_name || '闲鱼'}</span>
+                    </div>
+                    <i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+                </div>
+            </div>
+        `;
     } else if (type === 'icity_card') {
         extraClass = 'icity-card-msg';
         let cardData = typeof text === 'string' ? JSON.parse(text) : text;

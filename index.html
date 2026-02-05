@@ -2486,6 +2486,61 @@
         </div>
     </div>
 
+    <!-- 购物选项弹窗 -->
+    <div id="shopping-options-modal" class="modal hidden" style="z-index: 200; align-items: flex-end;">
+        <div class="modal-content" style="height: auto; border-radius: 12px 12px 0 0; width: 100%; max-width: 100%; background-color: transparent;">
+            <div class="ios-list-group" style="margin: 0 10px; border-radius: 12px; overflow: hidden;">
+                <div class="list-item center-content" id="shopping-opt-generate" style="background: white; border-bottom: 1px solid #eee; height: 56px;">
+                    <span style="font-size: 18px; color: #007AFF;">生成商品</span>
+                </div>
+                <div class="list-item center-content" id="shopping-opt-add" style="background: white; border-bottom: 1px solid #eee; height: 56px;">
+                    <span style="font-size: 18px; color: #007AFF;">新增商品</span>
+                </div>
+                <div class="list-item center-content" id="shopping-opt-manage" style="background: white; height: 56px;">
+                    <span style="font-size: 18px; color: #007AFF;">管理商品</span>
+                </div>
+            </div>
+            <div class="ios-list-group" style="margin: 10px 10px 20px 10px; border-radius: 12px; overflow: hidden;">
+                <div class="list-item center-content" id="shopping-opt-cancel" style="background: white; height: 56px;">
+                    <span style="font-size: 18px; font-weight: bold; color: #007AFF;">取消</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 购物新增商品弹窗 -->
+    <div id="shopping-add-product-modal" class="modal hidden" style="z-index: 210;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>新增商品</h3>
+                <button class="close-btn" id="close-shopping-add-product">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label>商品标题</label>
+                    <input type="text" id="shopping-add-title" placeholder="输入商品标题">
+                </div>
+                <div class="setting-group">
+                    <label>价格</label>
+                    <input type="number" id="shopping-add-price" placeholder="例如: 99.9">
+                </div>
+                <div class="setting-group">
+                    <label>店铺名称</label>
+                    <input type="text" id="shopping-add-shop" placeholder="输入店铺名称">
+                </div>
+                <div class="setting-group">
+                    <label>付款人数</label>
+                    <input type="text" id="shopping-add-paid" placeholder="例如: 100+">
+                </div>
+                <div class="setting-group">
+                    <label>图片描述 (用于生成图片)</label>
+                    <input type="text" id="shopping-add-desc" placeholder="例如: 红色连衣裙">
+                </div>
+                <button id="save-shopping-product-btn" class="ios-btn-block">保存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 查手机 - 微信 -->
     <div id="phone-wechat" class="sub-screen hidden" style="z-index: 200;">
         <div class="app-header" id="phone-wechat-header" style="background: transparent; border: none; position: absolute; top: 0; left: 0; width: 100%; z-index: 10; padding-left: 20px; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; height: auto; padding-top: max(47px, env(safe-area-inset-top)); justify-content: space-between;">
@@ -2523,7 +2578,7 @@
         </div>
 
         <!-- 底部 Tab 栏 -->
-        <div class="wechat-tab-bar" style="width: 100%; left: 0; bottom: 0; right: 0; border-radius: 0; padding-bottom: env(safe-area-inset-bottom); margin-bottom: 0;">
+        <div class="wechat-tab-bar" style="width: 100%; left: 0; bottom: 0; right: 0; border-radius: 0; padding-bottom: calc(15px + env(safe-area-inset-bottom)); padding-top: 15px; margin-bottom: 0; height: auto;">
             <div class="wechat-tab-item" onclick="switchPhoneWechatTab('contacts')">
                 <i class="fas fa-address-book"></i>
                 <span>通讯录</span>
@@ -3217,7 +3272,20 @@
         <div class="app-header" style="background: #fff; border-bottom: 1px solid #e5e5e5;">
             <button class="back-btn" id="close-shopping-app"><i class="fas fa-chevron-left"></i> 返回</button>
             <h3>购物中心</h3>
-            <button id="shopping-generate-btn" class="icon-btn" style="color: #333; font-size: 18px;"><i class="fas fa-search"></i></button>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button id="shopping-link-contact-btn" class="icon-btn" style="color: #333; font-size: 18px;"><i class="fas fa-link"></i></button>
+                <button id="shopping-menu-btn" class="icon-btn" style="color: #333; font-size: 18px;"><i class="fas fa-search"></i></button>
+            </div>
+        </div>
+
+        <!-- 购物管理模式顶部栏 (默认隐藏) -->
+        <div id="shopping-manage-header" class="app-header hidden" style="background: #fff; border-bottom: 1px solid #e5e5e5; position: absolute; top: 0; left: 0; width: 100%; z-index: 101;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="back-btn" id="exit-shopping-manage-btn" style="color: #333;">取消</button>
+                <button id="shopping-select-all-btn" style="border: none; background: none; font-size: 16px; color: #007AFF;">全选</button>
+            </div>
+            <h3>管理商品</h3>
+            <button id="delete-shopping-items-btn" class="icon-btn" style="color: #FF3B30; font-size: 16px; font-weight: bold;">删除(0)</button>
         </div>
 
         <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto;">
@@ -3259,6 +3327,57 @@
             <div class="wechat-tab-item" data-tab="orders">
                 <i class="fas fa-clipboard-list"></i>
                 <span>订单</span>
+            </div>
+        </div>
+
+        <!-- 商品详情页 -->
+        <div id="shopping-detail-screen" class="sub-screen hidden" style="z-index: 150; background-color: #f5f5f5;">
+            <!-- Header -->
+            <div class="app-header" style="background: transparent; position: absolute; width: 100%; z-index: 10; border: none; pointer-events: none;">
+                <button class="back-btn" id="close-shopping-detail" style="background: rgba(0,0,0,0.4); color: #fff; border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; margin-left: 10px;"><i class="fas fa-chevron-left" style="margin-right: 2px;"></i></button>
+                <div style="flex: 1;"></div>
+                <button id="shopping-share-btn" class="icon-btn" style="background: rgba(0,0,0,0.4); color: #fff; border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; margin-right: 10px;"><i class="fas fa-share"></i></button>
+            </div>
+            
+            <!-- Body -->
+            <div class="app-body" style="padding: 0; padding-bottom: 60px; overflow-y: auto;">
+                <img id="shopping-detail-img" src="" style="width: 100%; display: block;">
+                <div style="padding: 15px; background: #fff; margin-bottom: 10px;">
+                    <div style="color: #FF5000; font-size: 24px; font-weight: bold;">¥<span id="shopping-detail-price"></span></div>
+                    <div id="shopping-detail-title" style="font-size: 16px; font-weight: bold; margin: 10px 0; line-height: 1.4;"></div>
+                    <div style="display: flex; justify-content: space-between; color: #999; font-size: 12px;">
+                        <span>快递: 免运费</span>
+                        <span id="shopping-detail-paid"></span>
+                        <span>广东杭州</span>
+                    </div>
+                </div>
+                
+                <div style="padding: 15px; background: #fff; margin-bottom: 10px; display: flex; align-items: center;">
+                    <div style="width: 40px; height: 40px; background: #eee; border-radius: 4px; margin-right: 10px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-store"></i></div>
+                    <div style="flex: 1;">
+                        <div id="shopping-detail-shop" style="font-weight: bold;"></div>
+                        <div style="font-size: 12px; color: #999;">天猫五年老店</div>
+                    </div>
+                    <button style="border: 1px solid #FF5000; color: #FF5000; background: #fff; padding: 4px 12px; border-radius: 12px; font-size: 12px;">进店</button>
+                </div>
+                
+                <div style="padding: 15px; background: #fff; min-height: 300px;">
+                    <div style="text-align: center; color: #ccc; margin-top: 20px;">—— 宝贝详情 ——</div>
+                    <div id="shopping-detail-desc" style="margin-top: 20px; font-size: 14px; line-height: 1.6; color: #333;"></div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="position: absolute; bottom: 0; width: 100%; background: #fff; display: flex; align-items: center; height: 80px; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid #eee;">
+                <div style="flex: 1; display: flex; justify-content: space-around;">
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666; gap: 2px;"><i class="fas fa-store" style="font-size: 20px;"></i>店铺</div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666; gap: 2px;"><i class="fas fa-comment-dots" style="font-size: 20px;"></i>客服</div>
+                    <div style="display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #666; gap: 2px;"><i class="far fa-star" style="font-size: 20px;"></i>收藏</div>
+                </div>
+                <div style="flex: 1.6; display: flex; margin-right: 15px; height: 44px;">
+                    <button style="flex: 1; background: linear-gradient(90deg, #FFCB00, #FF9402); color: #fff; border: none; border-top-left-radius: 22px; border-bottom-left-radius: 22px; font-size: 15px; font-weight: bold;">加入购物车</button>
+                    <button style="flex: 1; background: linear-gradient(90deg, #FF5E00, #FF2A00); color: #fff; border: none; border-top-right-radius: 22px; border-bottom-right-radius: 22px; font-size: 15px; font-weight: bold;">立即购买</button>
+                </div>
             </div>
         </div>
     </div>

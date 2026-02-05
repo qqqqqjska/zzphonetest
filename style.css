@@ -3406,6 +3406,21 @@ input:checked + .slider:before {
     max-width: 100% !important;
 }
 
+/* Product Share Message Style */
+.message-content.product-share-msg {
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+}
+
+/* 修复用户发送的产品分享卡片样式 */
+.chat-message.user .message-content.product-share-msg {
+    background-color: transparent !important;
+    color: #000 !important;
+}
+
 .message-content.sticker-msg img {
     max-width: 150px; /* 适当调整表情包大小 */
     border-radius: 0; /* 表情包本身可能不需要圆角，或者保持原样 */
