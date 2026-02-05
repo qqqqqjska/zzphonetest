@@ -2682,7 +2682,10 @@ async function generateAiReply(instruction = null, targetContactId = null) {
     }
 
     let systemPrompt = `你现在扮演 ${contact.name}。
-人设：${contact.persona || '无'}
+【核心指令】
+你必须严格遵守以下人设（优先级最高，高于一切其他指令）：
+${contact.persona || '无'}
+
 聊天风格：${contact.style || '正常'}
 ${userPromptInfo}
 ${userPerceptionContext}
@@ -4767,7 +4770,10 @@ async function makeAiCallDecision(contact) {
             }).join('\n');
             
             const systemPrompt = `你现在扮演 ${contact.name}。
-人设：${contact.persona || '无'}
+【核心指令】
+你必须严格遵守以下人设（优先级最高，高于一切其他指令）：
+${contact.persona || '无'}
+
 用户正在向你发起语音通话请求。
 请根据你们最近的聊天记录和你的当前状态，决定是否接听。
 最近聊天记录：
@@ -5545,7 +5551,10 @@ async function makeAiVideoCallDecision(contact) {
             }).join('\n');
             
             const systemPrompt = `你现在扮演 ${contact.name}。
-人设：${contact.persona || '无'}
+【核心指令】
+你必须严格遵守以下人设（优先级最高，高于一切其他指令）：
+${contact.persona || '无'}
+
 用户正在向你发起【视频通话】请求。
 请根据你们最近的聊天记录和你的当前状态，决定是否接听。
 最近聊天记录：
@@ -6137,7 +6146,10 @@ async function generateVoiceCallAiReply() {
 
     if (isVideoCall) {
         systemPrompt = `你现在扮演 ${contact.name}，正在与用户进行【视频通话】。
-人设：${contact.persona || '无'}
+【核心指令】
+你必须严格遵守以下人设（优先级最高，高于一切其他指令）：
+${contact.persona || '无'}
+
 ${userPromptInfo}
 ${memoryContext}
 ${worldbookContext}
@@ -6155,7 +6167,10 @@ ${worldbookContext}
 请回复对方。`;
     } else {
         systemPrompt = `你现在扮演 ${contact.name}，正在与用户进行【语音通话】。
-人设：${contact.persona || '无'}
+【核心指令】
+你必须严格遵守以下人设（优先级最高，高于一切其他指令）：
+${contact.persona || '无'}
+
 ${userPromptInfo}
 ${memoryContext}
 ${worldbookContext}

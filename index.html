@@ -1726,6 +1726,21 @@
                             </div>
                         </div>
 
+                        <!-- 壁纸设置 -->
+                        <div class="section-title" style="margin-left: 0;">壁纸设置</div>
+                        <div class="ios-list-group">
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <label>上传详情页壁纸</label>
+                                    <input type="file" id="meeting-wallpaper-upload" accept="image/*" class="file-input-hidden">
+                                    <label for="meeting-wallpaper-upload" class="ios-btn">选择图片</label>
+                                </div>
+                            </div>
+                            <div class="list-item center-content" id="reset-meeting-wallpaper-btn">
+                                <span class="danger-text">重置默认壁纸</span>
+                            </div>
+                        </div>
+
                         <!-- 图标设置 -->
                         <div class="section-title" style="margin-left: 0;">图标设置</div>
                         <div class="ios-list-group">
@@ -3198,7 +3213,7 @@
     </div>
 
     <!-- 购物全屏App -->
-    <div id="shopping-app" class="app-screen hidden" style="background-color: #f2f2f7;">
+    <div id="shopping-app" class="app-screen hidden" style="background-color: #f2f2f7; position: fixed; height: 100dvh; height: 100vh; top: 0; left: 0; width: 100%; z-index: 100;">
         <div class="app-header" style="background: #fff; border-bottom: 1px solid #e5e5e5;">
             <button class="back-btn" id="close-shopping-app"><i class="fas fa-chevron-left"></i> 返回</button>
             <h3>购物中心</h3>

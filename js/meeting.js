@@ -127,6 +127,19 @@ function openMeetingDetail(meetingId) {
     
     if (!meeting) return;
 
+    // 检查是否已设置同步选项 (仅针对未完成或新进入的)
+    if (meeting.syncWithChat === undefined) {
+        // 使用 setTimeout 避免阻塞 UI 渲染
+        setTimeout(() => {
+            if (confirm('是否将此次见面剧情与线上聊天互通？\n\n选择“确定”：\n1. 见面结束时会自动将剧情摘要同步给AI。\n2. 回到聊天时，AI会记得刚才发生的事并自然接话。\n\n选择“取消”：\n此次见面将是独立的平行宇宙，不影响线上聊天。')) {
+                meeting.syncWithChat = true;
+            } else {
+                meeting.syncWithChat = false;
+            }
+            saveConfig();
+        }, 100);
+    }
+
     document.getElementById('meeting-detail-title').textContent = meeting.title;
 
     // 更新静态图标
@@ -138,6 +151,21 @@ function openMeetingDetail(meetingId) {
     
     const continueIcon = document.getElementById('meeting-continue-icon');
     if (continueIcon) continueIcon.src = continueIconUrl;
+
+    // 应用自定义壁纸
+    const contactId = window.iphoneSimState.currentChatContactId;
+    const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+    const detailScreen = document.getElementById('meeting-detail-screen');
+    
+    if (contact && contact.meetingWallpaper) {
+        detailScreen.style.backgroundImage = `url(${contact.meetingWallpaper})`;
+        detailScreen.style.backgroundSize = 'cover';
+        detailScreen.style.backgroundPosition = 'center';
+    } else {
+        detailScreen.style.backgroundImage = '';
+        detailScreen.style.backgroundSize = '';
+        detailScreen.style.backgroundPosition = '';
+    }
 
     document.getElementById('meeting-detail-screen').classList.remove('hidden');
     
@@ -260,16 +288,22 @@ function endMeeting() {
     window.iphoneSimState.currentMeetingId = null;
     renderMeetingsList(contactId); // 刷新列表
 
-    // 询问是否总结见面剧情
+    // 如果开启了同步，自动总结并注入聊天
     if (meeting && meeting.content && meeting.content.length > 0) {
-        if (confirm('是否要对本次见面剧情进行总结生成回忆？')) {
-            showNotification('正在总结见面剧情...');
-            generateMeetingSummary(contactId, meeting);
+        if (meeting.syncWithChat) {
+            showNotification('正在同步见面剧情...');
+            generateMeetingSummary(contactId, meeting, true); // true = inject into chat
+        } else {
+            // 原有逻辑：手动询问是否生成回忆
+            if (confirm('是否要对本次见面剧情进行总结生成回忆？')) {
+                showNotification('正在总结见面剧情...');
+                generateMeetingSummary(contactId, meeting, false);
+            }
         }
     }
 }
 
-async function generateMeetingSummary(contactId, meeting) {
+async function generateMeetingSummary(contactId, meeting, injectIntoChat = false) {
     const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
     if (!contact) {
         showNotification('联系人不存在', 2000, 'error');
@@ -300,6 +334,8 @@ async function generateMeetingSummary(contactId, meeting) {
 不要包含“剧情显示”、“用户说”等前缀，直接陈述事实。
 请将摘要控制在 100 字以内。`;
 
+    let summary = '';
+
     try {
         let fetchUrl = settings.url;
         if (!fetchUrl.endsWith('/chat/completions')) {
@@ -327,28 +363,67 @@ async function generateMeetingSummary(contactId, meeting) {
         }
 
         const data = await response.json();
-        let summary = data.choices[0].message.content.trim();
-        
-        if (summary) {
-            // 添加到记忆
-            window.iphoneSimState.memories.push({
-                id: Date.now(),
-                contactId: contact.id,
-                content: `【见面回忆】(${meeting.title}) ${summary}`,
-                time: Date.now(),
-                range: '见面剧情'
-            });
-            saveConfig();
-            
-            console.log('见面剧情总结完成:', summary);
-            showNotification('见面总结完成', 2000, 'success');
-        } else {
-            showNotification('未生成有效总结', 2000);
-        }
+        summary = data.choices[0].message.content.trim();
 
     } catch (error) {
-        console.error('见面总结失败:', error);
-        showNotification('总结出错', 2000, 'error');
+        console.error('见面总结API请求失败:', error);
+        
+        // 失败回退逻辑：如果需要同步，则使用原始内容作为"总结"
+        if (injectIntoChat) {
+            summary = `(由于网络原因，AI未能生成总结，以下是见面原始内容)\n${storyText}`;
+            // 截断过长内容以防 Token 溢出，保留前 1000 字和后 500 字
+            if (summary.length > 1500) {
+                summary = summary.substring(0, 1000) + '\n...[中间内容省略]...\n' + summary.substring(summary.length - 500);
+            }
+            showNotification('AI总结失败，使用原始内容同步', 2000, 'warning');
+        } else {
+            showNotification('总结出错: ' + error.message, 2000, 'error');
+            return;
+        }
+    }
+
+    if (summary) {
+        // 1. 添加到记忆
+        window.iphoneSimState.memories.push({
+            id: Date.now(),
+            contactId: contact.id,
+            content: `【见面回忆】(${meeting.title}) ${summary}`,
+            time: Date.now(),
+            range: '见面剧情'
+        });
+
+        // 2. 如果需要同步到聊天 (Inject into chat history)
+        if (injectIntoChat) {
+            if (!window.iphoneSimState.chatHistory[contactId]) {
+                window.iphoneSimState.chatHistory[contactId] = [];
+            }
+            
+            const systemMsg = {
+                id: Date.now() + Math.random().toString(36).substr(2, 9),
+                time: Date.now(),
+                role: 'system',
+                content: `[系统事件]: 用户刚刚结束了与你的线下见面（${meeting.title}）。\n见面剧情摘要：${summary}。\n请注意：你们刚刚分开，回到了线上聊天状态。请根据见面的情况，自然地继续话题，或者对见面进行回味/吐槽/关心。`,
+                type: 'system_event' // 特殊类型，不直接显示给用户，但包含在上下文
+            };
+            
+            window.iphoneSimState.chatHistory[contactId].push(systemMsg);
+            
+            // 触发 AI 主动回复（模拟刚分开后的消息）
+            setTimeout(() => {
+                if (window.generateAiReply) {
+                    window.generateAiReply(`（系统提示：见面结束了，用户现在回到了线上。请根据刚才的见面摘要"${summary}"，主动给用户发一条消息，自然地过渡到线上聊天。）`, contactId);
+                }
+            }, 2000);
+        }
+
+        saveConfig();
+        
+        console.log('见面剧情同步完成:', summary.substring(0, 20) + '...');
+        if (!document.querySelector('.notification-banner:not(.hidden)')) {
+             showNotification(injectIntoChat ? '已同步见面剧情' : '见面总结完成', 2000, 'success');
+        }
+    } else {
+        showNotification('未生成有效内容', 2000);
     }
 }
 
@@ -573,11 +648,91 @@ function setupMeetingListeners() {
     const closeMeetingStyleBtn = document.getElementById('close-meeting-style');
     const saveMeetingStyleBtn = document.getElementById('save-meeting-style-btn');
 
+    // 预设相关元素
+    const saveMeetingStylePresetBtn = document.getElementById('save-meeting-style-preset');
+    const deleteMeetingStylePresetBtn = document.getElementById('delete-meeting-style-preset');
+    const meetingStylePresetSelect = document.getElementById('meeting-style-preset-select');
+
     if (closeMeetingsScreenBtn) closeMeetingsScreenBtn.addEventListener('click', () => {
         document.getElementById('meetings-screen').classList.add('hidden');
     });
 
     if (newMeetingBtn) newMeetingBtn.addEventListener('click', createNewMeeting);
+
+    // 加载文风预设
+    function loadMeetingStylePresets() {
+        if (!meetingStylePresetSelect) return;
+        meetingStylePresetSelect.innerHTML = '<option value="">-- 选择预设 --</option>';
+        
+        if (!window.iphoneSimState.meetingStylePresets) window.iphoneSimState.meetingStylePresets = [];
+        
+        window.iphoneSimState.meetingStylePresets.forEach((preset, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = preset.name;
+            meetingStylePresetSelect.appendChild(option);
+        });
+    }
+
+    // 保存文风预设
+    if (saveMeetingStylePresetBtn) {
+        saveMeetingStylePresetBtn.addEventListener('click', () => {
+            const style = document.getElementById('meeting-style-input').value.trim();
+            const minWords = document.getElementById('meeting-min-words').value;
+            const maxWords = document.getElementById('meeting-max-words').value;
+            
+            if (!style) {
+                alert('请先输入描写风格内容');
+                return;
+            }
+
+            const name = prompt('请输入预设名称：');
+            if (name) {
+                if (!window.iphoneSimState.meetingStylePresets) window.iphoneSimState.meetingStylePresets = [];
+                window.iphoneSimState.meetingStylePresets.push({
+                    name: name,
+                    style: style,
+                    minWords: minWords,
+                    maxWords: maxWords
+                });
+                saveConfig();
+                loadMeetingStylePresets();
+                alert('预设保存成功');
+            }
+        });
+    }
+
+    // 删除文风预设
+    if (deleteMeetingStylePresetBtn) {
+        deleteMeetingStylePresetBtn.addEventListener('click', () => {
+            const index = meetingStylePresetSelect.value;
+            if (index === '') {
+                alert('请先选择一个预设');
+                return;
+            }
+            
+            if (confirm('确定删除该预设吗？')) {
+                window.iphoneSimState.meetingStylePresets.splice(index, 1);
+                saveConfig();
+                loadMeetingStylePresets();
+            }
+        });
+    }
+
+    // 应用文风预设
+    if (meetingStylePresetSelect) {
+        meetingStylePresetSelect.addEventListener('change', (e) => {
+            const index = e.target.value;
+            if (index !== '') {
+                const preset = window.iphoneSimState.meetingStylePresets[index];
+                if (preset) {
+                    document.getElementById('meeting-style-input').value = preset.style || '';
+                    document.getElementById('meeting-min-words').value = preset.minWords || '';
+                    document.getElementById('meeting-max-words').value = preset.maxWords || '';
+                }
+            }
+        });
+    }
 
     if (meetingStyleBtn) meetingStyleBtn.addEventListener('click', () => {
         const contact = window.iphoneSimState.contacts.find(c => c.id === window.iphoneSimState.currentChatContactId);
@@ -586,6 +741,7 @@ function setupMeetingListeners() {
             document.getElementById('meeting-min-words').value = contact.meetingMinWords || '';
             document.getElementById('meeting-max-words').value = contact.meetingMaxWords || '';
         }
+        loadMeetingStylePresets(); // 加载预设列表
         meetingStyleModal.classList.remove('hidden');
     });
 
@@ -714,6 +870,60 @@ function setupMeetingListeners() {
     }
 
     // 图标上传监听
+    // 壁纸上传监听
+    const wallpaperInput = document.getElementById('meeting-wallpaper-upload');
+    const resetWallpaperBtn = document.getElementById('reset-meeting-wallpaper-btn');
+
+    if (wallpaperInput) {
+        wallpaperInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const result = e.target.result;
+                const contactId = window.iphoneSimState.currentChatContactId;
+                const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+                
+                if (contact) {
+                    contact.meetingWallpaper = result;
+                    saveConfig();
+                    
+                    // 实时预览 (如果当前在详情页)
+                    const detailScreen = document.getElementById('meeting-detail-screen');
+                    if (!detailScreen.classList.contains('hidden')) {
+                        detailScreen.style.backgroundImage = `url(${result})`;
+                        detailScreen.style.backgroundSize = 'cover';
+                        detailScreen.style.backgroundPosition = 'center';
+                    }
+                    alert('壁纸设置成功');
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (resetWallpaperBtn) {
+        resetWallpaperBtn.addEventListener('click', () => {
+            if (confirm('确定要重置为默认背景吗？')) {
+                const contactId = window.iphoneSimState.currentChatContactId;
+                const contact = window.iphoneSimState.contacts.find(c => c.id === contactId);
+                if (contact) {
+                    delete contact.meetingWallpaper;
+                    saveConfig();
+                    
+                    const detailScreen = document.getElementById('meeting-detail-screen');
+                    if (!detailScreen.classList.contains('hidden')) {
+                        detailScreen.style.backgroundImage = '';
+                        detailScreen.style.backgroundSize = '';
+                        detailScreen.style.backgroundPosition = '';
+                    }
+                    alert('壁纸已重置');
+                }
+            }
+        });
+    }
+
     const iconUploads = [
         { id: 'meeting-edit-icon-upload', key: 'edit', previewId: 'meeting-edit-icon-preview' },
         { id: 'meeting-delete-icon-upload', key: 'delete', previewId: 'meeting-delete-icon-preview' },
