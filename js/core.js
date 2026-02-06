@@ -620,20 +620,36 @@ async function loadConfig() {
 
 // 更新音频会话配置
 window.updateAudioSession = function() {
-    if (window.iphoneSimState.enableBackgroundAudio) {
-        // 尝试设置音频会话类型为 'ambient' 以允许混音
-        if (navigator.audioSession) {
-            navigator.audioSession.type = 'ambient';
+    try {
+        if (window.iphoneSimState.enableBackgroundAudio) {
+            // 使用 'play-and-record' 类型并设置 'mix' 选项，这通常允许与后台音频共存
+            // 注意：这需要 HTTPS 环境才能完全生效
+            if (navigator.audioSession) {
+                navigator.audioSession.type = 'play-and-record';
+            }
+            
+            // 尝试使用 Media Session API 保持活跃
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+                // 设置元数据有助于某些系统保持后台活跃
+                if (!navigator.mediaSession.metadata && window.iphoneSimState.music) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: window.iphoneSimState.music.title || 'Background Audio',
+                        artist: window.iphoneSimState.music.artist || 'iPhone Simulator',
+                        artwork: [
+                            { src: window.iphoneSimState.music.cover || 'https://placehold.co/512x512', sizes: '512x512', type: 'image/png' }
+                        ]
+                    });
+                }
+            }
+        } else {
+            // 恢复默认
+            if (navigator.audioSession) {
+                navigator.audioSession.type = 'auto';
+            }
         }
-        // 尝试使用 Media Session API 保持活跃
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'playing';
-        }
-    } else {
-        // 恢复默认 (通常是 'playback' 或 'auto')
-        if (navigator.audioSession) {
-            navigator.audioSession.type = 'auto';
-        }
+    } catch (e) {
+        console.warn('Audio Session configuration failed:', e);
     }
 };
 
