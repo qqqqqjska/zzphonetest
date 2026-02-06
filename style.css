@@ -165,7 +165,7 @@
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
     font-size: 14px;
-    z-index: 140; /* 低于子屏幕，高于聊天内容 */
+    z-index: 1010; /* 高于通知横幅，确保不被遮挡 */
     max-width: 80%;
     text-align: center;
     transition: opacity 0.3s ease, transform 0.3s ease;

@@ -51,6 +51,11 @@
             <span id="summary-notification-text">正在总结...</span>
         </div>
 
+        <!-- 心声气泡 (移到此处以确保层级高于总结通知) -->
+        <div id="thought-bubble" class="thought-bubble hidden">
+            <div class="thought-content" id="thought-content-text"></div>
+        </div>
+
         <!-- 行程生成通知横幅 -->
         <div id="itinerary-notification" class="notification-banner hidden" style="top: 110px;">
             <i class="fas fa-spinner fa-spin"></i>
@@ -1049,10 +1054,7 @@
                 </div>
                 <!-- 多选删除控制项：右下删除（退出按钮已移入 header） -->
                 <button id="multi-select-delete" class="multi-select-delete hidden">删除(<span id="multi-select-count">0</span>)</button>
-                <!-- 心声气泡 -->
-                <div id="thought-bubble" class="thought-bubble hidden">
-                    <div class="thought-content" id="thought-content-text"></div>
-                </div>
+                
                 <div class="chat-body" id="chat-messages">
                     <!-- 消息列表 -->
                 </div>
@@ -2554,6 +2556,29 @@
                 </div>
                 <button id="payment-choice-self" class="ios-btn-block" style="margin-bottom: 10px;">给自己买</button>
                 <button id="payment-choice-gift" class="ios-btn-block secondary">送给朋友</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 购物规格选择弹窗 -->
+    <div id="shopping-spec-modal" class="modal hidden" style="z-index: 230;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>选择规格</h3>
+                <button class="close-btn" id="close-shopping-spec">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                     <img id="shopping-spec-img" src="" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: #eee;">
+                     <div style="flex: 1;">
+                         <div id="shopping-spec-price" style="color: #FF5000; font-size: 18px; font-weight: bold;"></div>
+                         <div id="shopping-spec-selected-text" style="font-size: 12px; color: #666; margin-top: 4px;">请选择规格</div>
+                     </div>
+                </div>
+                <div id="shopping-spec-container" style="margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
+                    <!-- 动态生成规格选项 -->
+                </div>
+                <button id="confirm-shopping-spec-btn" class="ios-btn-block">确定</button>
             </div>
         </div>
     </div>

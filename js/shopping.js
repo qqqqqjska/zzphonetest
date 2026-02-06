@@ -22,8 +22,18 @@ window.switchShoppingTab = function(tabName) {
     contents.forEach(content => {
         if (content.id === `shopping-tab-${tabName}`) {
             content.style.display = 'block';
+            // 添加自然过渡动画 (仅针对购物车和订单页)
+            // 购物车页面单独在 renderShoppingCart 中处理动画，避免父容器transform影响fixed定位
+            if (tabName === 'orders') {
+                content.classList.remove('shopping-tab-enter');
+                void content.offsetWidth; // Trigger reflow
+                content.classList.add('shopping-tab-enter');
+            } else if (tabName === 'cart') {
+                content.classList.remove('shopping-tab-enter');
+            }
         } else {
             content.style.display = 'none';
+            content.classList.remove('shopping-tab-enter');
         }
     });
 
@@ -39,7 +49,7 @@ window.switchShoppingTab = function(tabName) {
     }
 
     if (tabName === 'cart') {
-        renderShoppingCart();
+        renderShoppingCart(true);
     } else if (tabName === 'orders') {
         updateShoppingOrderStatuses();
         renderShoppingOrders();
@@ -123,41 +133,230 @@ function injectShoppingStyles() {
     const style = document.createElement('style');
     style.id = 'shopping-styles';
     style.textContent = `
+        :root {
+            --shopping-bg: #f2f2f7;
+            --shopping-card-bg: #ffffff;
+            --shopping-text-primary: #000000;
+            --shopping-text-secondary: #8e8e93;
+            --shopping-accent: #000000; /* Minimalist Black */
+            --shopping-accent-blue: #007AFF;
+            --shopping-price: #000000; /* Minimalist Black for price too, or keep subtle */
+            --shopping-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --shopping-radius: 16px;
+        }
+
+        #shopping-app {
+            background-color: var(--shopping-bg) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "San Francisco", "Helvetica Neue", sans-serif;
+        }
+
+        /* 简约卡片样式 */
         .shopping-card {
             position: relative;
-            transition: transform 0.2s;
+            background: var(--shopping-card-bg);
+            border-radius: var(--shopping-radius);
+            overflow: hidden;
+            box-shadow: var(--shopping-shadow);
+            transition: transform 0.2s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.2s;
+            border: none;
         }
+        
+        .shopping-card:active {
+            transform: scale(0.96);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
         .shopping-card.manage-active {
             transform: scale(0.95);
+            box-shadow: 0 0 0 2px var(--shopping-accent-blue);
         }
+
+        .shopping-card-content {
+            padding: 12px;
+        }
+
+        .shopping-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--shopping-text-primary);
+            margin-bottom: 6px;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .shopping-card-meta {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        .shopping-card-price {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--shopping-text-primary);
+        }
+        
+        .shopping-card-price::before {
+            content: '¥';
+            font-size: 12px;
+            margin-right: 1px;
+            font-weight: 500;
+        }
+
+        .shopping-card-shop {
+            font-size: 11px;
+            color: var(--shopping-text-secondary);
+            display: flex;
+            align-items: center;
+        }
+
+        /* 复选框样式 */
         .shopping-checkbox {
             position: absolute;
-            top: 5px;
-            right: 5px;
+            top: 10px;
+            right: 10px;
             width: 24px;
             height: 24px;
-            background: rgba(0,0,0,0.3);
-            border: 2px solid #fff;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.1);
             border-radius: 50%;
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 10;
             cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .shopping-checkbox.checked {
-            background: #007AFF;
-            border-color: #fff;
+            background: var(--shopping-accent-blue);
+            border-color: transparent;
         }
         .shopping-checkbox.checked::after {
-            content: '✓';
-            color: #fff;
-            font-size: 14px;
-            font-weight: bold;
+            content: '';
+            width: 10px;
+            height: 5px;
+            border-left: 2px solid #fff;
+            border-bottom: 2px solid #fff;
+            transform: rotate(-45deg);
+            margin-top: -2px;
         }
         .manage-mode .shopping-checkbox {
             display: flex;
         }
+
+        /* 详情页样式 */
+        .shopping-detail-modal {
+            background: #fff;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .shopping-btn-primary {
+            background: #000;
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+        
+        .shopping-btn-primary:active {
+            opacity: 0.8;
+        }
+
+        .shopping-btn-secondary {
+            background: #f2f2f7;
+            color: #000;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .shopping-btn-secondary:active {
+            background: #e5e5ea;
+        }
+
+        /* 购物车列表 */
+        .cart-item-modern {
+            background: #fff;
+            border-radius: 16px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .cart-item-modern:active {
+            transform: scale(0.98);
+        }
+
+        /* 订单列表 */
+        .order-card-modern {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .order-status-badge {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #f2f2f7;
+            color: #000;
+            font-weight: 500;
+        }
+        
+        .order-status-badge.active {
+            background: #000;
+            color: #fff;
+        }
+
+        /* 外卖卡片 */
+        .delivery-card-modern {
+            background: #fff;
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            transition: transform 0.2s;
+            position: relative;
+        }
+        
+        .delivery-card-modern:active {
+            transform: scale(0.98);
+        }
+        
+        .delivery-card-modern.manage-active {
+            box-shadow: 0 0 0 2px var(--shopping-accent-blue);
+        }
+
+        /* 隐藏的消息样式覆盖 */
         .message-content.pay-request-msg,
         .message-content.shopping-gift-msg,
         .message-content.delivery-share-msg {
@@ -172,6 +371,220 @@ function injectShoppingStyles() {
         .message-content.delivery-share-msg::before,
         .message-content.delivery-share-msg::after {
             display: none !important;
+        }
+
+        /* 动画定义 */
+        @keyframes shoppingFadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes shoppingScaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .shopping-anim-item {
+            opacity: 0; /* 初始隐藏，等待动画执行 */
+            animation: shoppingFadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        /* 页面切换动画 - 移除导致fixed定位异常的scale变换 */
+        .shopping-tab-content {
+            /* animation: shoppingScaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); */
+        }
+
+        /* 自然过渡动画 */
+        @keyframes shoppingPageEnter {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .shopping-tab-enter {
+            animation: shoppingPageEnter 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        /* 规格选择样式 */
+        .spec-group {
+            margin-bottom: 15px;
+        }
+        .spec-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .spec-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .spec-option-btn {
+            padding: 6px 12px;
+            border-radius: 16px;
+            background: #f5f5f5;
+            color: #333;
+            font-size: 13px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .spec-option-btn.selected {
+            background: #FFF0E6;
+            color: #FF5000;
+            border-color: #FF5000;
+            font-weight: 500;
+        }
+
+        /* 订单进度条样式 */
+        .order-progress-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: flex;
+            align-items: flex-end;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .order-progress-modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .order-progress-content {
+            background: #fff;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 25px 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            padding-bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+        .order-progress-modal.active .order-progress-content {
+            transform: translateY(0);
+        }
+        
+        .progress-timeline {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            margin: 40px 10px 50px;
+        }
+        /* Connecting Line Background */
+        .progress-timeline::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            height: 3px;
+            background: #f2f2f7;
+            z-index: 0;
+            border-radius: 2px;
+        }
+        /* Active Line - set width via JS */
+        .progress-line-active {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            height: 3px;
+            background: #000;
+            z-index: 1;
+            transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            border-radius: 2px;
+        }
+        
+        .progress-step {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 40px; 
+        }
+        .progress-dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid #f2f2f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            box-sizing: border-box;
+        }
+        .progress-dot.active {
+            border-color: #000;
+            background: #000;
+        }
+        .progress-dot.active::after {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fff;
+        }
+        .progress-label {
+            font-size: 13px;
+            color: #8e8e93;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .progress-label.active {
+            color: #000;
+            font-weight: 600;
+        }
+        .progress-time {
+            font-size: 11px;
+            color: #8e8e93;
+            position: absolute;
+            top: 55px;
+            width: 120px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
+        /* 订单进度消息卡片 */
+        .order-progress-msg {
+            background: transparent !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+        }
+        .order-progress-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 15px;
+            width: 260px;
+            /* height: 100px; */ /* Let content define height, but keep it roughly 4:1 aspect ratio visually if needed, though width 260 height ~100 is close to 2.6:1 */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
     `;
     document.head.appendChild(style);
@@ -194,6 +607,22 @@ function setupShoppingListeners() {
     const menuBtn = document.getElementById('shopping-menu-btn');
     if (menuBtn) {
         menuBtn.addEventListener('click', () => {
+            const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+            const optGenerate = document.getElementById('shopping-opt-generate');
+            const optAdd = document.getElementById('shopping-opt-add');
+            const optManage = document.getElementById('shopping-opt-manage');
+            
+            if (currentTab && currentTab.dataset.tab === 'delivery') {
+                // 外卖页选项
+                if (optGenerate) optGenerate.querySelector('span').textContent = '生成外卖';
+                if (optManage) optManage.querySelector('span').textContent = '管理外卖';
+                if (optAdd) optAdd.classList.add('hidden');
+            } else {
+                // 商品页选项
+                if (optGenerate) optGenerate.querySelector('span').textContent = '生成商品';
+                if (optManage) optManage.querySelector('span').textContent = '管理商品';
+                if (optAdd) optAdd.classList.remove('hidden');
+            }
             document.getElementById('shopping-options-modal').classList.remove('hidden');
         });
     }
@@ -268,6 +697,19 @@ function setupShoppingListeners() {
         });
     }
 
+// 规格弹窗关闭
+    const closeSpecBtn = document.getElementById('close-shopping-spec');
+    if (closeSpecBtn) {
+        closeSpecBtn.addEventListener('click', () => {
+            document.getElementById('shopping-spec-modal').classList.add('hidden');
+        });
+    }
+
+    const confirmSpecBtn = document.getElementById('confirm-shopping-spec-btn');
+    if (confirmSpecBtn) {
+        confirmSpecBtn.addEventListener('click', handleConfirmShoppingSpec);
+    }
+
     // Bind Tab Clicks
     const tabs = document.querySelectorAll('#shopping-app .wechat-tab-item');
     tabs.forEach(tab => {
@@ -275,9 +717,6 @@ function setupShoppingListeners() {
             const tabName = tab.dataset.tab;
             if (tabName) {
                 window.switchShoppingTab(tabName);
-                if (tabName === 'cart') {
-                    renderShoppingCart();
-                }
             }
         });
     });
@@ -352,12 +791,20 @@ function enterShoppingManageMode() {
     selectedShoppingProducts.clear();
     
     document.getElementById('shopping-manage-header').classList.remove('hidden');
+    
     const container = document.querySelector('.shopping-waterfall-container');
     if (container) container.classList.add('manage-mode');
     
+    const deliveryContainer = document.querySelector('.delivery-container');
+    if (deliveryContainer) deliveryContainer.classList.add('manage-mode');
+    
     updateDeleteButton();
-    // 重新渲染以绑定点击事件
-    if (window.iphoneSimState.shoppingProducts) {
+    
+    // Check active tab
+    const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+    if (currentTab && currentTab.dataset.tab === 'delivery') {
+        renderDeliveryItems();
+    } else if (window.iphoneSimState.shoppingProducts) {
         renderShoppingProducts(window.iphoneSimState.shoppingProducts);
     }
 }
@@ -367,11 +814,18 @@ function exitShoppingManageMode() {
     selectedShoppingProducts.clear();
     
     document.getElementById('shopping-manage-header').classList.add('hidden');
+    
     const container = document.querySelector('.shopping-waterfall-container');
     if (container) container.classList.remove('manage-mode');
     
-    // 重新渲染以移除点击事件
-    if (window.iphoneSimState.shoppingProducts) {
+    const deliveryContainer = document.querySelector('.delivery-container');
+    if (deliveryContainer) deliveryContainer.classList.remove('manage-mode');
+    
+    // Check active tab
+    const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+    if (currentTab && currentTab.dataset.tab === 'delivery') {
+        renderDeliveryItems();
+    } else if (window.iphoneSimState.shoppingProducts) {
         renderShoppingProducts(window.iphoneSimState.shoppingProducts);
     }
 }
@@ -390,21 +844,33 @@ function toggleProductSelection(id, cardElement) {
 }
 
 function toggleSelectAllShoppingItems() {
-    const allProducts = window.iphoneSimState.shoppingProducts || [];
-    if (allProducts.length === 0) return;
+    const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+    let allItems = [];
+    
+    if (currentTab && currentTab.dataset.tab === 'delivery') {
+        allItems = window.iphoneSimState.deliveryItems || [];
+    } else {
+        allItems = window.iphoneSimState.shoppingProducts || [];
+    }
 
-    if (selectedShoppingProducts.size === allProducts.length) {
+    if (allItems.length === 0) return;
+
+    if (selectedShoppingProducts.size === allItems.length) {
         // Deselect all
         selectedShoppingProducts.clear();
     } else {
         // Select all
         selectedShoppingProducts.clear();
-        allProducts.forEach(p => selectedShoppingProducts.add(p.id));
+        allItems.forEach(p => selectedShoppingProducts.add(p.id));
     }
     
     updateDeleteButton();
     // Re-render to update UI state
-    renderShoppingProducts(allProducts);
+    if (currentTab && currentTab.dataset.tab === 'delivery') {
+        renderDeliveryItems();
+    } else {
+        renderShoppingProducts(allItems);
+    }
 }
 
 function updateDeleteButton() {
@@ -414,7 +880,14 @@ function updateDeleteButton() {
     }
     const selectAllBtn = document.getElementById('shopping-select-all-btn');
     if (selectAllBtn) {
-        const allCount = window.iphoneSimState.shoppingProducts ? window.iphoneSimState.shoppingProducts.length : 0;
+        const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+        let allCount = 0;
+        if (currentTab && currentTab.dataset.tab === 'delivery') {
+            allCount = window.iphoneSimState.deliveryItems ? window.iphoneSimState.deliveryItems.length : 0;
+        } else {
+            allCount = window.iphoneSimState.shoppingProducts ? window.iphoneSimState.shoppingProducts.length : 0;
+        }
+
         if (allCount > 0 && selectedShoppingProducts.size === allCount) {
             selectAllBtn.textContent = '取消全选';
         } else {
@@ -427,9 +900,17 @@ function deleteSelectedShoppingItems() {
     if (selectedShoppingProducts.size === 0) return;
     
     if (confirm(`确定要删除选中的 ${selectedShoppingProducts.size} 个商品吗？`)) {
-        window.iphoneSimState.shoppingProducts = window.iphoneSimState.shoppingProducts.filter(p => !selectedShoppingProducts.has(p.id));
-        saveConfig();
-        renderShoppingProducts(window.iphoneSimState.shoppingProducts);
+        const currentTab = document.querySelector('#shopping-app .wechat-tab-item.active');
+        
+        if (currentTab && currentTab.dataset.tab === 'delivery') {
+            window.iphoneSimState.deliveryItems = window.iphoneSimState.deliveryItems.filter(p => !selectedShoppingProducts.has(p.id));
+            saveConfig();
+            renderDeliveryItems();
+        } else {
+            window.iphoneSimState.shoppingProducts = window.iphoneSimState.shoppingProducts.filter(p => !selectedShoppingProducts.has(p.id));
+            saveConfig();
+            renderShoppingProducts(window.iphoneSimState.shoppingProducts);
+        }
         exitShoppingManageMode();
     }
 }
@@ -725,13 +1206,14 @@ async function generateShoppingProducts() {
 - shop_name: 店铺名称
 - image_desc: 商品图片的简短中文描述 (不超过5个字，用于生成占位图文字)
 - detail_desc: 商品详情页的详细描述 (一段话，描述商品卖点、材质、规格等，50-100字)
+- specifications: 可选规格 (Object, key为规格名, value为选项数组). 例如: {"尺码": ["S", "M", "L"], "颜色": ["白色", "黑色"]}
 
 ${userContext ? userContext : '商品种类要丰富，包括但不限于：服饰、数码、美食、家居、美妆等。'}
 
 示例：
 [
-  {"title": "2025新款纯棉白色T恤男女同款宽松", "price": 39.9, "paid_count": "1万+", "shop_name": "优选服饰", "image_desc": "白色T恤", "detail_desc": "精选优质新疆长绒棉，亲肤透气，不易变形。宽松版型设计，遮肉显瘦，男女同款。"},
-  {"title": "网红爆款芝士半熟光头蛋糕", "price": 28.8, "paid_count": "5000+", "shop_name": "美味烘焙", "image_desc": "芝士蛋糕", "detail_desc": "进口安佳芝士，奶香浓郁，入口即化。现烤现发，日期新鲜，早餐下午茶首选。"}
+  {"title": "2025新款纯棉白色T恤男女同款宽松", "price": 39.9, "paid_count": "1万+", "shop_name": "优选服饰", "image_desc": "白色T恤", "detail_desc": "精选优质新疆长绒棉，亲肤透气，不易变形。宽松版型设计，遮肉显瘦，男女同款。", "specifications": {"尺码": ["S", "M", "L", "XL"], "颜色": ["白色", "黑色", "灰色"]}},
+  {"title": "网红爆款芝士半熟光头蛋糕", "price": 28.8, "paid_count": "5000+", "shop_name": "美味烘焙", "image_desc": "芝士蛋糕", "detail_desc": "进口安佳芝士，奶香浓郁，入口即化。现烤现发，日期新鲜，早餐下午茶首选。", "specifications": {"口味": ["原味", "巧克力味"], "规格": ["4个装", "8个装"]}}
 ]`;
 
     try {
@@ -850,9 +1332,10 @@ function renderShoppingProducts(products) {
         col2.innerHTML = '';
     }
 
-    products.forEach(p => {
+    products.forEach((p, index) => {
         const card = document.createElement('div');
-        card.className = 'shopping-card';
+        card.className = 'shopping-card shopping-anim-item';
+        card.style.animationDelay = `${index * 0.05}s`;
         card.dataset.id = p.id;
         
         if (isShoppingManageMode) {
@@ -871,11 +1354,6 @@ function renderShoppingProducts(products) {
             card.classList.add('manage-active'); // Re-apply visual selection state
         }
 
-        card.style.background = '#fff';
-        card.style.borderRadius = '8px';
-        card.style.overflow = 'hidden';
-        card.style.paddingBottom = '10px';
-        
         // 确保有固定的背景色和高度 (持久化)
         if (!p.bgColor) {
             p.bgColor = Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
@@ -890,19 +1368,19 @@ function renderShoppingProducts(products) {
         // 优先使用AI生成的图片
         const imgUrl = p.aiImage || generatePlaceholderImage(300, height, p.image_desc || '商品', validBgColor);
 
+        // 使用新定义的CSS类
         card.innerHTML = `
             <div class="shopping-checkbox ${isSelected ? 'checked' : ''}"></div>
             <img id="product-img-${p.id}" src="${imgUrl}" style="width: 100%; display: block; object-fit: cover; aspect-ratio: 300/${height};">
-            <div style="padding: 8px 8px 0 8px;">
-                <div style="font-size: 14px; color: #333; margin-bottom: 6px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-weight: 500;">${p.title}</div>
-                <div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px;">
-                    <span style="color: #ff5000; font-size: 12px;">¥</span>
-                    <span style="color: #ff5000; font-size: 18px; font-weight: bold;">${p.price}</span>
-                    <span style="color: #999; font-size: 11px; margin-left: 4px;">${p.paid_count}人付款</span>
+            <div class="shopping-card-content">
+                <div class="shopping-card-title">${p.title}</div>
+                <div class="shopping-card-meta">
+                    <div class="shopping-card-price">${p.price}</div>
+                    <div style="font-size: 11px; color: var(--shopping-text-secondary);">${p.paid_count}付款</div>
                 </div>
-                <div style="display: flex; align-items: center; color: #999; font-size: 11px;">
+                <div class="shopping-card-shop" style="margin-top: 4px;">
                    <span>${p.shop_name}</span>
-                   <i class="fas fa-chevron-right" style="font-size: 10px; margin-left: 2px; transform: scale(0.8);"></i>
+                   <i class="fas fa-chevron-right" style="font-size: 9px; margin-left: 2px; opacity: 0.6;"></i>
                 </div>
             </div>
         `;
@@ -918,91 +1396,48 @@ function renderShoppingProducts(products) {
 
 function openShoppingProductDetail(product) {
     currentShoppingProduct = product;
+    
+    // 如果是外卖商品且没有规格信息，尝试添加默认规格
+    if (product.isDelivery && (!product.specifications || Object.keys(product.specifications).length === 0)) {
+        product.specifications = {
+            "口味": ["正常", "不辣", "微辣", "特辣"],
+            "餐具": ["需要", "不需要"]
+        };
+    }
+    
     const screen = document.getElementById('shopping-detail-screen');
     if (!screen) return;
 
-    // 绑定加入购物车事件
-    const addToCartBtn = document.getElementById('detail-add-to-cart-btn');
-    if (addToCartBtn) {
-        // Remove old listeners by cloning
-        const newBtn = addToCartBtn.cloneNode(true);
-        addToCartBtn.parentNode.replaceChild(newBtn, addToCartBtn);
-        
-        newBtn.onclick = () => {
-            addToCart(product);
-            // 显示成功反馈
-            const toast = document.getElementById('shopping-success-toast');
-            if (toast) {
-                toast.classList.remove('hidden');
-                // Checkmark animation
-                const icon = toast.querySelector('i');
-                if (icon) {
-                    icon.style.transform = 'scale(0)';
-                    icon.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                    requestAnimationFrame(() => {
-                        icon.style.transform = 'scale(1)';
-                    });
-                }
-                
-                setTimeout(() => {
-                    toast.classList.add('hidden');
-                }, 1500);
-            } else {
-                if (window.showChatToast) window.showChatToast('已加入购物车');
-                else alert('已加入购物车');
-            }
-        };
-    }
-
-    // 绑定立即购买事件
-    const buyNowBtn = document.getElementById('detail-buy-now-btn');
-    if (buyNowBtn) {
-        const newBtn = buyNowBtn.cloneNode(true);
-        buyNowBtn.parentNode.replaceChild(newBtn, buyNowBtn);
-        // Change: open payment choice instead of direct buy
-        newBtn.onclick = () => openPaymentChoice(product.price, [product]);
-    }
-
-    // 针对外卖商品隐藏加入购物车按钮
-    if (product.isDelivery) {
-        if (addToCartBtn) addToCartBtn.classList.add('hidden');
-    } else {
-        if (addToCartBtn) addToCartBtn.classList.remove('hidden');
-    }
-
-    // 填充数据
+    // 1. 设置图片和内容
     const imgEl = document.getElementById('shopping-detail-img');
+    const bodyEl = screen.querySelector('.app-body');
+    
+    // 如果没有图片元素，说明结构被破坏，尝试修复（或者基于现有结构）
+    // 这里我们直接操作现有的DOM结构，利用CSS变量优化样式
+    
+    if (imgEl) {
+        if (product.aiImage) {
+            imgEl.src = product.aiImage;
+        } else {
+            imgEl.src = generatePlaceholderImage(600, 600, product.image_desc || product.title, '#cccccc'); 
+        }
+    }
+
     const priceEl = document.getElementById('shopping-detail-price');
     const titleEl = document.getElementById('shopping-detail-title');
     const paidEl = document.getElementById('shopping-detail-paid');
     const shopEl = document.getElementById('shopping-detail-shop');
     const descEl = document.getElementById('shopping-detail-desc');
 
-    if (imgEl) {
-        // 使用卡片上的图片URL (可能已经有AI图片了)
-        // 重新生成一个高清的或者复用现有的
-        // 这里简单复用 product 的 aiImage 或者 generatePlaceholder
-        if (product.aiImage) {
-            imgEl.src = product.aiImage;
-        } else {
-            // 重新生成一个占位图，或者从DOM中获取？
-            // 重新生成比较简单，背景色可能变，但这是 placeholder
-            imgEl.src = generatePlaceholderImage(600, 600, product.image_desc || product.title, '#cccccc'); 
-        }
+    if (priceEl) {
+        priceEl.textContent = product.price;
+        priceEl.parentElement.style.color = 'var(--shopping-text-primary)';
     }
-
-    // 重新绑定分享按钮事件，确保每次打开详情页时都绑定正确的事件
-    const shareBtn = document.getElementById('shopping-share-btn');
-    if (shareBtn) {
-        shareBtn.onclick = () => {
-            openProductShareContactPicker(product);
-        };
+    if (titleEl) {
+        titleEl.textContent = product.title;
+        titleEl.style.color = 'var(--shopping-text-primary)';
     }
-    
-    if (priceEl) priceEl.textContent = product.price;
-    if (titleEl) titleEl.textContent = product.title;
     if (paidEl) {
-        // 如果包含非数字字符（除了万/+等），可能已经是完整描述
         if (product.paid_count && (product.paid_count.toString().includes('月售') || product.paid_count.toString().includes('人付款'))) {
             paidEl.textContent = product.paid_count;
         } else {
@@ -1010,15 +1445,204 @@ function openShoppingProductDetail(product) {
         }
     }
     if (shopEl) shopEl.textContent = product.shop_name;
+    
     if (descEl) {
         if (product.detail_desc) {
              descEl.textContent = product.detail_desc;
         } else {
              descEl.textContent = product.title + '\n\n' + (product.image_desc || '暂无详情描述');
         }
+        descEl.style.color = 'var(--shopping-text-secondary)';
+    }
+
+    // 2. 优化底部按钮样式
+    const addToCartBtn = document.getElementById('detail-add-to-cart-btn');
+    const buyNowBtn = document.getElementById('detail-buy-now-btn');
+
+    if (addToCartBtn) {
+        // 重置样式为新风格
+        addToCartBtn.className = 'shopping-btn-secondary';
+        addToCartBtn.style = ''; // 清除内联样式
+        addToCartBtn.style.marginRight = '10px';
+        addToCartBtn.textContent = '加入购物车';
+        
+        // 绑定事件
+        const newBtn = addToCartBtn.cloneNode(true);
+        addToCartBtn.parentNode.replaceChild(newBtn, addToCartBtn);
+        newBtn.onclick = () => {
+            if (product.specifications && Object.keys(product.specifications).length > 0) {
+                openShoppingSpecModal(product, (productWithSpec) => {
+                    addToCart(productWithSpec);
+                    const toast = document.getElementById('shopping-success-toast');
+                    if (toast) {
+                        toast.classList.remove('hidden');
+                        setTimeout(() => toast.classList.add('hidden'), 1500);
+                    }
+                    // Close details after adding? Or keep open? Usually keep open or show toast.
+                    // Spec modal closes automatically in handleConfirm
+                });
+            } else {
+                addToCart(product);
+                const toast = document.getElementById('shopping-success-toast');
+                if (toast) {
+                    toast.classList.remove('hidden');
+                    setTimeout(() => toast.classList.add('hidden'), 1500);
+                }
+            }
+        };
+        
+        // 外卖隐藏购物车按钮
+        if (product.isDelivery) newBtn.classList.add('hidden');
+        else newBtn.classList.remove('hidden');
+    }
+
+    if (buyNowBtn) {
+        buyNowBtn.className = 'shopping-btn-primary';
+        buyNowBtn.style = '';
+        buyNowBtn.textContent = '立即购买';
+        
+        const newBtn = buyNowBtn.cloneNode(true);
+        buyNowBtn.parentNode.replaceChild(newBtn, buyNowBtn);
+        newBtn.onclick = () => {
+            if (product.specifications && Object.keys(product.specifications).length > 0) {
+                openShoppingSpecModal(product, (productWithSpec) => {
+                    openPaymentChoice(productWithSpec.price, [productWithSpec]);
+                });
+            } else {
+                openPaymentChoice(product.price, [product]);
+            }
+        };
+    }
+
+    // 3. 分享按钮
+    const shareBtn = document.getElementById('shopping-share-btn');
+    if (shareBtn) {
+        shareBtn.onclick = () => openProductShareContactPicker(product);
     }
 
     screen.classList.remove('hidden');
+}
+
+// 规格选择逻辑
+let pendingSpecProduct = null;
+let pendingSpecCallback = null;
+let selectedSpecs = {};
+
+function openShoppingSpecModal(product, callback) {
+    pendingSpecProduct = product;
+    pendingSpecCallback = callback;
+    selectedSpecs = {}; // Clear previous selections
+
+    const modal = document.getElementById('shopping-spec-modal');
+    const container = document.getElementById('shopping-spec-container');
+    const imgEl = document.getElementById('shopping-spec-img');
+    const priceEl = document.getElementById('shopping-spec-price');
+    const selectedTextEl = document.getElementById('shopping-spec-selected-text');
+
+    if (!modal || !container) return;
+
+    // Set Header Info
+    if (imgEl) {
+        const imgUrl = product.aiImage || generatePlaceholderImage(300, product.imgHeight || 300, product.image_desc || product.title, '#' + (product.bgColor || 'cccccc').replace('#',''));
+        imgEl.src = imgUrl;
+    }
+    if (priceEl) priceEl.textContent = product.price;
+    if (selectedTextEl) selectedTextEl.textContent = '请选择规格';
+
+    // Generate Options
+    container.innerHTML = '';
+    
+    for (const [specName, options] of Object.entries(product.specifications)) {
+        const group = document.createElement('div');
+        group.className = 'spec-group';
+        
+        const title = document.createElement('div');
+        title.className = 'spec-title';
+        title.textContent = specName;
+        group.appendChild(title);
+        
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'spec-options';
+        
+        options.forEach(option => {
+            const btn = document.createElement('div');
+            btn.className = 'spec-option-btn';
+            btn.textContent = option;
+            btn.onclick = () => {
+                // Deselect siblings
+                Array.from(optionsDiv.children).forEach(c => c.classList.remove('selected'));
+                // Select clicked
+                btn.classList.add('selected');
+                selectedSpecs[specName] = option;
+                updateSpecSelectedText();
+            };
+            optionsDiv.appendChild(btn);
+        });
+        
+        group.appendChild(optionsDiv);
+        container.appendChild(group);
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function updateSpecSelectedText() {
+    const el = document.getElementById('shopping-spec-selected-text');
+    if (!el || !pendingSpecProduct) return;
+    
+    const specs = pendingSpecProduct.specifications;
+    const missing = [];
+    const selected = [];
+    
+    for (const key of Object.keys(specs)) {
+        if (selectedSpecs[key]) {
+            selected.push(selectedSpecs[key]);
+        } else {
+            missing.push(key);
+        }
+    }
+    
+    if (missing.length > 0) {
+        el.textContent = '请选择 ' + missing.join(' ');
+        el.style.color = '#666';
+    } else {
+        el.textContent = '已选: ' + selected.join(', ');
+        el.style.color = '#333';
+    }
+}
+
+function handleConfirmShoppingSpec() {
+    if (!pendingSpecProduct) return;
+    
+    const specs = pendingSpecProduct.specifications;
+    const missing = [];
+    for (const key of Object.keys(specs)) {
+        if (!selectedSpecs[key]) {
+            missing.push(key);
+        }
+    }
+    
+    if (missing.length > 0) {
+        alert('请选择 ' + missing.join(' '));
+        return;
+    }
+    
+    const specString = Object.values(selectedSpecs).join('; ');
+    
+    // Clone product and add spec info
+    const productWithSpec = {
+        ...pendingSpecProduct,
+        selectedSpec: specString,
+        selectedSpecsMap: { ...selectedSpecs },
+        // Create a unique ID for cart differentiation
+        cartId: pendingSpecProduct.id + '_' + Object.values(selectedSpecs).join('_')
+    };
+    
+    document.getElementById('shopping-spec-modal').classList.add('hidden');
+    
+    if (pendingSpecCallback) {
+        pendingSpecCallback(productWithSpec);
+    }
 }
 
 // 加入购物车
@@ -1026,8 +1650,13 @@ function addToCart(product) {
     if (!window.iphoneSimState.shoppingCart) {
         window.iphoneSimState.shoppingCart = [];
     }
+    
+    // Identify by cartId if available (for specs), otherwise id
+    const identifyId = product.cartId || product.id;
+    
     // Check if already in cart
-    const existing = window.iphoneSimState.shoppingCart.find(item => item.id === product.id);
+    const existing = window.iphoneSimState.shoppingCart.find(item => (item.cartId || item.id) === identifyId);
+    
     if (existing) {
         existing.count = (existing.count || 1) + 1;
     } else {
@@ -1041,7 +1670,7 @@ function addToCart(product) {
 }
 
 // 渲染购物车
-function renderShoppingCart() {
+function renderShoppingCart(animate = false) {
     const container = document.getElementById('shopping-tab-cart');
     if (!container) return;
 
@@ -1057,9 +1686,10 @@ function renderShoppingCart() {
         return;
     }
 
-    let html = '<div style="padding: 10px;">';
+    const animClass = animate ? 'shopping-tab-enter' : '';
+    let html = `<div class="${animClass}" style="padding: 10px;">`;
     
-    cart.forEach(item => {
+    cart.forEach((item, index) => {
         // Ensure image properties exist (fallback for old data)
         const bgColor = item.bgColor || 'cccccc'; 
         const height = item.imgHeight || 300;
@@ -1067,24 +1697,22 @@ function renderShoppingCart() {
         const imgUrl = item.aiImage || generatePlaceholderImage(300, height, item.image_desc || '商品', validBgColor);
 
         html += `
-            <div class="cart-item-wrapper" style="position: relative; margin-bottom: 10px; overflow: hidden; border-radius: 12px;">
+            <div class="cart-item-wrapper" style="position: relative; margin-bottom: 15px; overflow: hidden; border-radius: 16px;">
                 <div class="cart-item-delete" onclick="deleteCartItem('${item.id}')" style="position: absolute; top: 0; right: 0; bottom: 0; width: 80px; background: #FF3B30; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;">删除</div>
-                <div class="cart-item" id="cart-item-${item.id}" 
-                     style="background: #fff; padding: 10px; display: flex; align-items: center; gap: 10px; position: relative; z-index: 1; transition: transform 0.2s ease-out;"
+                <div class="cart-item-modern" id="cart-item-${item.id}" 
+                     style="position: relative; z-index: 1; transition: transform 0.2s ease-out; margin-bottom: 0;"
                      ontouchstart="handleCartTouchStart(event, '${item.id}')"
                      ontouchmove="handleCartTouchMove(event, '${item.id}')"
                      ontouchend="handleCartTouchEnd(event, '${item.id}')"
                      oncontextmenu="handleCartContextMenu(event, '${item.id}')">
-                    <div class="cart-checkbox ${item.selected ? 'checked' : ''}" onclick="toggleCartItemSelection('${item.id}')" style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; ${item.selected ? 'background: #FF5000; border-color: #FF5000;' : ''}">
-                        ${item.selected ? '<i class="fas fa-check" style="color: #fff; font-size: 12px;"></i>' : ''}
-                    </div>
-                    <img src="${imgUrl}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; flex-shrink: 0;">
+                    <div class="shopping-checkbox ${item.selected ? 'checked' : ''}" onclick="toggleCartItemSelection('${item.id}')" style="position: relative; top: auto; right: auto; display: flex; margin-right: 5px;"></div>
+                    <img src="${imgUrl}" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: #f2f2f7;">
                     <div style="flex: 1; overflow: hidden;">
-                        <div style="font-size: 14px; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.title}</div>
-                        <div style="background: #f5f5f5; color: #999; font-size: 12px; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">默认规格</div>
+                        <div style="font-size: 15px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">${item.title}</div>
+                        <div style="background: #f2f2f7; color: #8e8e93; font-size: 12px; padding: 2px 8px; border-radius: 6px; display: inline-block; margin-bottom: 8px;">默认规格</div>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="color: #FF5000; font-weight: bold;">¥${item.price}</div>
-                            <div style="font-size: 12px; color: #666;">x${item.count}</div>
+                            <div style="color: var(--shopping-text-primary); font-weight: 700; font-size: 16px;">¥${item.price}</div>
+                            <div style="font-size: 13px; color: #8e8e93;">x${item.count}</div>
                         </div>
                     </div>
                 </div>
@@ -1097,22 +1725,20 @@ function renderShoppingCart() {
     const totalCount = cart.filter(i => i.selected).reduce((sum, item) => sum + item.count, 0);
 
     html += `</div>
-        <div style="position: fixed; bottom: calc(50px + env(safe-area-inset-bottom)); left: 0; width: 100%; background: #fff; border-top: 1px solid #eee; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 90;">
+        <div class="${animClass}" style="position: fixed; bottom: calc(50px + env(safe-area-inset-bottom)); left: 0; width: 100%; background: #fff; border-top: 1px solid rgba(0,0,0,0.05); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 90;">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div onclick="toggleSelectAllCart()" style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                    <div style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ccc; display: flex; align-items: center; justify-content: center; ${cart.every(i => i.selected) ? 'background: #FF5000; border-color: #FF5000;' : ''}">
-                        ${cart.every(i => i.selected) ? '<i class="fas fa-check" style="color: #fff; font-size: 12px;"></i>' : ''}
-                    </div>
+                <div onclick="toggleSelectAllCart()" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <div class="shopping-checkbox ${cart.every(i => i.selected) ? 'checked' : ''}" style="position: relative; top: auto; right: auto; display: flex;"></div>
                     <span style="font-size: 14px; color: #666;">全选</span>
                 </div>
-                <div style="margin-left: 10px;">
+                <div style="margin-left: 15px;">
                     <span style="font-size: 14px;">合计:</span>
-                    <span style="color: #FF5000; font-weight: bold; font-size: 16px;">¥${totalPrice}</span>
+                    <span style="color: var(--shopping-text-primary); font-weight: 700; font-size: 18px;">¥${totalPrice}</span>
                 </div>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button onclick="handleCartPayByFriend()" style="background: linear-gradient(90deg, #FFCB00, #FF9402); color: #fff; border: none; padding: 8px 15px; border-radius: 20px; font-size: 14px; font-weight: bold;">找人付</button>
-                <button onclick="handleCartBuy()" style="background: linear-gradient(90deg, #FF5E00, #FF2A00); color: #fff; border: none; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">结算(${totalCount})</button>
+                <button onclick="handleCartPayByFriend()" class="shopping-btn-secondary" style="padding: 10px 20px; font-size: 14px;">找人付</button>
+                <button onclick="handleCartBuy()" class="shopping-btn-primary" style="padding: 10px 20px; font-size: 14px;">结算(${totalCount})</button>
             </div>
         </div>
     `;
@@ -1240,7 +1866,8 @@ function processSelfPayment() {
             price: item.price,
             image: item.image,
             count: item.count,
-            isDelivery: item.isDelivery
+            isDelivery: item.isDelivery,
+            selectedSpec: item.selectedSpec
         }));
 
         const newOrder = {
@@ -1367,6 +1994,29 @@ function openShoppingGiftContactPicker(items) {
     const header = modal.querySelector('.modal-header h3');
     if (header) header.textContent = '送给谁';
     
+    // 清除可能存在的旧备注输入框
+    const oldInput = document.getElementById('gift-remark-input');
+    if (oldInput) oldInput.remove();
+
+    // 插入备注输入框到按钮容器中
+    const btnContainer = sendBtn ? sendBtn.parentNode : null;
+    let remarkInput = null;
+    
+    if (btnContainer) {
+        remarkInput = document.createElement('input');
+        remarkInput.id = 'gift-remark-input';
+        remarkInput.type = 'text';
+        remarkInput.placeholder = '给TA留个言 (可选)';
+        remarkInput.style.width = '100%';
+        remarkInput.style.marginBottom = '15px';
+        remarkInput.style.padding = '10px';
+        remarkInput.style.border = '1px solid #ddd';
+        remarkInput.style.borderRadius = '8px';
+        remarkInput.style.fontSize = '14px';
+        
+        btnContainer.insertBefore(remarkInput, sendBtn);
+    }
+    
     if (sendBtn) {
         sendBtn.textContent = '支付并发送';
         const newSendBtn = sendBtn.cloneNode(true);
@@ -1378,6 +2028,8 @@ function openShoppingGiftContactPicker(items) {
                 const selectedContact = list.querySelectorAll('input[type="checkbox"]:checked');
                 const ids = Array.from(selectedContact).map(cb => parseInt(cb.value)).filter(id => id !== 0);
                 
+                const remark = remarkInput ? remarkInput.value.trim() : '';
+
                 if (ids.length > 0) {
                     const totalAmount = pendingPaymentAmount * ids.length;
                     
@@ -1403,7 +2055,8 @@ function openShoppingGiftContactPicker(items) {
                             price: item.price,
                             image: item.image,
                             count: item.count,
-                            isDelivery: item.isDelivery
+                            isDelivery: item.isDelivery,
+                            selectedSpec: item.selectedSpec
                         }));
                         
                         const newOrder = {
@@ -1446,9 +2099,11 @@ function openShoppingGiftContactPicker(items) {
                                 title: i.title,
                                 price: i.price,
                                 image: i.image,
-                                isDelivery: i.isDelivery
+                                isDelivery: i.isDelivery,
+                                selectedSpec: i.selectedSpec
                             })),
-                            total: (pendingPaymentAmount).toFixed(2)
+                            total: (pendingPaymentAmount).toFixed(2),
+                            remark: remark 
                         };
                         
                         // Robust sendMessage call
@@ -1468,6 +2123,9 @@ function openShoppingGiftContactPicker(items) {
                     saveConfig();
                     
                     modal.classList.add('hidden');
+                    // 清理
+                    if (remarkInput) remarkInput.remove();
+                    
                     const detailScreen = document.getElementById('shopping-detail-screen');
                     if (detailScreen) detailScreen.classList.add('hidden');
                     window.switchShoppingTab('orders');
@@ -1485,7 +2143,11 @@ function openShoppingGiftContactPicker(items) {
     if (closeBtn) {
         const newCloseBtn = closeBtn.cloneNode(true);
         closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-        newCloseBtn.onclick = () => modal.classList.add('hidden');
+        newCloseBtn.onclick = () => {
+            modal.classList.add('hidden');
+            const inp = document.getElementById('gift-remark-input');
+            if (inp) inp.remove();
+        };
     }
 
     list.innerHTML = '';
@@ -1548,7 +2210,8 @@ function openShoppingContactPickerForPay(items) {
                         title: i.title,
                         price: i.price,
                         image: i.aiImage || generatePlaceholderImage(300, 300, i.image_desc, '#ccc'),
-                        isDelivery: i.isDelivery
+                        isDelivery: i.isDelivery,
+                        selectedSpec: i.selectedSpec
                     }))
                 };
 
@@ -1599,27 +2262,30 @@ function openShoppingContactPickerForPay(items) {
     modal.classList.remove('hidden');
 }
 
-// 生成占位图 (支持中文)
+// 生成占位图 (支持中文) - 高清版
 function generatePlaceholderImage(width, height, text, bgColor) {
+    const scale = 2; // 2x 分辨率
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
     const ctx = canvas.getContext('2d');
 
     // 填充背景
     ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // 绘制文字
     ctx.fillStyle = '#ffffff';
-    // 根据宽度动态调整字号
-    const fontSize = Math.max(16, Math.min(32, width / (text.length || 1)));
+    // 根据宽度动态调整字号 (基准大小 * 缩放)
+    const baseFontSize = Math.max(16, Math.min(32, width / (text.length || 1)));
+    const fontSize = baseFontSize * scale;
+    
     ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, width / 2, height / 2);
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-    return canvas.toDataURL('image/jpeg', 0.8);
+    return canvas.toDataURL('image/png'); // 使用PNG防止文字模糊
 }
 
 // 调用 AI 生成图片
@@ -1770,30 +2436,52 @@ function updateShoppingOrderStatuses() {
     const now = Date.now();
     const hour = 3600000;
 
+    // 收集所有外卖商品标题，用于识别旧数据
+    const deliveryTitles = new Set();
+    if (window.iphoneSimState.deliveryItems) {
+        window.iphoneSimState.deliveryItems.forEach(i => deliveryTitles.add(i.title));
+    }
+
     window.iphoneSimState.shoppingOrders.forEach(order => {
         // Check if it's a delivery order (contains delivery items)
-        const isDeliveryOrder = order.items && order.items.some(i => i.isDelivery);
+        let isDeliveryOrder = order.items && order.items.some(i => i.isDelivery);
 
-        // Initialize delays if missing (for existing orders)
-        if (!order.shipDelay) {
-             if (isDeliveryOrder) {
-                 // 外卖：5-10分钟 接单/备餐完成 (变为已发货/配送中)
-                 order.shipDelay = Math.floor(5 * 60000 + Math.random() * (5 * 60000));
-             } else {
-                 // 普通商品：随机 2-24 小时发货
-                 order.shipDelay = Math.floor(2 * hour + Math.random() * (22 * hour)); 
-             }
-             hasChanges = true; 
-        }
-        if (!order.deliverDelay) {
-            if (isDeliveryOrder) {
-                // 外卖：30-40分钟送达 (变为已完成)
-                order.deliverDelay = Math.floor(30 * 60000 + Math.random() * (10 * 60000));
-            } else {
-                // 普通商品：随机 48-72 小时送达 (2-3天)
-                order.deliverDelay = Math.floor(48 * hour + Math.random() * (24 * hour));
+        // 尝试通过标题识别旧的外卖订单
+        if (!isDeliveryOrder && order.items && deliveryTitles.size > 0) {
+            const hasDeliveryItem = order.items.some(i => deliveryTitles.has(i.title));
+            if (hasDeliveryItem) {
+                isDeliveryOrder = true;
+                // 标记 items 以便后续不需要再次匹配
+                order.items.forEach(i => {
+                    if (deliveryTitles.has(i.title)) i.isDelivery = true;
+                });
+                hasChanges = true;
             }
-            hasChanges = true;
+        }
+
+        // Initialize or Fix delays
+        // 如果是外卖订单，且延迟设置过大（超过2小时），则重置为外卖的时间标准
+        if (isDeliveryOrder) {
+             if (!order.shipDelay || order.shipDelay > 2 * 3600000) {
+                 // 外卖：5-10分钟 接单/备餐完成
+                 order.shipDelay = Math.floor(5 * 60000 + Math.random() * (5 * 60000));
+                 hasChanges = true;
+             }
+             if (!order.deliverDelay || order.deliverDelay > 3 * 3600000) {
+                 // 外卖：30-40分钟送达
+                 order.deliverDelay = Math.floor(30 * 60000 + Math.random() * (10 * 60000));
+                 hasChanges = true;
+             }
+        } else {
+             // 普通商品初始化
+             if (!order.shipDelay) {
+                 order.shipDelay = Math.floor(2 * hour + Math.random() * (22 * hour)); 
+                 hasChanges = true; 
+             }
+             if (!order.deliverDelay) {
+                order.deliverDelay = Math.floor(48 * hour + Math.random() * (24 * hour));
+                hasChanges = true;
+             }
         }
 
         const elapsed = now - order.time;
@@ -1806,6 +2494,14 @@ function updateShoppingOrderStatuses() {
         if (order.status === '已发货' && elapsed > order.deliverDelay) {
             order.status = '已完成';
             hasChanges = true;
+            
+            // 订单完成提示
+            const isDelivery = order.items && order.items.some(i => i.isDelivery);
+            if (isDelivery) {
+                showOrderNotification('外卖已送达', '您的外卖已准时送达，祝您用餐愉快');
+            } else {
+                showOrderNotification('商品已送达', '您的快递已送达，请及时查收');
+            }
         }
     });
 
@@ -1841,54 +2537,55 @@ function renderShoppingOrders() {
 
     let html = '<div style="padding: 10px;">';
     
-    orders.forEach(order => {
+    orders.forEach((order, index) => {
         const date = new Date(order.time);
         const dateStr = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
         
-        let statusColor = '#FF5000';
+        let statusClass = '';
         let statusText = order.status;
         let logisticsInfo = '';
 
         const isDeliveryOrder = order.items && order.items.some(i => i.isDelivery);
 
         if (statusText === '待发货') {
-            statusColor = '#FF5000';
+            statusClass = 'active'; // Black bg
             logisticsInfo = isDeliveryOrder ? '商家已接单，正在制作...' : '商家正在打包中...';
         } else if (statusText === '已发货') {
-            statusColor = '#007AFF';
+            statusClass = ''; // Gray bg
             logisticsInfo = isDeliveryOrder ? '骑手正在火速配送中' : '包裹正在运输途中';
         } else if (statusText === '已完成') {
-            statusColor = '#333';
+            statusClass = ''; // Gray bg
             logisticsInfo = isDeliveryOrder ? '订单已送达' : '订单已签收';
         }
 
         html += `
-            <div class="order-card" style="background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #666; margin-bottom: 10px; border-bottom: 1px solid #f5f5f5; padding-bottom: 8px;">
-                    <span>${dateStr}</span>
-                    <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+            <div class="order-card-modern" onclick="openShoppingOrderProgress('${order.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <span style="font-size: 13px; color: var(--shopping-text-secondary); font-weight: 500;">${dateStr}</span>
+                    <span class="order-status-badge ${statusClass}">${statusText}</span>
                 </div>
                 <div class="order-items">
         `;
 
         order.items.forEach(item => {
             html += `
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <img src="${item.image}" style="width: 60px; height: 60px; border-radius: 6px; object-fit: cover; background: #f0f0f0;">
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <img src="${item.image}" style="width: 60px; height: 60px; border-radius: 10px; object-fit: cover; background: #f2f2f7;">
                     <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="font-size: 13px; color: #333; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title}</div>
-                        <div style="font-size: 12px; color: #999;">x1</div>
+                        <div style="font-size: 15px; color: var(--shopping-text-primary); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">${item.title}</div>
+                        <div style="font-size: 12px; color: #8e8e93; margin-bottom: 2px;">${item.selectedSpec || ''}</div>
+                        <div style="font-size: 13px; color: var(--shopping-text-secondary);">数量: ${item.count || 1}</div>
                     </div>
-                    <div style="font-size: 14px; font-weight: bold; color: #333;">¥${item.price}</div>
+                    <div style="font-size: 15px; font-weight: 600; color: var(--shopping-text-primary);">¥${item.price}</div>
                 </div>
             `;
         });
 
         html += `
                 </div>
-                <div style="border-top: 1px solid #f5f5f5; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 12px; color: #666;">${logisticsInfo}</div>
-                    <div style="font-size: 14px;">实付款: <span style="font-weight: bold;">¥${order.total}</span></div>
+                <div style="border-top: 1px solid rgba(0,0,0,0.05); padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 12px; color: var(--shopping-text-secondary);">${logisticsInfo}</div>
+                    <div style="font-size: 14px;">实付: <span style="font-weight: 700; font-size: 16px;">¥${order.total}</span></div>
                 </div>
             </div>
         `;
@@ -1896,6 +2593,229 @@ function renderShoppingOrders() {
 
     html += '</div>';
     container.innerHTML = html;
+}
+
+// 订单进度查看
+window.openShoppingOrderProgress = function(orderId) {
+    const orders = window.iphoneSimState.shoppingOrders || [];
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    let modal = document.getElementById('shopping-order-progress-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'shopping-order-progress-modal';
+        modal.className = 'order-progress-modal';
+        modal.innerHTML = `
+            <div class="order-progress-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div style="font-size: 18px; font-weight: 700;">订单进度</div>
+                    <div onclick="document.getElementById('shopping-order-progress-modal').classList.remove('active')" style="padding: 5px; cursor: pointer;">
+                        <i class="fas fa-times" style="font-size: 18px; color: #999;"></i>
+                    </div>
+                </div>
+                
+                <div class="progress-timeline">
+                    <div class="progress-line-active" id="progress-line"></div>
+                    
+                    <div class="progress-step" id="step-1">
+                        <div class="progress-dot"></div>
+                        <div class="progress-label">已下单</div>
+                        <div class="progress-time" id="time-1"></div>
+                    </div>
+                    
+                    <div class="progress-step" id="step-2">
+                        <div class="progress-dot"></div>
+                        <div class="progress-label">已发货</div>
+                        <div class="progress-time" id="time-2"></div>
+                    </div>
+                    
+                    <div class="progress-step" id="step-3">
+                        <div class="progress-dot"></div>
+                        <div class="progress-label">已送达</div>
+                        <div class="progress-time" id="time-3"></div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <div style="font-size: 13px; color: #8e8e93; margin-bottom: 5px;">预计送达时间</div>
+                    <div style="font-size: 20px; font-weight: 600; color: #000;" id="progress-eta"></div>
+                </div>
+                
+                <button id="share-progress-btn" class="shopping-btn-secondary" style="width: 100%;">
+                    <i class="fas fa-share-alt" style="margin-right: 8px;"></i>分享给好友
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // 点击遮罩关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('active');
+        });
+    }
+
+    // Update Content
+    const step1 = modal.querySelector('#step-1');
+    const step2 = modal.querySelector('#step-2');
+    const step3 = modal.querySelector('#step-3');
+    const line = modal.querySelector('#progress-line');
+    const etaEl = modal.querySelector('#progress-eta');
+    
+    // Reset classes
+    [step1, step2, step3].forEach(s => {
+        s.querySelector('.progress-dot').classList.remove('active');
+        s.querySelector('.progress-label').classList.remove('active');
+        s.querySelector('.progress-time').textContent = '';
+    });
+    
+    // Format helpers
+    const formatDate = (ts) => {
+        const d = new Date(ts);
+        return `${d.getMonth()+1}-${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+    };
+
+    // Calculate times
+    const time1 = order.time;
+    const time2 = order.time + (order.shipDelay || 0);
+    const time3 = order.time + (order.deliverDelay || 0);
+    
+    modal.querySelector('#time-1').textContent = formatDate(time1);
+    
+    let activeStep = 1;
+    if (order.status === '已发货') activeStep = 2;
+    if (order.status === '已完成') activeStep = 3;
+    
+    // Apply state
+    if (activeStep >= 1) {
+        step1.querySelector('.progress-dot').classList.add('active');
+        step1.querySelector('.progress-label').classList.add('active');
+    }
+    if (activeStep >= 2) {
+        step2.querySelector('.progress-dot').classList.add('active');
+        step2.querySelector('.progress-label').classList.add('active');
+        modal.querySelector('#time-2').textContent = formatDate(time2);
+    } else {
+        modal.querySelector('#time-2').textContent = '预计 ' + formatDate(time2);
+    }
+    if (activeStep >= 3) {
+        step3.querySelector('.progress-dot').classList.add('active');
+        step3.querySelector('.progress-label').classList.add('active');
+        modal.querySelector('#time-3').textContent = formatDate(time3);
+    } else {
+        modal.querySelector('#time-3').textContent = '预计 ' + formatDate(time3);
+    }
+    
+    // Line width
+    if (activeStep === 1) line.style.width = '0%';
+    else if (activeStep === 2) line.style.width = '50%';
+    else if (activeStep === 3) line.style.width = '100%';
+    
+    // ETA Display
+    if (activeStep === 3) {
+        etaEl.textContent = '订单已完成';
+        etaEl.style.color = '#34C759';
+    } else {
+        etaEl.textContent = formatDate(time3);
+        etaEl.style.color = '#000';
+    }
+    
+    // Share Button
+    const shareBtn = document.getElementById('share-progress-btn');
+    // Remove old listeners
+    const newShareBtn = shareBtn.cloneNode(true);
+    shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+    
+    newShareBtn.onclick = () => {
+        openShoppingProgressSharePicker(order, formatDate(time3));
+        modal.classList.remove('active');
+    };
+
+    // Show modal
+    // Force reflow
+    void modal.offsetWidth;
+    modal.classList.add('active');
+};
+
+function openShoppingProgressSharePicker(order, eta) {
+    const modal = document.getElementById('contact-picker-modal');
+    const list = document.getElementById('contact-picker-list');
+    const sendBtn = document.getElementById('contact-picker-send-btn');
+    const closeBtn = document.getElementById('close-contact-picker');
+    
+    if (!modal || !list) return;
+    
+    const header = modal.querySelector('.modal-header h3');
+    if (header) header.textContent = '分享进度给';
+    
+    if (sendBtn) {
+        sendBtn.textContent = '发送';
+        const newSendBtn = sendBtn.cloneNode(true);
+        sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
+        
+        newSendBtn.onclick = () => {
+            const selected = list.querySelectorAll('input[type="checkbox"]:checked');
+            const ids = Array.from(selected).map(cb => parseInt(cb.value)).filter(id => id !== 0);
+            
+            if (ids.length > 0) {
+                const title = order.items[0].title + (order.items.length > 1 ? ` 等${order.items.length}件` : '');
+                const status = order.status;
+                
+                // Construct card data
+                const msgData = {
+                    title: title,
+                    status: status,
+                    eta: eta,
+                    orderId: order.id
+                };
+                const jsonStr = JSON.stringify(msgData);
+                
+                ids.forEach(id => {
+                    if (typeof sendMessage !== 'undefined') {
+                        sendMessage(jsonStr, true, 'order_progress', null, id);
+                    } else if (window.sendMessage) {
+                        window.sendMessage(jsonStr, true, 'order_progress', null, id);
+                    }
+                });
+                modal.classList.add('hidden');
+                alert('已分享进度');
+            } else {
+                alert('请选择联系人');
+            }
+        };
+    }
+    
+    if (closeBtn) {
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+        newCloseBtn.onclick = () => modal.classList.add('hidden');
+    }
+
+    list.innerHTML = '';
+    
+    if (window.iphoneSimState.contacts) {
+        window.iphoneSimState.contacts.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            
+            item.innerHTML = `
+                <div class="list-content" style="display: flex; align-items: center; justify-content: flex-start;">
+                    <img src="${c.avatar}" style="width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; object-fit: cover; flex-shrink: 0;">
+                    <span style="font-size: 16px;">${c.remark || c.name}</span>
+                </div>
+                <input type="checkbox" name="share-contact" value="${c.id}" style="width: 20px; height: 20px;">
+            `;
+            item.onclick = (e) => {
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = item.querySelector('input');
+                    if (checkbox) checkbox.checked = !checkbox.checked;
+                }
+            };
+            list.appendChild(item);
+        });
+    }
+    
+    modal.classList.remove('hidden');
 }
 
 // 处理代付请求支付
@@ -2103,47 +3023,159 @@ function renderDeliveryItems() {
 
     listContainer.innerHTML = '';
     
-    window.iphoneSimState.deliveryItems.forEach(item => {
+    window.iphoneSimState.deliveryItems.forEach((item, index) => {
         const card = document.createElement('div');
-        card.className = 'delivery-card';
-        card.style.background = '#fff';
-        card.style.borderRadius = '8px';
-        card.style.padding = '10px';
-        card.style.display = 'flex';
-        card.style.gap = '10px';
-        card.style.marginBottom = '10px';
-        card.style.cursor = 'pointer';
+        card.className = 'delivery-card-modern shopping-anim-item';
+        card.style.animationDelay = `${index * 0.05}s`;
+        card.dataset.id = item.id;
         
-        // 点击直接购买/送礼
-        card.onclick = () => openPaymentChoice(item.price, [item]);
+        if (isShoppingManageMode) {
+            card.style.cursor = 'pointer';
+            card.onclick = () => toggleProductSelection(item.id, card);
+        } else {
+            // 点击直接购买/送礼
+            card.onclick = () => {
+                // 确保外卖商品有默认规格
+                if (!item.specifications || Object.keys(item.specifications).length === 0) {
+                    item.specifications = {
+                        "口味": ["正常", "不辣", "微辣", "特辣"],
+                        "餐具": ["需要", "不需要"]
+                    };
+                }
+                
+                if (item.specifications && Object.keys(item.specifications).length > 0) {
+                    openShoppingSpecModal(item, (itemWithSpec) => {
+                        openPaymentChoice(itemWithSpec.price, [itemWithSpec]);
+                    });
+                } else {
+                    openPaymentChoice(item.price, [item]);
+                }
+            };
+        }
+
+        const isSelected = selectedShoppingProducts.has(item.id);
+        if (isSelected && isShoppingManageMode) {
+            card.classList.add('manage-active');
+        }
 
         const imgUrl = item.aiImage || generatePlaceholderImage(100, 100, item.image_desc || '美食', '#ff9500');
 
         card.innerHTML = `
-            <img id="delivery-img-${item.id}" src="${imgUrl}" style="width: 100px; height: 100px; border-radius: 6px; object-fit: cover; flex-shrink: 0;">
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="shopping-checkbox ${isSelected ? 'checked' : ''}"></div>
+            <img id="delivery-img-${item.id}" src="${imgUrl}" style="width: 90px; height: 90px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: #f2f2f7;">
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0;">
                 <div>
-                    <div style="font-size: 16px; font-weight: bold; color: #333; margin-bottom: 4px;">${item.title}</div>
-                    <div style="font-size: 12px; color: #666; display: flex; align-items: center; gap: 5px;">
-                        <span style="color: #FF9500; font-weight: bold;">${item.rating || '4.8分'}</span>
+                    <div style="font-size: 16px; font-weight: 600; color: var(--shopping-text-primary); margin-bottom: 4px; line-height: 1.3;">${item.title}</div>
+                    <div style="font-size: 12px; color: var(--shopping-text-secondary); display: flex; align-items: center; gap: 8px;">
+                        <span style="color: #FF9500; font-weight: 600;">${item.rating || '4.8分'}</span>
                         <span>${item.paid_count || '月售100+'}</span>
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <div style="display: flex; flex-direction: column;">
-                         <div style="font-size: 12px; color: #999;">
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                         <div style="font-size: 11px; color: var(--shopping-text-secondary);">
                              <span>${item.delivery_time || '30分钟'}</span> 
                              <span style="margin: 0 4px;">|</span>
                              <span>${item.delivery_fee || '免配送费'}</span>
                          </div>
-                         <div style="font-size: 12px; color: #666; margin-top: 2px;">${item.shop_name}</div>
+                         <div style="font-size: 11px; color: var(--shopping-text-secondary); opacity: 0.8;">${item.shop_name}</div>
                     </div>
-                    <div style="color: #FF5000; font-size: 18px; font-weight: bold;">¥${item.price}</div>
+                    <div style="color: var(--shopping-text-primary); font-size: 18px; font-weight: 700;">¥${item.price}</div>
                 </div>
             </div>
         `;
         listContainer.appendChild(card);
     });
+}
+
+function showOrderNotification(title, message) {
+    let container = document.getElementById('order-notification-banner');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'order-notification-banner';
+        container.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 12px 20px;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 220px;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        `;
+        
+        const icon = document.createElement('div');
+        icon.id = 'order-notif-icon';
+        icon.style.cssText = `
+            width: 36px;
+            height: 36px;
+            background: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 16px;
+            flex-shrink: 0;
+        `;
+        
+        const textDiv = document.createElement('div');
+        textDiv.style.cssText = `display: flex; flex-direction: column;`;
+        
+        const titleSpan = document.createElement('span');
+        titleSpan.id = 'order-notif-title';
+        titleSpan.style.cssText = `font-weight: 600; font-size: 15px; color: #000; margin-bottom: 2px;`;
+        
+        const msgSpan = document.createElement('span');
+        msgSpan.id = 'order-notif-msg';
+        msgSpan.style.cssText = `font-size: 13px; color: #666;`;
+        
+        textDiv.appendChild(titleSpan);
+        textDiv.appendChild(msgSpan);
+        
+        container.appendChild(icon);
+        container.appendChild(textDiv);
+        
+        document.body.appendChild(container);
+    }
+    
+    const icon = container.querySelector('#order-notif-icon');
+    const titleSpan = container.querySelector('#order-notif-title');
+    const msgSpan = container.querySelector('#order-notif-msg');
+    
+    if (title.includes('外卖')) {
+        icon.innerHTML = '<i class="fas fa-utensils"></i>';
+        icon.style.background = '#FF9500'; // Orange for food
+    } else {
+        icon.innerHTML = '<i class="fas fa-box-open"></i>';
+        icon.style.background = '#007AFF'; // Blue for package
+    }
+    
+    titleSpan.textContent = title;
+    msgSpan.textContent = message;
+    
+    // Show animation
+    requestAnimationFrame(() => {
+        container.style.opacity = '1';
+        container.style.transform = 'translateX(-50%) translateY(0)';
+    });
+    
+    // Hide after delay
+    if (window.orderNotifTimeout) clearTimeout(window.orderNotifTimeout);
+    window.orderNotifTimeout = setTimeout(() => {
+        container.style.opacity = '0';
+        container.style.transform = 'translateX(-50%) translateY(-100px)';
+    }, 4000);
 }
 
 // 注册初始化函数

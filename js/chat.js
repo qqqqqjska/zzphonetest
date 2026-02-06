@@ -1818,6 +1818,7 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
         const itemCount = giftData.items ? giftData.items.length : 0;
         const firstItem = itemCount > 0 ? giftData.items[0] : { title: '礼物', image: '' };
         const total = giftData.total || '0.00';
+        const remarkHtml = giftData.remark ? `<div style="padding: 6px 12px; font-size: 13px; color: #333; background: #fff; border-top: 1px solid #f5f5f5; font-style: italic;">"${giftData.remark}"</div>` : '';
         
         contentHtml = `
             <div class="shopping-gift-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
@@ -1831,9 +1832,11 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                     </div>
                     <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${firstItem.selectedSpec ? `<div style="font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${firstItem.selectedSpec}</div>` : ''}
                         ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件商品</div>` : ''}
                     </div>
                 </div>
+                ${remarkHtml}
                 <div style="padding: 2px 12px; border-top: 1px solid #f5f5f5; text-align: right; line-height: 1;">
                      <span style="font-size: 12px; color: #999;">已发送</span>
                 </div>
@@ -1849,6 +1852,7 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
         const itemCount = deliveryData.items ? deliveryData.items.length : 0;
         const firstItem = itemCount > 0 ? deliveryData.items[0] : { title: '美食', image: '' };
         const total = deliveryData.total || '0.00';
+        const remarkHtml = deliveryData.remark ? `<div style="padding: 6px 12px; font-size: 13px; color: #333; background: #fff; border-top: 1px solid #f5f5f5; font-style: italic;">"${deliveryData.remark}"</div>` : '';
         
         contentHtml = `
             <div class="delivery-share-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 230px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-top: -40px; display: flex; flex-direction: column;">
@@ -1862,15 +1866,64 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                     </div>
                     <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${firstItem.selectedSpec ? `<div style="font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${firstItem.selectedSpec}</div>` : ''}
                         ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件美食</div>` : ''}
                     </div>
                 </div>
+                ${remarkHtml}
                 <div style="padding: 2px 12px; border-top: 1px solid #f5f5f5; text-align: right; line-height: 1;">
                      <span style="font-size: 12px; color: #999;">正在配送中</span>
                 </div>
             </div>
         `;
+    } else if (type === 'order_progress') {
+        extraClass = 'order-progress-msg';
+        let progressData = {};
+        try {
+            progressData = typeof text === 'string' ? JSON.parse(text) : text;
+        } catch(e) {}
+        
+        const title = progressData.title || '商品订单';
+        const status = progressData.status || '待发货';
+        const eta = progressData.eta || '计算中';
+        
+        // Determine progress state
+        let step = 1;
+        if (status === '已发货') step = 2;
+        if (status === '已完成') step = 3;
+        
+        contentHtml = `
+            <div class="order-progress-card" style="background: #fff; border-radius: 12px; overflow: hidden; width: 260px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 15px 15px 1px 15px; margin-top: -40px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <div style="font-size: 14px; font-weight: bold; color: #333;">${title}</div>
+                    <div style="font-size: 12px; color: #007AFF;">${status}</div>
+                </div>
+                
+                <div style="position: relative; height: 35px; display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 5px;">
+                    <div style="position: absolute; top: 5px; left: 5px; right: 5px; height: 2px; background: #f0f0f0; z-index: 0;"></div>
+                    <div style="position: absolute; top: 5px; left: 5px; height: 2px; background: #000; z-index: 0; width: ${step === 1 ? '0%' : (step === 2 ? '50%' : '100%')}; transition: width 0.3s;"></div>
+                    
+                    <div style="z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${step >= 1 ? '#000' : '#fff'}; border: 2px solid ${step >= 1 ? '#000' : '#ddd'}; box-sizing: border-box;"></div>
+                        <div style="font-size: 10px; color: ${step >= 1 ? '#333' : '#999'};">下单</div>
+                    </div>
+                    <div style="z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${step >= 2 ? '#000' : '#fff'}; border: 2px solid ${step >= 2 ? '#000' : '#ddd'}; box-sizing: border-box;"></div>
+                        <div style="font-size: 10px; color: ${step >= 2 ? '#333' : '#999'};">发货</div>
+                    </div>
+                    <div style="z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${step >= 3 ? '#000' : '#fff'}; border: 2px solid ${step >= 3 ? '#000' : '#ddd'}; box-sizing: border-box;"></div>
+                        <div style="font-size: 10px; color: ${step >= 3 ? '#333' : '#999'};">送达</div>
+                    </div>
+                </div>
+                
+                <div style="font-size: 11px; color: #999; text-align: right; margin-top: 5px;">
+                    ${step === 3 ? '订单已完成' : `预计送达 ${eta}`}
+                </div>
+            </div>
+        `;
     } else if (type === 'pay_request') {
+
         extraClass = 'pay-request-msg';
         let payData = {};
         try {
@@ -1894,6 +1947,7 @@ function appendMessageToUI(text, isUser, type = 'text', description = null, repl
                     </div>
                     <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 13px; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${firstItem.title}</div>
+                        ${firstItem.selectedSpec ? `<div style="font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${firstItem.selectedSpec}</div>` : ''}
                         ${itemCount > 1 ? `<div style="font-size: 12px; color: #999; margin-top: 4px;">等 ${itemCount} 件商品</div>` : ''}
                     </div>
                 </div>
@@ -2429,11 +2483,59 @@ function parseMixedAiResponse(content) {
         }
     };
 
+    // Helper to extract JSON objects from text using brace counting
+    const extractJsonFromText = (text) => {
+        const found = [];
+        let braceCount = 0;
+        let inString = false;
+        let escape = false;
+        let jsonStart = -1;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (char === '\\') {
+                escape = true;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString) {
+                if (char === '{') {
+                    if (braceCount === 0) jsonStart = i;
+                    braceCount++;
+                } else if (char === '}') {
+                    braceCount--;
+                    if (braceCount === 0 && jsonStart !== -1) {
+                        const jsonStr = text.substring(jsonStart, i + 1);
+                        try {
+                            const obj = JSON.parse(jsonStr);
+                            found.push(obj);
+                            jsonStart = -1;
+                        } catch (e) {
+                            // Ignore invalid JSON
+                            console.warn('Failed to parse candidate JSON:', jsonStr.substring(0, 50));
+                        }
+                    } else if (braceCount < 0) {
+                        braceCount = 0;
+                        jsonStart = -1;
+                    }
+                }
+            }
+        }
+        return found;
+    };
+
     // Strategy 1: Attempt to parse the whole content (or markdown block)
     let cleanContent = content.trim();
-    // Remove markdown code blocks if present
     if (cleanContent.includes('```')) {
-        // Try to extract content inside ```json ... ``` or just ``` ... ```
         const match = cleanContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
         if (match) {
             cleanContent = match[1].trim();
@@ -2441,80 +2543,57 @@ function parseMixedAiResponse(content) {
     }
 
     let parsed = tryParse(cleanContent);
-    if (parsed && Array.isArray(parsed)) {
-        parsed.forEach(processItem);
+    if (parsed) {
+        if (Array.isArray(parsed)) parsed.forEach(processItem);
+        else processItem(parsed);
         return results;
     }
 
-    // Strategy 2: Forced Regex Extraction
-    // Look for the outermost square brackets [ ... ] that might contain the array
-    // This handles cases where there is extra text before or after, or the JSON is messy
+    // Strategy 2: Forced Regex Extraction for Arrays
     const jsonArrayRegex = /\[\s*\{[\s\S]*\}\s*\]/g;
     let match;
-    let foundJson = false;
+    let foundArray = false;
     
-    // We iterate in case there are multiple JSON blocks (though usually one)
     while ((match = jsonArrayRegex.exec(content)) !== null) {
         const potentialJson = match[0];
         parsed = tryParse(potentialJson);
         if (parsed && Array.isArray(parsed)) {
             parsed.forEach(processItem);
-            foundJson = true;
+            foundArray = true;
         }
     }
+    if (foundArray) return results;
 
-    if (foundJson) return results;
-
-    // Strategy 3: Line-by-line fallback (for streaming-like or broken multi-line structures)
-    const lines = content.split('\n');
-    let buffer = '';
+    // Strategy 3: Regex Split + JSON Filter (Targeted for "merged messages")
+    // Split by pattern "} {" or "}, {" to handle concatenated JSON objects
+    // Use regex to insert a unique delimiter
+    const delimiter = "___SPLIT___";
+    const splitRegex = /(\})\s*,?\s*(\{)/g;
+    const splitContent = cleanContent.replace(splitRegex, `$1${delimiter}$2`);
+    const parts = splitContent.split(delimiter);
     
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
-        if (!line) continue;
+    let foundAnyJson = false;
 
-        // Try parsing current line
-        parsed = tryParse(line);
-        
-        if (!parsed) {
-            if (buffer) {
-                let combined = buffer + line;
-                parsed = tryParse(combined);
-                if (parsed) {
-                    buffer = ''; 
-                } else {
-                    buffer += line; 
-                    continue; 
-                }
-            } else {
-                // Start buffering if it looks like start of JSON
-                if (line.startsWith('{') || line.startsWith('[')) {
-                    buffer = line;
-                    continue;
-                }
-                // Otherwise treat as plain text
-                results.push({ type: '消息', content: line });
-                continue;
-            }
-        }
+    for (const part of parts) {
+        const p = part.trim();
+        if (!p) continue;
 
-        if (parsed) {
-            if (Array.isArray(parsed)) {
-                parsed.forEach(processItem);
-            } else {
-                processItem(parsed);
-            }
-        }
-    }
-
-    // Process remaining buffer
-    if (buffer) {
-        parsed = tryParse(buffer);
+        // Try parsing the chunk directly
+        parsed = tryParse(p);
         if (parsed) {
             if (Array.isArray(parsed)) parsed.forEach(processItem);
             else processItem(parsed);
+            foundAnyJson = true;
         } else {
-            results.push({ type: '消息', content: buffer });
+            // Fallback: Extract JSON objects from this chunk
+            const extracted = extractJsonFromText(p);
+            if (extracted.length > 0) {
+                extracted.forEach(processItem);
+                foundAnyJson = true;
+            } else {
+                // If no JSON found, treat as text
+                results.push({ type: '消息', content: p });
+            }
         }
     }
 
@@ -2833,6 +2912,14 @@ ${itineraryContext}
 你必须完全沉浸在角色中，绝对不能透露你是AI或语言模型。你的回复必须像一个真实的${contact.name}在使用微信聊天。
 你拥有一个“微信朋友圈”功能和“微信转账”功能。
 
+${contact.showThought ? `
+【⚡️强制要求：内心独白⚡️】
+⚠️ **最高优先级指令**：当前用户已开启“显示心声”模式。
+你**必须**在返回的 JSON 数组的**第一个元素**位置输出角色的内心独白。
+格式：{"type": "thought", "content": "这里写角色的心理活动..."}
+**如果不输出心声，将视为严重错误！请务必执行！**
+` : ''}
+
 【⚡️绝对输出规则 - JSON 格式 (强制)⚡️】
 为了确保回复格式正确，你**必须且只能**返回一个标准的 JSON 数组。
 **严禁**包含任何 Markdown 代码块标记（如 \`\`\`json 或 \`\`\`）。
@@ -2842,28 +2929,29 @@ ${itineraryContext}
 
 数组中的每个元素代表一条消息、表情包或动作指令。请严格遵守以下 JSON 对象结构：
 
-1. 💬 **文本消息**：
+1. 💭 **内心独白** ${contact.showThought ? '(**必须作为第一项**)' : '(可选)'}：
+   \`{"type": "thought", "content": "想法内容"}\`
+   ${contact.showThought ? '*要求*：这是角色的心理活动，必须输出，且必须放在数组第一个位置。' : ''}
+
+2. 💬 **文本消息**：
    \`{"type": "text", "content": "消息内容"}\`
    *注意*：请务必将长回复拆分为多条短消息，模拟真实聊天节奏。**不要把多句话合并在一条消息里**。每条消息尽量简短（1-2句话）。
    *禁止*：content 中绝对不能包含 "[发送了一个表情包...]" 或 "[图片]" 这样的描述文本。表情包必须通过独立的 type="sticker" 对象发送。
 
-2. 😂 **表情包**（如果有）：
+3. 😂 **表情包**（如果有）：
    \`{"type": "sticker", "content": "表情包名称"}\`
    *注意*：只能使用下方【可用表情包列表】中存在的名称。
    *禁止*：不要在 content 中写 "[发送了一个表情包...]"，直接写表情包名称即可。
 
-3. 🖼️ **图片**：
+4. 🖼️ **图片**：
    \`{"type": "image", "content": "图片描述"}\`
 
-4. 🎤 **语音**：
+5. 🎤 **语音**：
    \`{"type": "voice", "duration": 秒数, "content": "语音文本"}\`
 
-5. ⚡️ **动作指令**：
+6. ⚡️ **动作指令**：
    \`{"type": "action", "command": "指令名", "payload": "参数"}\`
    *说明*：原本的 \`ACTION:\` 指令请封装在此结构中。例如 \`ACTION: POST_MOMENT: 内容\` 变为 \`{"type": "action", "command": "POST_MOMENT", "payload": "内容"}\`。
-
-6. 💭 **内心独白**（可选）：
-   \`{"type": "thought", "content": "想法内容"}\`
 
 **示例回复：**
 [
@@ -2889,6 +2977,8 @@ ${itineraryContext}
 - 接收转账 -> command: "ACCEPT_TRANSFER", payload: "ID"
 - 退回转账 -> command: "RETURN_TRANSFER", payload: "ID"
 - 支付代付请求 -> command: "PAY_FOR_REQUEST", payload: "requestId" (当用户发送了代付请求时，你可以选择帮他支付。requestId在代付消息的JSON中)
+- 送礼物给用户 -> command: "SEND_GIFT", payload: "物品名称 | 价格 | 备注" (例如 "一束鲜花 | 52.0 | 节日快乐")
+- 点外卖给用户 -> command: "SEND_DELIVERY", payload: "餐品名称 | 价格 | 备注" (例如 "炸鸡啤酒 | 35.0 | 趁热吃")
 - 引用回复 -> command: "QUOTE_MESSAGE", payload: "消息内容摘要"
 - 更改资料 -> 
   - command: "UPDATE_NAME", payload: "新网名"
@@ -2926,7 +3016,7 @@ ${contact.showThought ? '- **强制执行**：请务必输出角色的【内心�
 5. 发送图片时，请提供详细的画面描述。
 5. 一次回复中最多只能发起一笔转账。
 6. 你有权限更改自己的资料卡信息（网名、微信号、签名），当用户要求或你自己想改时可以使用。
-7. **内心独白**是角色的心理活动，用户可见（如果开启了显示）。${contact.showThought ? '当前已开启显示，请务必输出。' : ''}
+7. **内心独白**是角色的心理活动，用户可见（如果开启了显示）。${contact.showThought ? '当前已开启显示，请务必输出，且作为第一条。' : ''}
 
 请回复对方的消息。`;
 
@@ -3341,6 +3431,8 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
         const acceptTransferRegex = /ACTION:\s*ACCEPT_TRANSFER:\s*(\d+)(?:\n|$)/;
         const returnTransferRegex = /ACTION:\s*RETURN_TRANSFER:\s*(\d+)(?:\n|$)/;
         const payForRequestRegex = /ACTION:\s*PAY_FOR_REQUEST:\s*(.*?)(?:\n|$)/;
+        const sendGiftRegex = /ACTION:\s*SEND_GIFT:\s*(.*?)(?:\n|$)/;
+        const sendDeliveryRegex = /ACTION:\s*SEND_DELIVERY:\s*(.*?)(?:\n|$)/;
         const updateNameRegex = /ACTION:\s*UPDATE_NAME:\s*(.*?)(?:\n|$)/;
         const updateWxidRegex = /ACTION:\s*UPDATE_WXID:\s*(.*?)(?:\n|$)/;
         const updateSignatureRegex = /ACTION:\s*UPDATE_SIGNATURE:\s*(.*?)(?:\n|$)/;
@@ -3725,6 +3817,75 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
                     }
                 }
                 processedSegment = processedSegment.replace(payForRequestMatch[0], '');
+            }
+
+            let sendGiftMatch;
+            while ((sendGiftMatch = processedSegment.match(sendGiftRegex)) !== null) {
+                const payload = sendGiftMatch[1].trim();
+                const parts = payload.split('|').map(s => s.trim());
+                if (parts.length >= 2) {
+                    const title = parts[0];
+                    const price = parseFloat(parts[1]) || 0;
+                    const remark = parts[2] || '';
+                    
+                    // 生成占位图
+                    let imgUrl = '';
+                    if (typeof generatePlaceholderImage === 'function') {
+                        imgUrl = generatePlaceholderImage(300, 300, title, '#FF9500');
+                    } else {
+                        imgUrl = 'https://placehold.co/300x300/FF9500/ffffff?text=' + encodeURIComponent(title);
+                    }
+
+                    const giftData = {
+                        items: [{
+                            title: title,
+                            price: price,
+                            image: imgUrl,
+                            isDelivery: false
+                        }],
+                        total: price.toFixed(2),
+                        remark: remark
+                    };
+                    
+                    setTimeout(() => {
+                        sendMessage(JSON.stringify(giftData), false, 'shopping_gift');
+                    }, 1000);
+                }
+                processedSegment = processedSegment.replace(sendGiftMatch[0], '');
+            }
+
+            let sendDeliveryMatch;
+            while ((sendDeliveryMatch = processedSegment.match(sendDeliveryRegex)) !== null) {
+                const payload = sendDeliveryMatch[1].trim();
+                const parts = payload.split('|').map(s => s.trim());
+                if (parts.length >= 2) {
+                    const title = parts[0];
+                    const price = parseFloat(parts[1]) || 0;
+                    const remark = parts[2] || '';
+                    
+                    let imgUrl = '';
+                    if (typeof generatePlaceholderImage === 'function') {
+                        imgUrl = generatePlaceholderImage(300, 300, title, '#007AFF');
+                    } else {
+                        imgUrl = 'https://placehold.co/300x300/007AFF/ffffff?text=' + encodeURIComponent(title);
+                    }
+
+                    const deliveryData = {
+                        items: [{
+                            title: title,
+                            price: price,
+                            image: imgUrl,
+                            isDelivery: true
+                        }],
+                        total: price.toFixed(2),
+                        remark: remark
+                    };
+                    
+                    setTimeout(() => {
+                        sendMessage(JSON.stringify(deliveryData), false, 'delivery_share');
+                    }, 1000);
+                }
+                processedSegment = processedSegment.replace(sendDeliveryMatch[0], '');
             }
         }
 
