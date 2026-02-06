@@ -8256,6 +8256,29 @@ function setupChatListeners() {
             }
         });
     }
+
+    // 后台音频混音设置
+    const bgAudioToggle = document.getElementById('background-audio-toggle');
+    if (bgAudioToggle) {
+        bgAudioToggle.checked = window.iphoneSimState.enableBackgroundAudio || false;
+        
+        bgAudioToggle.addEventListener('change', (e) => {
+            window.iphoneSimState.enableBackgroundAudio = e.target.checked;
+            saveConfig();
+            
+            if (window.updateAudioSession) {
+                window.updateAudioSession();
+            }
+            
+            if (e.target.checked) {
+                // 尝试请求播放静音音频以激活会话（如果是用户交互触发）
+                // 这在某些浏览器上可能有助于立即生效
+                if (window.iphoneSimState.music && window.iphoneSimState.music.playing) {
+                    // 如果正在播放，不需要做什么，updateAudioSession 会处理 Session 类型
+                }
+            }
+        });
+    }
 }
 
 function updateWechatHeader(tab) {
@@ -8651,6 +8674,11 @@ window.updateSystemSettingsUi = function() {
     const sysNotifToggle = document.getElementById('system-notification-toggle');
     if (sysNotifToggle) {
         sysNotifToggle.checked = window.iphoneSimState.enableSystemNotifications || false;
+    }
+    
+    const bgAudioToggle = document.getElementById('background-audio-toggle');
+    if (bgAudioToggle) {
+        bgAudioToggle.checked = window.iphoneSimState.enableBackgroundAudio || false;
     }
 };
 

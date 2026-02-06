@@ -114,6 +114,7 @@ const state = {
     isMultiSelectMode: false,
     selectedMessages: new Set(), // 存储选中的消息ID
     enableSystemNotifications: false, // 系统后台通知开关
+    enableBackgroundAudio: false, // 允许后台音频混音播放
     shoppingProducts: [] // 购物商品列表
 };
 
@@ -617,6 +618,25 @@ async function loadConfig() {
     }
 }
 
+// 更新音频会话配置
+window.updateAudioSession = function() {
+    if (window.iphoneSimState.enableBackgroundAudio) {
+        // 尝试设置音频会话类型为 'ambient' 以允许混音
+        if (navigator.audioSession) {
+            navigator.audioSession.type = 'ambient';
+        }
+        // 尝试使用 Media Session API 保持活跃
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+        }
+    } else {
+        // 恢复默认 (通常是 'playback' 或 'auto')
+        if (navigator.audioSession) {
+            navigator.audioSession.type = 'auto';
+        }
+    }
+};
+
 function handleClearAllData() {
     if (confirm('确定要清空所有数据吗？此操作不可恢复！所有设置、聊天记录、图片等都将丢失。')) {
         localforage.clear().then(() => {
@@ -847,6 +867,7 @@ async function init() {
     if (window.updateWhisperUi) updateWhisperUi();
     if (window.updateMinimaxUi) updateMinimaxUi();
     if (window.updateSystemSettingsUi) updateSystemSettingsUi();
+    if (window.updateAudioSession) window.updateAudioSession();
     if (window.renderContactList) renderContactList();
     if (window.migrateWorldbookData) migrateWorldbookData();
     if (window.renderWorldbookCategoryList) renderWorldbookCategoryList();
