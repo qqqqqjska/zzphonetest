@@ -734,13 +734,13 @@ function handleSaveShoppingProduct() {
         return;
     }
 
-    const bgColor = Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+    const bgColor = window.getRandomPastelColor();
     // 如果没有输入图片描述，使用标题
     const imageDesc = desc ? desc.substring(0, 5) : title.substring(0, 5);
     
     // 生成图片
     const height = Math.floor(Math.random() * (250 - 150 + 1)) + 150;
-    const imgUrl = generatePlaceholderImage(300, height, imageDesc, '#' + bgColor);
+    const imgUrl = generatePlaceholderImage(300, height, imageDesc, bgColor);
 
     const product = {
         id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9),
@@ -1206,7 +1206,7 @@ async function generateShoppingProducts() {
 - shop_name: 店铺名称
 - image_desc: 商品图片的简短中文描述 (不超过5个字，用于生成占位图文字)
 - detail_desc: 商品详情页的详细描述 (一段话，描述商品卖点、材质、规格等，50-100字)
-- specifications: 可选规格 (Object, key为规格名, value为选项数组). 例如: {"尺码": ["S", "M", "L"], "颜色": ["白色", "黑色"]}
+- specifications: 可选规格 (Object, key为规格名, value为选项数组). 请根据商品类型生成合理的规格选项。例如服饰生成尺码/颜色，食品生成口味/规格，数码生成颜色/存储容量等。
 
 ${userContext ? userContext : '商品种类要丰富，包括但不限于：服饰、数码、美食、家居、美妆等。'}
 
@@ -1356,13 +1356,17 @@ function renderShoppingProducts(products) {
 
         // 确保有固定的背景色和高度 (持久化)
         if (!p.bgColor) {
-            p.bgColor = Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            p.bgColor = window.getRandomPastelColor();
         }
         if (!p.imgHeight) {
             p.imgHeight = Math.floor(Math.random() * (250 - 150 + 1)) + 150;
         }
 
-        const validBgColor = '#' + p.bgColor;
+        let validBgColor = p.bgColor;
+        if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+             validBgColor = '#' + validBgColor;
+        }
+
         const height = p.imgHeight;
 
         // 优先使用AI生成的图片
@@ -1397,14 +1401,6 @@ function renderShoppingProducts(products) {
 function openShoppingProductDetail(product) {
     currentShoppingProduct = product;
     
-    // 如果是外卖商品且没有规格信息，尝试添加默认规格
-    if (product.isDelivery && (!product.specifications || Object.keys(product.specifications).length === 0)) {
-        product.specifications = {
-            "口味": ["正常", "不辣", "微辣", "特辣"],
-            "餐具": ["需要", "不需要"]
-        };
-    }
-    
     const screen = document.getElementById('shopping-detail-screen');
     if (!screen) return;
 
@@ -1419,7 +1415,11 @@ function openShoppingProductDetail(product) {
         if (product.aiImage) {
             imgEl.src = product.aiImage;
         } else {
-            imgEl.src = generatePlaceholderImage(600, 600, product.image_desc || product.title, '#cccccc'); 
+            let validBgColor = product.bgColor || window.getRandomPastelColor();
+            if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+                 validBgColor = '#' + validBgColor;
+            }
+            imgEl.src = generatePlaceholderImage(600, 600, product.image_desc || product.title, validBgColor); 
         }
     }
 
@@ -1543,7 +1543,11 @@ function openShoppingSpecModal(product, callback) {
 
     // Set Header Info
     if (imgEl) {
-        const imgUrl = product.aiImage || generatePlaceholderImage(300, product.imgHeight || 300, product.image_desc || product.title, '#' + (product.bgColor || 'cccccc').replace('#',''));
+        let validBgColor = product.bgColor || 'cccccc';
+        if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+             validBgColor = '#' + validBgColor;
+        }
+        const imgUrl = product.aiImage || generatePlaceholderImage(300, product.imgHeight || 300, product.image_desc || product.title, validBgColor);
         imgEl.src = imgUrl;
     }
     if (priceEl) priceEl.textContent = product.price;
@@ -1691,9 +1695,11 @@ function renderShoppingCart(animate = false) {
     
     cart.forEach((item, index) => {
         // Ensure image properties exist (fallback for old data)
-        const bgColor = item.bgColor || 'cccccc'; 
+        let validBgColor = item.bgColor || 'cccccc'; 
+        if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+             validBgColor = '#' + validBgColor;
+        }
         const height = item.imgHeight || 300;
-        const validBgColor = '#' + bgColor.replace('#', '');
         const imgUrl = item.aiImage || generatePlaceholderImage(300, height, item.image_desc || '商品', validBgColor);
 
         html += `
@@ -1792,12 +1798,18 @@ window.handleBuyNow = function(product) {
 function openPaymentChoice(amount, items, isCart = false) {
     pendingPaymentAmount = amount;
     // Normalize items structure
-    pendingPaymentItems = items.map(item => ({
-        ...item,
-        count: item.count || 1,
-        // Ensure image properties exist
-        image: item.image || item.aiImage || generatePlaceholderImage(300, item.imgHeight || 300, item.image_desc || item.title || '商品', '#' + (item.bgColor || 'cccccc').replace('#', ''))
-    }));
+    pendingPaymentItems = items.map(item => {
+        let validBgColor = item.bgColor || 'cccccc';
+        if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+             validBgColor = '#' + validBgColor;
+        }
+        return {
+            ...item,
+            count: item.count || 1,
+            // Ensure image properties exist
+            image: item.image || item.aiImage || generatePlaceholderImage(300, item.imgHeight || 300, item.image_desc || item.title || '商品', validBgColor)
+        };
+    });
     pendingPaymentItems.isCart = isCart; // Flag to know if we need to clear cart later
 
     const modal = document.getElementById('shopping-payment-choice-modal');
@@ -2262,6 +2274,12 @@ function openShoppingContactPickerForPay(items) {
     modal.classList.remove('hidden');
 }
 
+// 生成随机低饱和度淡色背景
+window.getRandomPastelColor = function() {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 70%, 85%)`; // High lightness, moderate saturation
+};
+
 // 生成占位图 (支持中文) - 高清版
 function generatePlaceholderImage(width, height, text, bgColor) {
     const scale = 2; // 2x 分辨率
@@ -2364,8 +2382,15 @@ function openProductShareContactPicker(product) {
                 // 构建商品数据
                 let imgUrl = product.aiImage;
                 if (!imgUrl) {
-                     const bgColor = 'cccccc'; // 简单fallback
-                     imgUrl = generatePlaceholderImage(300, 300, product.image_desc || product.title, '#' + bgColor);
+                     let bgColor = window.getRandomPastelColor();
+                     // Use product background if available and valid
+                     if (product.bgColor) {
+                         bgColor = product.bgColor;
+                         if (!bgColor.startsWith('#') && !bgColor.startsWith('hsl') && !bgColor.startsWith('rgb')) {
+                             bgColor = '#' + bgColor;
+                         }
+                     }
+                     imgUrl = generatePlaceholderImage(300, 300, product.image_desc || product.title, bgColor);
                 }
 
                 const productData = {
@@ -2910,13 +2935,17 @@ async function generateDeliveryItems() {
 - rating: 评分 (例如 "4.8分")
 - image_desc: 菜品图片的简短描述 (不超过5个字)
 - detail_desc: 菜品详细描述
+- specifications: 可选规格 (Object, key为规格名, value为选项数组). 必须根据具体的商品类型生成合理的规格！例如：奶茶生成甜度/冰度，烧烤生成辣度，米饭套餐生成配菜，蛋糕生成口味等。不要所有商品都生成辣度！
 
-${userContext ? userContext : '菜品种类要丰富，包括：正餐、快餐、奶茶、甜点等。'}
+${userContext ? userContext : '菜品种类要极度丰富和随机！不要局限于常见的快餐。请生成各种不同的美食，例如：地方特色菜（川菜/粤菜/湘菜等）、异国料理（日料/韩料/西餐/泰餐等）、网红小吃、轻食沙拉、烘焙甜品、特色饮品、夜宵烧烤、火锅食材等。请发挥想象力，生成一些有趣或诱人的菜名。'}
+
+请不要只生成示例中的商品，要完全随机和多样化！
 
 示例：
 [
-  {"title": "香辣鸡腿堡套餐", "price": 25.9, "shop_name": "快乐汉堡店", "paid_count": "月售2000+", "delivery_time": "25分钟", "delivery_fee": "¥0", "rating": "4.9分", "image_desc": "汉堡套餐", "detail_desc": "香辣鸡腿堡+中薯+可乐，快乐加倍！"},
-  {"title": "招牌杨枝甘露", "price": 18, "shop_name": "七分甜", "paid_count": "月售500+", "delivery_time": "35分钟", "delivery_fee": "¥3", "rating": "4.7分", "image_desc": "杨枝甘露", "detail_desc": "精选芒果，口感浓郁，清凉解暑。"}
+  {"title": "香辣鸡腿堡套餐", "price": 25.9, "shop_name": "快乐汉堡店", "paid_count": "月售2000+", "delivery_time": "25分钟", "delivery_fee": "¥0", "rating": "4.9分", "image_desc": "汉堡套餐", "detail_desc": "香辣鸡腿堡+中薯+可乐，快乐加倍！", "specifications": {"饮料": ["可乐", "雪碧", "橙汁"], "辣度": ["正常辣", "不辣"]}},
+  {"title": "招牌杨枝甘露", "price": 18, "shop_name": "七分甜", "paid_count": "月售500+", "delivery_time": "35分钟", "delivery_fee": "¥3", "rating": "4.7分", "image_desc": "杨枝甘露", "detail_desc": "精选芒果，口感浓郁，清凉解暑。", "specifications": {"甜度": ["常规糖", "七分糖", "三分糖"], "温度": ["冰", "去冰", "常温"]}},
+  {"title": "草莓奶油蛋糕", "price": 35, "shop_name": "甜蜜时光", "paid_count": "月售300+", "delivery_time": "45分钟", "delivery_fee": "¥5", "rating": "4.9分", "image_desc": "草莓蛋糕", "detail_desc": "新鲜草莓，动物奶油，口感细腻。", "specifications": {"口味": ["原味", "巧克力底"], "蜡烛": ["不需要", "需要"]}}
 ]`;
 
     try {
@@ -3035,14 +3064,6 @@ function renderDeliveryItems() {
         } else {
             // 点击直接购买/送礼
             card.onclick = () => {
-                // 确保外卖商品有默认规格
-                if (!item.specifications || Object.keys(item.specifications).length === 0) {
-                    item.specifications = {
-                        "口味": ["正常", "不辣", "微辣", "特辣"],
-                        "餐具": ["需要", "不需要"]
-                    };
-                }
-                
                 if (item.specifications && Object.keys(item.specifications).length > 0) {
                     openShoppingSpecModal(item, (itemWithSpec) => {
                         openPaymentChoice(itemWithSpec.price, [itemWithSpec]);
@@ -3058,7 +3079,14 @@ function renderDeliveryItems() {
             card.classList.add('manage-active');
         }
 
-        const imgUrl = item.aiImage || generatePlaceholderImage(100, 100, item.image_desc || '美食', '#ff9500');
+        let validBgColor = window.getRandomPastelColor();
+        if (item.bgColor) { // If delivery items start saving color later
+             validBgColor = item.bgColor;
+             if (!validBgColor.startsWith('#') && !validBgColor.startsWith('hsl') && !validBgColor.startsWith('rgb')) {
+                 validBgColor = '#' + validBgColor;
+             }
+        }
+        const imgUrl = item.aiImage || generatePlaceholderImage(100, 100, item.image_desc || '美食', validBgColor);
 
         card.innerHTML = `
             <div class="shopping-checkbox ${isSelected ? 'checked' : ''}"></div>

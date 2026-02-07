@@ -2616,14 +2616,13 @@ function forceSplitMixedContent(content) {
     while ((match = regex.exec(processed)) !== null) {
         // 1. 捕获当前匹配项之前的文本
         const preText = processed.substring(lastIndex, match.index); // 不trim以保留格式
-        if (preText) { // 只要不是空字符串
-             // 如果是纯空白，可能需要保留（如换行），但通常 trim 后判断
-             if (preText.trim()) {
-                 results.push({ type: '消息', content: preText });
-             } else if (preText.includes('\n')) {
-                 // 保留换行
-                 results.push({ type: '消息', content: preText });
-             }
+        if (preText) { 
+             const parts = preText.split('\n');
+             parts.forEach(p => {
+                 if (p.trim()) {
+                     results.push({ type: '消息', content: p.trim() });
+                 }
+             });
         }
 
         // 2. 添加当前匹配项
@@ -2648,7 +2647,12 @@ function forceSplitMixedContent(content) {
     // 3. 捕获剩余的文本
     const postText = processed.substring(lastIndex);
     if (postText && postText.trim()) {
-        results.push({ type: '消息', content: postText });
+        const parts = postText.split('\n');
+        parts.forEach(p => {
+            if (p.trim()) {
+                results.push({ type: '消息', content: p.trim() });
+            }
+        });
     }
 
     return results.length > 0 ? results : [{ type: '消息', content: content }];
@@ -3831,7 +3835,11 @@ const icityDiaryRegex = /ACTION:\s*POST_ICITY_DIARY:\s*(.*?)(?:\n|$)/;
                     // 生成占位图
                     let imgUrl = '';
                     if (typeof generatePlaceholderImage === 'function') {
-                        imgUrl = generatePlaceholderImage(300, 300, title, '#FF9500');
+                        let bgColor = '#FF9500';
+                        if (window.getRandomPastelColor) {
+                            bgColor = window.getRandomPastelColor();
+                        }
+                        imgUrl = generatePlaceholderImage(300, 300, title, bgColor);
                     } else {
                         imgUrl = 'https://placehold.co/300x300/FF9500/ffffff?text=' + encodeURIComponent(title);
                     }
